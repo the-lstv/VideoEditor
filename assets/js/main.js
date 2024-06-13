@@ -673,7 +673,7 @@ function build(){
             let intersect = app.ui.timeline.intersectingAt(at);
             for(let id in app.project.elements){
                 if(!app.project.elements.hasOwnProperty(id)) continue;
-                
+
                 let resource = app.project.elements[id];
                 if(resource.timeline !== app.time.timeline) continue;
 
@@ -681,7 +681,7 @@ function build(){
                     resource.element.currentTime =  (at - resource.position.start) / 60
                 }
 
-                resource.element[intersect.includes(id)? "show" : "hide"]()
+                resource.element.style.display = intersect.includes(id)? "block" : "none"
             }
 
             O("#time_current").set(app.time.minuteFormat(at))
@@ -868,6 +868,9 @@ M.on("load", ()=>{
             },
             image: {
                 color: "blue"
+            },
+            data: {
+                color: "orange"
             }
         }
 

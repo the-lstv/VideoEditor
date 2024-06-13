@@ -7,7 +7,8 @@
             assets/css/main.css,
             assets/css/window.css,
             assets/css/extras.css,
-            assets/css/themes.css
+            assets/css/themes.css,
+            assets/css/ui.css
         ;
         
         js:
@@ -37,7 +38,7 @@
 
     <div %load_circle ls-accent="white" load class="load-noBackground" style="position: absolute; height: 2em; width: 2em; top: calc(50% + 5em); left: calc(50% - 1em); --load-width: calc(2 / 16 * 1em); transition: 1s; z-index: 30000"></div>
 
-    <main %app style="display: none">
+    <main %app hidden>
         <div class="header" id="header" ls-accent="gray">
             <div style="min-width:300px">
                     <ls-nav>
@@ -234,13 +235,13 @@
                 </div>
             </ls-tab>
             <ls-tab tab-title="Patcher">
-                <div id="bay">
+                <div %bay>
                     <div class="node" style="top:120px;left:780px">
                         <div class="sources input">
                             <div class="source" bay-class="image"></div>
                             <div class="source" bay-class="audio"></div>
                         </div>
-                        <div class="node-content" label="Output">
+                        <div class="node-content" label="Master Output">
                             <i class="bi-box-arrow-right"></i>
                         </div>
                     </div>
@@ -255,18 +256,107 @@
                             <div class="source" bay-class="audio"></div>
                         </div>
                     </div>
+                    <div class="node" style="top:20px;left:400px">
+                        <div class="sources input">
+                            <div class="source" bay-class="image"></div>
+                        </div>
+                        <div class="node-content" label="SVG Filter">
+                            <i class="bi-magic"></i>
+                        </div>
+                        <div class="sources output">
+                            <div class="source" bay-class="image"></div>
+                        </div>
+                    </div>
+                    <div class="node" style="top:20px;left:580px">
+                        <div class="sources input">
+                            <div class="source" bay-class="data"></div>
+                        </div>
+                        <div class="node-content" label="Sound generator">
+                            <i class="bi-soundwave"></i>
+                        </div>
+                        <div class="sources output">
+                            <div class="source" bay-class="audio"></div>
+                        </div>
+                    </div>
                     <div class="node" style="top:120px;left:200px">
-                        <div class="node-content" label="Track">
+                        <div class="sources input">
+                            <div class="source" bay-class="data"></div>
+                        </div>
+                        <div class="node-content" label="Master Track">
                             <i class="bi-film"></i>
                         </div>
                         <div class="sources output">
                             <div class="source" bay-class="image"></div>
                             <div class="source" bay-class="audio"></div>
+                            <div class="source" bay-class="data"></div>
+                        </div>
+                    </div>
+                    <div class="node" style="top:120px;left:60px">
+                        <div class="node-content" label="Master Timer">
+                            <i class="bi-stopwatch-fill"></i>
+                        </div>
+                        <div class="sources output">
+                            <div class="source" bay-class="data"></div>
+                        </div>
+                    </div>
+                    <div class="node" style="top:220px;left:60px">
+                        <div class="node-content" label="Master Data Flow">
+                            <i class="bi-code-square"></i>
+                        </div>
+                        <div class="sources output">
+                            <div class="source" bay-class="image"></div>
+                            <div class="source" bay-class="data"></div>
+                            <div class="source" bay-class="audio"></div>
                         </div>
                     </div>
                 </div>
             </ls-tab>
-            <ls-tab tab-title="Audio mixer"></ls-tab>
+            <ls-tab tab-title="Audio mixer">
+                <div %mixer>
+                    <div .mixer-parts>
+                        <div .mixer-part .mixer-part-master>
+                            <div .mixer-part-label>M</div>
+                            <div .mixer-analyzer-container>
+                                <div .mixer-analyzer>
+                                    <div .mixer-analyzer-bar-container><div .mixer-analyzer-bar></div></div>
+                                    <div .mixer-analyzer-bar-container><div .mixer-analyzer-bar></div></div>
+                                </div>
+                            </div>
+                            <div .mixer-seeker></div>
+                        </div>
+                        <div .mixer-part>
+                            <div .mixer-part-label>1</div>
+                            <div .mixer-analyzer-container>
+                                <div .mixer-analyzer>
+                                    <div .mixer-analyzer-bar-container><div .mixer-analyzer-bar></div></div>
+                                    <div .mixer-analyzer-bar-container><div .mixer-analyzer-bar></div></div>
+                                </div>
+                            </div>
+                            <div .mixer-seeker></div>
+                        </div>
+                        <div .mixer-part>
+                            <div .mixer-part-label>2</div>
+                            <div .mixer-analyzer-container>
+                                <div .mixer-analyzer>
+                                    <div .mixer-analyzer-bar-container><div .mixer-analyzer-bar></div></div>
+                                    <div .mixer-analyzer-bar-container><div .mixer-analyzer-bar></div></div>
+                                </div>
+                            </div>
+                            <div .mixer-seeker></div>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                    Q(".mixer-seeker").all(element => {
+                        LS.Progress(null, element, {
+                            seeker: true,
+                            styled: false,
+                            vertical: true,
+                            value: 100
+                        })
+                    })
+                </script>
+            </ls-tab>
         </ls-tabs>
         <ls-group radio>
 
