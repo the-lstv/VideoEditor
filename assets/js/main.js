@@ -524,7 +524,7 @@ function build(){
             app.ui.keyframes.currentTimeline = resource.animationsID
 
             O("#resourceProperties").set([
-                N("h2", resource.type + " element"),
+                N("h2", app.project.editingTarget.type + " element"),
 
                 N("h3", "Timing"),
                 N([
@@ -535,9 +535,9 @@ function build(){
                             N("button", {inner: "Frames", id: "editor-unit-f", onclick(){ app.time.editorUseFrameUnits = true; app.ui.editorUpdate() }}),
                         ]})
                     ]),
-                    N([ "<span><i class=bi-align-start></i> Start:</span>", N("input", {type: "number", id: "editor-s", min: 0, oninput(){ resource.position.start = +this.value * (app.time.editorUseFrameUnits? 1 : app.time.fps) }}) ]),
-                    N([ "<span><i class=bi-stopwatch></i> Duration:</span>", N("input", {type: "number", id: "editor-d", min: 0, oninput(){ resource.position.length = +this.value * (app.time.editorUseFrameUnits? 1 : app.time.fps) }}) ]),
-                    N([ "<span><i class=bi-tag></i> Label:</span>", N("input", {value: resource.label, oninput(){ resource.label = this.value }}) ]),
+                    N([ "<span><i class=bi-align-start></i> Start:</span>", N("input", {type: "number", id: "editor-s", min: 0, oninput(){ app.project.editingTarget.position.start = +this.value * (app.time.editorUseFrameUnits? 1 : app.time.fps) }}) ]),
+                    N([ "<span><i class=bi-stopwatch></i> Duration:</span>", N("input", {type: "number", id: "editor-d", min: 0, oninput(){ app.project.editingTarget.position.length = +this.value * (app.time.editorUseFrameUnits? 1 : app.time.fps) }}) ]),
+                    N([ "<span><i class=bi-tag></i> Label:</span>", N("input", {value: app.project.editingTarget.label, oninput(){ app.project.editingTarget.label = this.value }}) ]),
                     N([ "<span><i class=bi-palette2></i> Tile color:</span>", app.ui.colorPicker ]),
                 ]),
 
@@ -545,51 +545,51 @@ function build(){
                 N([
                     N({style: "justify-content:space-evenly", inner: [
                         "Align: ",
-                        N("ls-group", {attr: ["join", "radio", {value: resource.alignH}], inner: [
-                            N("button", {inner: "<i class=bi-align-start></i>", value: "left", onclick(){ resource.alignH = "left"; app.ui.editorUpdate() }}),
-                            N("button", {inner: "<i class=bi-align-center></i>", value: "center", onclick(){ resource.alignH = "center"; app.ui.editorUpdate() }}),
-                            N("button", {inner: "<i class=bi-align-end></i>", value: "right", onclick(){ resource.alignH = "right"; app.ui.editorUpdate() }})
+                        N("ls-group", {attr: ["join", "radio", {value: app.project.editingTarget.alignH}], inner: [
+                            N("button", {inner: "<i class=bi-align-start></i>", value: "left", onclick(){ app.project.editingTarget.alignH = "left"; app.ui.editorUpdate() }}),
+                            N("button", {inner: "<i class=bi-align-center></i>", value: "center", onclick(){ app.project.editingTarget.alignH = "center"; app.ui.editorUpdate() }}),
+                            N("button", {inner: "<i class=bi-align-end></i>", value: "right", onclick(){ app.project.editingTarget.alignH = "right"; app.ui.editorUpdate() }})
                         ]}),
-                        N("ls-group", {attr: ["join", "radio", {value: resource.alignV}], inner: [
-                            N("button", {inner: "<i class=bi-align-top></i>", value: "top", onclick(){ resource.alignV = "top"; app.ui.editorUpdate() }}),
-                            N("button", {inner: "<i class=bi-align-middle></i>", value: "center", onclick(){ resource.alignV = "center"; app.ui.editorUpdate() }}),
-                            N("button", {inner: "<i class=bi-align-bottom></i>", value: "bottom", onclick(){ resource.alignV = "bottom"; app.ui.editorUpdate() }}),
+                        N("ls-group", {attr: ["join", "radio", {value: app.project.editingTarget.alignV}], inner: [
+                            N("button", {inner: "<i class=bi-align-top></i>", value: "top", onclick(){ app.project.editingTarget.alignV = "top"; app.ui.editorUpdate() }}),
+                            N("button", {inner: "<i class=bi-align-middle></i>", value: "center", onclick(){ app.project.editingTarget.alignV = "center"; app.ui.editorUpdate() }}),
+                            N("button", {inner: "<i class=bi-align-bottom></i>", value: "bottom", onclick(){ app.project.editingTarget.alignV = "bottom"; app.ui.editorUpdate() }}),
                         ]})
                     ]}),
 
                     N({style: "justify-content:space-evenly;flex-wrap:wrap", inner: [
                         N("ls-group", {style: "align-items:center", attr: ["join"], inner: [
                             "X&nbsp;" ,
-                            N([ N("input", {style: "width: 80px", id: "editor-x", type: "number", oninput(){ resource.x = +this.value }}) ]),
-                            N("button", {onclick(){ resource.x = 0; O("#editor-x").value = "0" }, inner: "<i class=bi-x></i>"}),
+                            N([ N("input", {style: "width: 80px", id: "editor-x", type: "number", oninput(){ app.project.editingTarget.x = +this.value }}) ]),
+                            N("button", {onclick(){ app.project.editingTarget.x = 0; O("#editor-x").value = "0" }, inner: "<i class=bi-x></i>"}),
                         ]}),
                         N("ls-group", {style: "align-items:center", attr: ["join"], inner: [
                             "Y&nbsp;" ,
-                            N([ N("input", {style: "width: 80px", id: "editor-y", type: "number", oninput(){ resource.y = +this.value }}) ]),
-                            N("button", {onclick(){ resource.y = 0; O("#editor-y").value = "0" }, inner: "<i class=bi-x></i>"}),
+                            N([ N("input", {style: "width: 80px", id: "editor-y", type: "number", oninput(){ app.project.editingTarget.y = +this.value }}) ]),
+                            N("button", {onclick(){ app.project.editingTarget.y = 0; O("#editor-y").value = "0" }, inner: "<i class=bi-x></i>"}),
                         ]}),
                         N("ls-group", {style: "align-items:center", attr: ["join"], inner: [
                             "<i class=bi-arrow-repeat></i>&nbsp;" ,
-                            N([ N("input", {style: "width: 80px", id: "editor-r", type: "number", min: "-360", max: "360", value: resource.transform.rotate.replace("deg", ""), oninput(){ resource.transform.rotate = this.value + "deg"; app.ui.aidBoxUpdate() }}) ]),
-                            N("button", {onclick(){ resource.transform.rotate = "0deg"; O("#editor-r").value = "0" }, inner: "<i class=bi-x></i>"}),
+                            N([ N("input", {style: "width: 80px", id: "editor-r", type: "number", min: "-360", max: "360", value: app.project.editingTarget.transform.rotate.replace("deg", ""), oninput(){ app.project.editingTarget.transform.rotate = this.value + "deg"; app.ui.aidBoxUpdate() }}) ]),
+                            N("button", {onclick(){ app.project.editingTarget.transform.rotate = "0deg"; O("#editor-r").value = "0" }, inner: "<i class=bi-x></i>"}),
                         ]}),
                     ]}),
 
                     N({style: "justify-content:space-evenly;flex-wrap:wrap", inner: [
                         N("ls-group", {style: "align-items:center", attr: ["join"], inner: [
                             "W&nbsp;" ,
-                            N("input", {style: "width: 80px", id: "editor-w", min: 0, type: "number", value: resource.width, oninput(){ resource.width = +this.value }}),
-                            N("button", {onclick(){ resource.width = "unset"; O("#editor-w").value = "" }, inner: "<i class=bi-x></i>"}),
+                            N("input", {style: "width: 80px", id: "editor-w", min: 0, type: "number", value: app.project.editingTarget.width, oninput(){ app.project.editingTarget.width = +this.value }}),
+                            N("button", {onclick(){ app.project.editingTarget.width = "unset"; O("#editor-w").value = "" }, inner: "<i class=bi-x></i>"}),
                         ]}),
                         N("ls-group", {style: "align-items:center", attr: ["join"], inner: [
                             "H&nbsp;",
-                            N("input", {style: "width: 80px", id: "editor-h", min: 0, type: "number", value: resource.height, oninput(){ resource.height = +this.value }}),
-                            N("button", {onclick(){ resource.height = "unset"; O("#editor-h").value = "" }, inner: "<i class=bi-x></i>"}),
+                            N("input", {style: "width: 80px", id: "editor-h", min: 0, type: "number", value: app.project.editingTarget.height, oninput(){ app.project.editingTarget.height = +this.value }}),
+                            N("button", {onclick(){ app.project.editingTarget.height = "unset"; O("#editor-h").value = "" }, inner: "<i class=bi-x></i>"}),
                         ]}),
                         N("ls-group", {style: "align-items:center", attr: ["join"], inner: [
                             "<i class=bi-arrows-angle-expand></i>&nbsp;",
-                            N("input", {style: "width: 80px", id: "editor-ts", min: -5, max: 200, step: .1, type: "number", value: resource.transform.scale, oninput(){ resource.transform.scale = +this.value }}),
-                            N("button", {onclick(){ resource.transform.scale = 1; O("#editor-ts").value = "1" }, inner: "<i class=bi-x></i>"}),
+                            N("input", {style: "width: 80px", id: "editor-ts", min: -5, max: 200, step: .1, type: "number", value: app.project.editingTarget.transform.scale, oninput(){ app.project.editingTarget.transform.scale = +this.value }}),
+                            N("button", {onclick(){ app.project.editingTarget.transform.scale = 1; O("#editor-ts").value = "1" }, inner: "<i class=bi-x></i>"}),
                         ]}),
                     ]}),
 
