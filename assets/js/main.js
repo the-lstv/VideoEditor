@@ -266,47 +266,43 @@ function build(){
                 type = "text"
             }
 
+            console.log(type);
+
             if(["image", "audio", "video"].includes(type)) {
                 // Items to be added to the library
 
-                let hash = await new Promise((resolve, fail) => {
-                    let chunkText = N("span", {inner: "0"});
-                    
-                    var blobSlice = File.prototype.slice || File.prototype.mozSlice || File.prototype.webkitSlice,
-                        file = data.file,
-                        chunkSize = 2097152,
-                        chunks = Math.ceil(file.size / chunkSize),
-                        currentChunk = 0,
-                        spark = new SparkMD5.ArrayBuffer(),
-                        fileReader = new FileReader()
+                let chunkSize = 2097152;
+
+                let hash = await new Promise((resolve, reject) => {
+                    let reader = new FileReader(),
+                        position = 0,
+                        total_size = data.file.size,
+                        hasher = md5
                     ;
     
-                    log.add(" - done\n> Calculating file hash [", chunkText, `/${chunks} chunks]`)
+                    reader.onload = function(e) {
+                        try {
+                            hasher = hasher.update(e.target.result);
+                            next();
+                        } catch (e) {
+                            reject(e)
+                        }
+                    };
     
-                    fileReader.onload = function (e) {
-                        spark.append(e.target.result);
-                        currentChunk++;
-                        chunkText.set(String(currentChunk))
+                    function next() {
+                        if (position < total_size) {
+                            var end = Math.min(position + chunkSize, total_size);
+
+                            log.add(` - done\n> Calculating file hash [bytes ${position} to ${end}] (${(position / total_size * 100).toFixed(2) + "%"})`)
     
-                        if (currentChunk < chunks) {
-                            loadNext();
+                            reader.readAsArrayBuffer(data.file.slice(position, end));
+                            position = end
                         } else {
-                            resolve(spark.end())
+                            resolve(hasher.hex());
                         }
                     }
     
-                    fileReader.onerror = function () {
-                        fail()
-                    }
-    
-                    function loadNext() {
-                        var start = currentChunk * chunkSize,
-                            end = ((start + chunkSize) >= file.size) ? file.size : start + chunkSize;
-    
-                        fileReader.readAsArrayBuffer(blobSlice.call(file, start, end));
-                    }
-    
-                    loadNext();
+                    next();
                 })
 
                 console.log(hash);
@@ -663,6 +659,8 @@ function build(){
             }
         },
 
+        _firstFrameSincePlaying: false,
+
         frame(at = app.time._current){
             if(at < 0) at = 0;
             if(at > app.time.total) at = app.time.total;
@@ -677,14 +675,40 @@ function build(){
                 let resource = app.project.elements[id];
                 if(resource.timeline !== app.time.timeline) continue;
 
-                if(!app.playing && resource.type == "video"){
-                    resource.element.currentTime =  (at - resource.position.start) / 60
+                let inFrame = intersect.includes(id);
+
+                if(resource.type == "video"){
+                    if(!app.playing){
+                        resource.element.currentTime = (at - resource.position.start) / 60
+                    } else {
+                        if(resource.element._firstFrameSincePlaying && inFrame){
+                            resource.element.currentTime = (app.time.playerStart - resource.position.start) / 60
+                            resource.element.play()
+                            resource.element._firstFrameSincePlaying = false
+                        }
+                    }
                 }
 
-                resource.element.style.display = intersect.includes(id)? "block" : "none"
+                if(resource.element) resource.element.style.display = inFrame? "block" : "none"
             }
 
+            app._firstFrameSincePlaying = false;
+
             O("#time_current").set(app.time.minuteFormat(at))
+        },
+
+        stopAllVideos(){
+            for(let id in app.project.elements){
+                if(!app.project.elements.hasOwnProperty(id)) continue;
+
+                let resource = app.project.elements[id];
+                if(resource.timeline !== app.time.timeline) continue;
+
+                if(resource.type == "video"){
+                    resource.element._firstFrameSincePlaying = true
+                    resource.element.pause()
+                }
+            }
         },
 
         toggle(){
@@ -726,6 +750,9 @@ function build(){
 
             app.time.playerStart = app.time.current;
             app.time.playerTiming = performance.now();
+            app._firstFrameSincePlaying = true;
+
+            app.stopAllVideos()
 
             if(value) requestAnimationFrame(app.Player)
         },

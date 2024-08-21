@@ -598,4 +598,6 @@ ls-timeline-cutline {
     background: var(--ui);
     padding: 0 20px;
     border: 1px solid var(--elevate-1);
+    max-height: 300px;
+    overflow: auto;
 }
