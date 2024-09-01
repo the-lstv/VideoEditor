@@ -594,10 +594,34 @@ ls-timeline-cutline {
     background: var(--ui-overlay);
 }
 
-#timelineOverlay div {
+#resourceEmpty, #timelineOverlay {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.floatingHeaderHandle, .controlsPanelTime {
+    display: flex;
+    align-items: center;
+}
+
+.floatingHeaderButton {
+    display: flex;
+}
+
+#timelineOverlay > div {
     background: var(--ui);
     padding: 0 20px;
     border: 1px solid var(--elevate-1);
     max-height: 300px;
     overflow: auto;
+}
+
+#timelineOverlay .ls-progress-styled {
+    height: 14px;
+    margin: 10px 0;
+}
+
+ls-select {
+    min-height: 20px;
 }

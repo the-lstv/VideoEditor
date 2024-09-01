@@ -74,7 +74,7 @@ function build(){
 
             editing: null,
 
-            colorPicker: N("ls-select", {attr: "compatibility"}),
+            colorPicker: N("ls-select"),
 
             updateScale(source){
                 if(source != "resize") app.container.fixResolution()
@@ -174,6 +174,12 @@ function build(){
                 if(app.ui.cuttingTool) requestAnimationFrame(app.ui.cuttingFrame)
             },
 
+            fitVideoContent(){
+                let contentLength = app.ui.timeline.contentLength();
+
+                if(app.time.total < contentLength) app.time.total = contentLength
+            },
+
             action: {
                 about(){
                     let aboutWindow = createWindow({
@@ -243,13 +249,14 @@ function build(){
         async addTile(layout, data = {}){
             let log = O("#timelineOverlayLog");
 
+            log.clear().add("> Processing file");
+
             let element = N({
                 inner: N("span", {inner: layout.label || data.value || ""}),
                 attr: {"ls-accent": layout.color || "red"},
                 class: "main-timeline-item"
             })
 
-            ;(layout.row || O("ls-timeline-row")).add(element)
 
             let id = app.ui.timeline.item(element, data.id || M.GlobalID), type = data.type || null;
         
@@ -258,7 +265,7 @@ function build(){
                 let file_type = data.file.type.replace(/\/.*/, "");
 
                 switch(file_type){
-                    case"image":case"video":case"audio":
+                    case"image": case"video": case"audio":
                         type = file_type
                     break;
                 }
@@ -266,18 +273,27 @@ function build(){
                 type = "text"
             }
 
-            console.log(type);
+            let hash;
 
             if(["image", "audio", "video"].includes(type)) {
                 // Items to be added to the library
 
-                let chunkSize = 2097152;
+                let progressBar = LS.Progress(N(), {
+                    label: false
+                }), progressText = N();
 
-                let hash = await new Promise((resolve, reject) => {
+                log.add(progressBar.element, progressText)
+
+                let chunkSize = 2097152 * 8, start = Date.now();
+
+                hash = await new Promise(async (resolve, reject) => {
+
+                    let hashLib = await xxhash();
+
                     let reader = new FileReader(),
                         position = 0,
                         total_size = data.file.size,
-                        hasher = md5
+                        hasher = hashLib.create64()
                     ;
     
                     reader.onload = function(e) {
@@ -293,24 +309,24 @@ function build(){
                         if (position < total_size) {
                             var end = Math.min(position + chunkSize, total_size);
 
-                            log.add(` - done\n> Calculating file hash [bytes ${position} to ${end}] (${(position / total_size * 100).toFixed(2) + "%"})`)
+                            progressBar.value = (position / total_size * 100);
+                            progressText.set(`Calculating file hash [bytes ${position} to ${end}] (${(position / total_size * 100).toFixed(2) + "%"})`)
     
                             reader.readAsArrayBuffer(data.file.slice(position, end));
                             position = end
                         } else {
-                            resolve(hasher.hex());
+                            progressBar.value = 100;
+                            resolve(hasher.digest().toString(16).padStart(16, "0"));
                         }
                     }
-    
+
                     next();
                 })
-
-                console.log(hash);
                 
                 // URL.createObjectURL(data.file)
             }
 
-            log.add(" - done\n> Setting up the timeline")
+            log.add("\n> Setting up the timeline")
 
             let videoElement;
             if(["image", "text", "video"].includes(type)) {
@@ -338,7 +354,8 @@ function build(){
                     ... type == "image" ? { src: URL.createObjectURL(data.file), draggable: false } : {},
                     ... type == "image" ? { src: URL.createObjectURL(data.file), draggable: false } : {},
                     ... type == "video" ? { src: URL.createObjectURL(data.file), onloadedmetadata(){
-                        app.ui.timeline.timeline.items[id].length = (videoElement.duration * app.time.fps) / app.ui.timeline.zoom
+                        app.ui.timeline.timeline.items[id].length = videoElement.duration * app.time.fps
+                        app.ui.fitVideoContent()
                     } } : {},
                 });
             }
@@ -351,6 +368,8 @@ function build(){
 
             let animationsID = app.ui.keyframes.timelines.length + 1;
             app.ui.keyframes.currentTimeline = animationsID
+
+            ;(layout.row || O("ls-timeline-row")).add(element)
 
             app.project.elements[id] = {
                 element: videoElement,
@@ -477,6 +496,8 @@ function build(){
             app.frame()
             app.updateZIndex()
 
+            app.ui.fitVideoContent()
+
             O("#timelineOverlay").hide();
 
             return app.project.elements[id]
@@ -531,9 +552,17 @@ function build(){
                             N("button", {inner: "Frames", id: "editor-unit-f", onclick(){ app.time.editorUseFrameUnits = true; app.ui.editorUpdate() }}),
                         ]})
                     ]),
-                    N([ "<span><i class=bi-align-start></i> Start:</span>", N("input", {type: "number", id: "editor-s", min: 0, oninput(){ app.project.editingTarget.position.start = +this.value * (app.time.editorUseFrameUnits? 1 : app.time.fps) }}) ]),
-                    N([ "<span><i class=bi-stopwatch></i> Duration:</span>", N("input", {type: "number", id: "editor-d", min: 0, oninput(){ app.project.editingTarget.position.length = +this.value * (app.time.editorUseFrameUnits? 1 : app.time.fps) }}) ]),
+
+                    N([ "<span><i class=bi-align-start></i> Start:</span>", N("input", {type: "number", id: "editor-s", min: 0, oninput(){
+                        app.project.editingTarget.position.start = +this.value * (app.time.editorUseFrameUnits? 1 : app.time.fps)
+                    }}) ]),
+
+                    N([ "<span><i class=bi-stopwatch></i> Duration:</span>", N("input", {type: "number", id: "editor-d", min: 0, oninput(){
+                        app.project.editingTarget.position.length = +this.value * (app.time.editorUseFrameUnits? 1 : app.time.fps)
+                    }}) ]),
+
                     N([ "<span><i class=bi-tag></i> Label:</span>", N("input", {value: app.project.editingTarget.label, oninput(){ app.project.editingTarget.label = this.value }}) ]),
+
                     N([ "<span><i class=bi-palette2></i> Tile color:</span>", app.ui.colorPicker ]),
                 ]),
 
@@ -632,7 +661,7 @@ function build(){
 
             app.ui.editorUpdate()
 
-            LS.Select("color").set(LS.Select("color").getOptions().find(o=> o.value == resource.color))
+            LS.Select("color").set(resource.color)
         },
 
         unselect(noOverride = false){
@@ -837,8 +866,7 @@ function build(){
 
             for (const file of files) {
                 if(!isLibrary){
-                    O("#timelineOverlay").show()
-                    O("#timelineOverlayLog").clear().add("> Processing file");
+                    O("#timelineOverlay").style.display = "flex"
 
                     app.addTile({
                         x: app.ui.timeline.container.scrollLeft + (M.x - app.ui.timeline.element.offsetLeft),
@@ -1031,12 +1059,19 @@ M.on("load", ()=>{
             }
         })
 
-        LS.Select("color", app.ui.colorPicker, [...LS.Color.all().map(c=>{return{value: c, label: `<div ls-accent="${c}" class="select_color"></div>`}})])
-            .on("change", (value)=>{
-                app.project.editingTarget.color = value
-            })
+        LS.Select("color", app.ui.colorPicker, {
+            search: false,
+            values: [...LS.Color.all().map(color => {
+                return {value: color, element: `<div ls-accent="${color}" class="select_color"></div>`}
+            })]
+        })
+        .on("change", (value)=>{
+            app.project.editingTarget.color = value
+        })
+        
+        LS.Select("color").updateElements()
 
-        app.ui.aidHandle = LS.Util.RegisterMouseDrag(O("#aidBox"), ".ls-resize-bar");
+        app.ui.aidHandle = LS.Util.touchHandle(O("#aidBox"), {exclude: ".ls-resize-bar"});
 
         let aidInitialX, aidInitialY, aidInitialWX, aidInitialWY;
 

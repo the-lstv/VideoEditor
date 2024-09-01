@@ -1,7 +1,8 @@
 <head>
+
     @resources {
         ls-js: tiny, *;
-        ls-css: base,ls-flat, *;
+        ls-css: base, ls-flat, *;
 
         css:
             assets/css/main.css,
@@ -14,7 +15,7 @@
         js:
             assets/js/main.js,
             assets/js/window-manager.js,
-            assets/js/md5.js
+            assets/js/xxhash.js
         ;
 
         fonts: "JetBrains Mono", "Rubik", "Ubuntu Mono", "Poppins";
@@ -84,24 +85,25 @@
             <div ch style="width:100%">
                 <!-- <input type="text"> -->
             </div>
-            <div style="width: 500px; justify-content: flex-end" fl>
+            <div style="display:flex; width: 500px; justify-content: flex-end">
                 <div tabindex="0" class="control-button" ls-tooltip="Undo (ctrl + z)"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M236,144a68.07,68.07,0,0,1-68,68H80a12,12,0,0,1,0-24h88a44,44,0,0,0,0-88H61l27.52,27.51a12,12,0,0,1-17,17l-48-48a12,12,0,0,1,0-17l48-48a12,12,0,1,1,17,17L61,76H168A68.08,68.08,0,0,1,236,144Z"></path></svg></div>
                 <div tabindex="0" class="control-button" ls-tooltip="Redo (ctrl + y)"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M167.51,127.51,195,100H88a44,44,0,0,0,0,88h88a12,12,0,0,1,0,24H88A68,68,0,0,1,88,76H195L167.51,48.49a12,12,0,1,1,17-17l48,48a12,12,0,0,1,0,17l-48,48a12,12,0,0,1-17-17Z"></path></svg></div>
             </div>
         </div>
-        <div id="workspace">
-            <div id="topLeftArea" class="floatingTabDrop">
+
+        <div %workspace>
+            <div %topLeftArea .floatingTabDrop>
                 <div class="floatingTab">
                     <div class="floatingHeader">
-                        <div cv>
+                        <div .floatingHeaderHandle>
                             &nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M108,60A16,16,0,1,1,92,44,16,16,0,0,1,108,60Zm56,16a16,16,0,1,0-16-16A16,16,0,0,0,164,76ZM92,112a16,16,0,1,0,16,16A16,16,0,0,0,92,112Zm72,0a16,16,0,1,0,16,16A16,16,0,0,0,164,112ZM92,180a16,16,0,1,0,16,16A16,16,0,0,0,92,180Zm72,0a16,16,0,1,0,16,16A16,16,0,0,0,164,180Z"></path></svg>&nbsp;Resource editor
                         </div>
-                        <div fl>
+                        <div .floatingHeaderButton>
                             <div onclick="app.ui.editorSide = !app.ui.editorSide" tabindex="0" class="control-button" ls-tooltip="Toggle UI side left/right"><i class="bi-box-arrow-right"></i></div>
                         </div>
                     </div>
                     <div id="resourceEditor">
-                        <div chv id="resourceEmpty">
+                        <div %resourceEmpty>
                             <svg xmlns="http://www.w3.org/2000/svg" width="5em" height="5em" fill="currentColor" viewBox="0 0 256 256" style="margin-bottom:10px"><path d="M120.85,28.42l8-16a8,8,0,0,1,14.31,7.16l-8,16a8,8,0,1,1-14.31-7.16ZM16,104h8a8,8,0,0,0,0-16H16a8,8,0,0,0,0,16ZM96,32a8,8,0,0,0,8-8V16a8,8,0,0,0-16,0v8A8,8,0,0,0,96,32ZM28.42,120.85l-16,8a8,8,0,0,0,7.16,14.31l16-8a8,8,0,1,0-7.16-14.31Zm135.65,15.9,50.34-21.88A16,16,0,0,0,213,85.07L52.92,32.8A15.95,15.95,0,0,0,32.8,52.92L85.07,213a15.82,15.82,0,0,0,14.41,11l.78,0a15.84,15.84,0,0,0,14.61-9.59l21.88-50.34L192,219.31a16,16,0,0,0,22.63,0l4.68-4.68a16,16,0,0,0,0-22.63Z"></path></svg>
                             <h1>Nothing selected</h1>
                             <h3>Select an element to edit it</h3>
@@ -128,6 +130,7 @@
                     </div>
                 </div>
             </div>
+
             <div id="preview">
                 <span style="display: none" id="hint"></span>
                 <div id="aidBox">
@@ -145,7 +148,7 @@
                         <div onclick="app.toggle()" tabindex="0" class="control-button" ls-tooltip="Play/Pause (space)"><i style="transform:scale(1.5)" class="bi-play-fill"></i></div>
                         <div onclick="app.time.current++" tabindex="0" class="control-button" ls-tooltip="Next frame (shift + left arrow)"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M184.49,136.49l-80,80a12,12,0,0,1-17-17L159,128,87.51,56.49a12,12,0,1,1,17-17l80,80A12,12,0,0,1,184.49,136.49Z"></path></svg></i></div>
                     </div>
-                    <div cv>
+                    <div .controlsPanelTime>
                         <span style="color:var(--accent)" id="time_current">0:00</span><span>&nbsp;/&nbsp;</span><span id="time_total">0:00</span>
                     </div>
                     <div>
@@ -164,10 +167,10 @@
                     <div id="bottomLeftArea" class="floatingTabDrop">
                         <div class="floatingTab">
                             <div class="floatingHeader">
-                                <div cv>
+                                <div .floatingHeaderHandle>
                                     &nbsp;<svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M108,60A16,16,0,1,1,92,44,16,16,0,0,1,108,60Zm56,16a16,16,0,1,0-16-16A16,16,0,0,0,164,76ZM92,112a16,16,0,1,0,16,16A16,16,0,0,0,92,112Zm72,0a16,16,0,1,0,16,16A16,16,0,0,0,164,112ZM92,180a16,16,0,1,0,16,16A16,16,0,0,0,92,180Zm72,0a16,16,0,1,0,16,16A16,16,0,0,0,164,180Z"></path></svg>&nbsp;Resource library
                                 </div>
-                                <div fl>
+                                <div .floatingHeaderButton>
                                     <div onclick="app.ui.editorSide = !app.ui.editorSide" tabindex="0" class="control-button" ls-tooltip="Toggle UI side left/right"><i class="bi-box-arrow-right"></i></div>
                                 </div>
                             </div>
@@ -191,14 +194,12 @@
                                 <div tabindex="0" class="control-button" ls-tooltip="Cutting tool (ctrl)"><i class="bi-scissors"></i></div>
                                 <div tabindex="0" class="control-button" ls-tooltip="Gruop (ctrl + g)"><i class="bi-collection"></i></div>
                             </div>
-                            <div cv></div>
-                            <div></div>
                         </div>
                         <ls-timeline id="mainTimeline">
-                            <div style="display: none" chv id="timelineOverlay">
+                            <div style="display: none" %timelineOverlay>
                                 <div>
                                     <h1>Importing resources</h1>
-                                    <span style="white-space: pre-wrap" id="timelineOverlayLog"></span>
+                                    <span style="white-space: pre-wrap" %timelineOverlayLog></span>
                                     <br><br>
                                 </div>
                             </div>
@@ -244,6 +245,7 @@
                             <i class="bi-box-arrow-right"></i>
                         </div>
                     </div>
+
                     <div class="node" style="top:160px;left:450px">
                         <div class="sources input">
                             <div class="source" bay-class="audio"></div>
@@ -255,6 +257,7 @@
                             <div class="source" bay-class="audio"></div>
                         </div>
                     </div>
+
                     <div class="node" style="top:20px;left:400px">
                         <div class="sources input">
                             <div class="source" bay-class="image"></div>
@@ -266,6 +269,7 @@
                             <div class="source" bay-class="image"></div>
                         </div>
                     </div>
+
                     <div class="node" style="top:20px;left:580px">
                         <div class="sources input">
                             <div class="source" bay-class="data"></div>
@@ -277,6 +281,7 @@
                             <div class="source" bay-class="audio"></div>
                         </div>
                     </div>
+
                     <div class="node" style="top:120px;left:200px">
                         <div class="sources input">
                             <div class="source" bay-class="data"></div>
@@ -285,11 +290,12 @@
                             <i class="bi-film"></i>
                         </div>
                         <div class="sources output">
-                            <div class="source" bay-class="image"></div>
-                            <div class="source" bay-class="audio"></div>
-                            <div class="source" bay-class="data"></div>
+                            <div .source bay-class="image"></div>
+                            <div .source bay-class="audio"></div>
+                            <div .source bay-class="data"></div>
                         </div>
                     </div>
+
                     <div class="node" style="top:120px;left:60px">
                         <div class="node-content" label="Master Timer">
                             <i class="bi-stopwatch-fill"></i>
@@ -298,6 +304,7 @@
                             <div class="source" bay-class="data"></div>
                         </div>
                     </div>
+
                     <div class="node" style="top:220px;left:60px">
                         <div class="node-content" label="Master Data Flow">
                             <i class="bi-code-square"></i>
