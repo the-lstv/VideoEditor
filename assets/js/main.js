@@ -74,9 +74,22 @@ window.addEventListener('load', async () => {
         window.addEventListener('resize', updateEditorViewport);
         updateEditorViewport();
 
+        //  --- DEBUG, testing timeline ---
         app.layoutManager.setSchema({
             inner: { type: "slot", name: "bottom-right-row" }
         })
+
+        for(let i = 0; i < 100; i++)
+        timelineView.timeline.add({
+            start: i * 5,
+            duration: Math.random() * 5 + 10,
+            row: i % 3,
+            label: `Clip ${i+1}`,
+            color: `hsl(${(i / 10) * 360}deg 80% 60%)`
+        });
+
+        window.timelineView = timelineView;
+        window.timeline = timelineView.timeline;
     
         // Shortcuts
         app.shortcutManager.map({

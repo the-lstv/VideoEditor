@@ -104,24 +104,12 @@ class TimelineView extends View {
             defaultSlots: ['bottom-right-row', 'left-panel'],
             container: LS.Create({
                 class: 'editor-timeline',
-                inner: [
-                    { tag: "ls-timeline", class: "timeline-container" }
-                ]
+                inner: []
             })
         });
 
-        this.timelineContainer = this.container.querySelector(".timeline-container");
         this.timeline = new LS.Timeline({
-            element: this.timelineContainer,
-            label(value, repeat, multiplier, scroll){
-                let values = [];
-                for(let i = 0; i < repeat; i++){
-                    let seconds = value + (i * multiplier);
-                    values.push(value + i == 0 ? "" : seconds+"s") // < 60 ? `${seconds}s` : seconds < 3600 ? `${(seconds / 60).toFixed(2)}m` : seconds < 86400 ? `${(seconds / 3600).toFixed(2)}h` : `${(seconds / 86400).toFixed(2)}d`)
-                }
-                return values
-            },
-            baseValue: 60
+            element: this.container
         });
     }
 }

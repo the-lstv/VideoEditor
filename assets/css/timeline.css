@@ -1,4 +1,4 @@
-ls-timeline {
+.ls-timeline {
     -webkit-user-select: none;
     user-select: none;
     width: 100%;
@@ -9,7 +9,7 @@ ls-timeline {
     overflow: hidden;
 }
 
-ls-timeline-pointer {
+.ls-timeline-pointer {
     position: absolute;
     top: 0;
     bottom: 0;
@@ -17,7 +17,7 @@ ls-timeline-pointer {
     z-index: 10;
 }
 
-ls-timeline-pointer::after {
+.ls-timeline-pointer::after {
     content: "";
     border-left: 12px solid transparent;
     border-right: 12px solid transparent;
@@ -28,27 +28,75 @@ ls-timeline-pointer::after {
     transform: translateX(-50%);
 }
 
-ls-timeline-blackout {
-    position: absolute;
-    top: 0;
-    bottom: 0;
-    right: 0;
-    background: rgba(0, 0, 0, 0.2705882353);
-    pointer-events: none;
-}
-
-ls-timeline-row {
-    width: var(--scroll-width);
+.ls-timeline-row {
     display: block;
     min-height: 45px;
     position: relative;
     background: var(--background);
 }
 
-ls-timeline-row:nth-child(odd) {
-    background: var(--ui);
+.ls-timeline-row:nth-child(odd) {
+    background: var(--elevate);
 }
 
+.ls-timeline-item {
+    display: inline-flex;
+    align-items: center;
+    position: absolute;
+    bottom: 0;
+    top: 0;
+    overflow: hidden;
+    min-width: 5px;
+    cursor: pointer
+}
+
+.ls-timeline-item {
+    margin: 5px 0;
+    background: var(--accent);
+    color: var(--color-bg,var(--color))
+}
+
+.ls-timeline-item.selected {
+    background: var(--accent);
+    box-shadow: 4px 4px 0 0 #000;
+    outline: 2px solid black;
+    filter: brightness(1.2);
+    cursor: default
+}
+
+.ls-timeline-item span {
+    padding: 0 10px;
+    width: 100%;
+    overflow: hidden;
+    white-space: nowrap;
+    text-overflow: ellipsis
+}
+
+.ls-timeline-item.ls-held {
+    opacity: .8
+}
+
+.ls-timeline-scroll-container {
+    overflow: auto;
+    height: 100%;
+}
+
+.ls-timeline-rows {
+    position: sticky;
+    left: 0;
+    right: 0;
+}
+
+.ls-timeline-markers {
+    display: flex;
+    justify-content: space-between;
+    height: 25px;
+    min-height: 25px;
+    max-height: 35px;
+}
+
+
+/* 
 ls-timeline-container {
     width: 100%;
     height: 100%;
@@ -56,14 +104,6 @@ ls-timeline-container {
     overflow: overlay;
     z-index: 5;
     background: var(--ui-bg-0);
-}
-
-ls-timeline-markers {
-    display: flex;
-    justify-content: space-between;
-    height: 25px;
-    min-height: 25px;
-    max-height: 35px;
 }
 
 ls-timeline-markers>div {
@@ -127,4 +167,4 @@ ls-timeline-area {
     display: flex;
     flex-direction: column;
     position: relative;
-}
+} */
