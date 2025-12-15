@@ -57,14 +57,19 @@ class View extends LS.EventHandler {
 
         this._defaultSlots = Array.isArray(defaultSlots) ? defaultSlots : (defaultSlots ? [defaultSlots] : []);
         this._slots = Array.isArray(slots) ? slots : (slots ? [slots] : []);
+        this.currentSlot = null;
     }
 
     // Subclasses should subscribe the destroy event to free resources
+    // (Don't override this method)
     destroy() {
         this.emit('destroy');
         this.container.remove();
         this.events.clear();
         this.__destroyed = true;
+        if(this.currentSlot) {
+            this.currentSlot.set(null);
+        }
     }
 }
 
@@ -109,11 +114,17 @@ class Slot {
             child.remove();
         }
 
-        if(!view) {
+        if(!view || view.__destroyed) {
             this.container.appendChild(this.__emptyMessage);
+            if(view && view.__destroyed) {
+                console.warn(`Slot.set: cannot set destroyed view ${view.constructor.name} to slot ${this.name}`);
+                view.currentSlot = null;
+                return;
+            }
             return;
         }
 
+        view.currentSlot = this;
         this.container.appendChild(view.container);
     }
 }

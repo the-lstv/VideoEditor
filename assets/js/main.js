@@ -97,6 +97,10 @@ window.addEventListener('load', async () => {
             GLOBAL_SEEK_HOME: 'home',
             GLOBAL_SEEK_END: 'end',
             GLOBAL_FULLSCREEN: 'f',
+            GLOBAL_NEXT_FRAME: 'shift+right',
+            GLOBAL_PREVIOUS_FRAME: 'shift+left',
+            UNDO: 'ctrl+z',
+            REDO: [ 'ctrl+shift+z', 'ctrl+y' ],
     
             ...app.config.get('shortcuts') || {} // Custom shortcuts
         });
@@ -123,6 +127,26 @@ window.addEventListener('load', async () => {
             if(app.focusedPreview) {
                 app.focusedPreview.toggleFullscreen();
             }
+        });
+    
+        app.shortcutManager.assign("GLOBAL_NEXT_FRAME", () => {
+            if(app.focusedPreview) {
+                app.focusedPreview.seek();
+            }
+        });
+    
+        app.shortcutManager.assign("GLOBAL_PREVIOUS_FRAME", () => {
+            if(app.focusedPreview) {
+                app.focusedPreview.seek();
+            }
+        });
+    
+        app.shortcutManager.assign("UNDO", () => {
+            app.currentProject.history.undo();
+        });
+    
+        app.shortcutManager.assign("REDO", () => {
+            app.currentProject.history.redo();
         });
 
     } catch(e) {
