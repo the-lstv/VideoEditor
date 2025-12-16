@@ -151,3 +151,8 @@
     position: absolute;
     transform: translateX(-50%);
 }
+
+.ls-drop-preview {
+    background: var(--surface-9);
+    opacity: 0.2;
+}
