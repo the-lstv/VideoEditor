@@ -65,6 +65,7 @@ layout-item:last-of-type {
 .layout-slot {
     display: block;
     min-width: 300px;
+    min-height: 0;
 }
 
 #editor-container {
@@ -111,6 +112,8 @@ layout-item:last-of-type {
     height: 100%;
     position: relative;
     overflow: hidden;
+    min-height: 0;
+    min-width: 0;
 }
 
 .centered-layout, .layout-slot-empty {

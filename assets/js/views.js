@@ -118,7 +118,23 @@ class TimelineView extends View {
             defaultSlots: ['bottom-right-row', 'left-panel'],
             container: LS.Create({
                 class: 'editor-timeline',
-                inner: []
+                inner: [
+                    {
+                        class: 'timeline-header',
+                        inner: [
+                            { tag: "button", class: "square clear", inner: { tag: "i", class: "bi-scissors" }, tooltip: "Cutting tool <kbd>Ctrl</kbd> + <kbd>X</kbd>", onclick: () => {
+                                // 
+                            } },
+                            { tag: "button", class: "square clear", inner: { tag: "i", class: "bi-plus-lg" }, tooltip: "Add track", onclick: () => {
+                                this.timeline.addTrack();
+                            } },
+                            { tag: "select", tooltip: "Select timeline", onchange: (e) => {
+                                const selectedTrack = e.target.value;
+                                this.timeline.selectTrack(selectedTrack);
+                            } }
+                        ]
+                    }
+                ]
             })
         });
 

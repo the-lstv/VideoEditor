@@ -158,7 +158,22 @@ const LAYOUT_SCHEMA_PRESETS = {
                 inner: [ { direction: "row", inner: [ { type: 'slot', name: 'top-right-left-row' }, { type: 'slot', name: 'top-right-right-row' } ] }, { type: 'slot', name: 'right-bottom' } ]
             } }
         ]
-    }
+    },
+
+    /**
+     * |   |   |
+     * |-------|
+     * |   |   |
+     */
+    'default-but-better': {
+        direction: 'column',
+        tilt: Math.floor(Math.random() * 17 + 28),
+        inner: [
+            // Two horizontal rows
+            { inner: [ { type: 'slot', name: 'top-left-row', resize: { width: 600 } }, { type: 'slot', name: 'top-right-row' } ], resize: { height: "65%" } },
+            { inner: [ { type: 'slot', name: 'bottom-left-row', resize: { width: 300 } }, { type: 'slot', name: 'bottom-right-row' } ] },
+        ]
+    },
 };
 
 /**
@@ -277,7 +292,7 @@ class LayoutManager {
         }
 
         const direction = schema.direction || "row";
-        const container = LS.Create({ tag: "layout-item", class: 'layout-' + direction });
+        const container = LS.Create({ tag: "layout-item", class: 'layout-' + direction, ...schema.tilt? { style: `transform:rotate(${schema.tilt}deg)` } : {} });
 
         if(Array.isArray(schema.inner)) {
             let i = 0;
