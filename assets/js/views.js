@@ -1,9 +1,7 @@
-const { View, Renderer } = EditorBaseClasses;
-
 /**
  * Video preview class
  */
-class PreviewView extends View {
+class PreviewView extends EditorBaseClasses.View {
     constructor() {
         super({
             name: 'PreviewView',
@@ -76,12 +74,12 @@ class PreviewView extends View {
     }
 
     setSource(source) {
-        if(!(source instanceof Renderer || source instanceof HTMLVideoElement || source instanceof HTMLCanvasElement)) {
+        if(!(source instanceof EditorBaseClasses.Renderer || source instanceof HTMLVideoElement || source instanceof HTMLCanvasElement)) {
             console.error("PreviewView.setSource: source must be a Renderer, HTMLVideoElement or HTMLCanvasElement");
             return;
         }
 
-        const isRenderer = source instanceof Renderer;
+        const isRenderer = source instanceof EditorBaseClasses.Renderer;
 
         if(this.sourceElement) this.sourceElement.remove();
         if(isRenderer) {
@@ -111,7 +109,7 @@ class PreviewView extends View {
 /**
  * Timeline class
  */
-class TimelineView extends View {
+class TimelineView extends EditorBaseClasses.View {
     constructor() {
         super({
             name: 'TimelineView',
@@ -152,7 +150,7 @@ class TimelineView extends View {
 /**
  * Asset manager view class
  */
-class AssetManagerView extends View {
+class AssetManagerView extends EditorBaseClasses.View {
     constructor() {
         super({
             name: 'AssetManagerView',
@@ -170,7 +168,7 @@ class AssetManagerView extends View {
 /**
  * Property editor view class
  */
-class PropertyEditorView extends View {
+class PropertyEditorView extends EditorBaseClasses.View {
     constructor() {
         super({
             name: 'PropertyEditorView',

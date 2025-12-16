@@ -2,12 +2,10 @@
  * Project class
  */
 class Project extends LS.EventHandler {
-    constructor(data, options = {}) {
+    constructor(data) {
         super();
 
-        if (data) {
-            this.loadFrom(data);
-        }
+        this.loadFrom(data);
 
         this.renderingCanvas = document.createElement('canvas');
         this.renderer = new Renderer({
@@ -15,10 +13,9 @@ class Project extends LS.EventHandler {
             width: 1280,
             height: 720,
             backgroundColor: 0x000000,
-            ...(options.rendererOptions || {})
+            ...(this.config.rendererOptions || {})
         });
 
-        this.resources = new Map();
         this.initialized = false;
     }
 
@@ -33,13 +30,45 @@ class Project extends LS.EventHandler {
         this.completed('ready');
     }
 
-    loadFrom(data) {
+    loadFrom(data = {}) {
+        if (typeof data === "string") {
+            data = JSON.parse(data);
+        }
+
+        this.config = data.config || {};
+        if(!this.config.rendererOptions) {
+            this.config.rendererOptions = {
+                width: 1280,
+                height: 720
+            };
+        }
+
+        this.timelines = new Map(Object.entries(data.timelines || {}));
+
+        if(Array.isArray(data.resources)) {
+            for (const resource of data.resources) {
+                const res = new Resource(resource);
+            }
+
+            this.resources = data.resources;
+        }
     }
 
     destroy() {
         // TODO: Proper destruction
         this.renderer.destroy();
         this.events.clear();
+        this.emit('destroy');
+        this.__destroyed = true;
+    }
+
+    export(asString = false) {
+        const data = {
+            config: this.config,
+            timelines: Object.fromEntries(this.timelines),
+            resources: Object.fromEntries(this.resources)
+        };
+        return asString ? JSON.stringify(data) : data;
     }
 }
 
@@ -383,13 +412,16 @@ class LayoutManager {
  */
 class Resource {
     static collection = new Map();
+    static get(id) {
+        return Resource.collection.get(id);
+    }
 
     static computeHash(data) {
         xxhash
     }
 
-    constructor() {
-
+    constructor(data) {
+        Resource.collection.set(data.id || data.hash, this);
     }
 }
 

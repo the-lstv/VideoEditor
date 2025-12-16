@@ -1,18 +1,17 @@
 // --- Application setup ---
-const { LayoutManager, Project, Renderer, ConfigStore } = EditorBaseClasses;
 
 /**
  * Central application object
  */
 const appContainer = document.querySelector("#editor-container") || LS.Create({ id: 'app-container' }).addTo(document.body);
 const layoutContainer = document.querySelector("#layout-container") || LS.Create({ class: 'layout-container' }).addTo(appContainer);
-const config = new ConfigStore();
+const config = new EditorBaseClasses.ConfigStore();
 
 const app = {
     container: appContainer,
-    currentProject: new Project(),
+    currentProject: new EditorBaseClasses.Project(),
 
-    layoutManager: new LayoutManager(layoutContainer, {
+    layoutManager: new EditorBaseClasses.LayoutManager(layoutContainer, {
         layout: config.get("default-layout") || "default",
     }),
 
