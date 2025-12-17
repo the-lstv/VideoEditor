@@ -61,7 +61,8 @@
     box-shadow: 4px 4px 0 0 #000;
     outline: 2px solid black;
     filter: brightness(1.2);
-    cursor: default
+    cursor: default;
+    z-index: 5;
 }
 
 .ls-timeline-item span {
@@ -155,4 +156,18 @@
 .ls-drop-preview {
     background: var(--surface-9);
     opacity: 0.2;
+}
+
+.ls-drag-snap-line::before, .ls-drag-snap-line::after {
+    content: "\00d7";
+    position: absolute;
+    transform: translateX(-50%);
+}
+
+.ls-drag-snap-line::before {
+    top: 0;
+}
+
+.ls-drag-snap-line::after {
+    bottom: 0;
 }

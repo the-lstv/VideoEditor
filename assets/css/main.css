@@ -170,3 +170,8 @@ layout-item:last-of-type {
     align-items: center;
     padding: 6px;
 }
+
+.editor-view, layout-item {
+    min-height: 0;
+    min-width: 0;
+}
