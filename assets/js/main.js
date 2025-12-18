@@ -78,14 +78,16 @@ window.addEventListener('load', async () => {
             inner: { type: "slot", name: "bottom-right-row" }
         })
 
-        for(let i = 0; i < 100; i++)
-        timelineView.timeline.add({
-            start: i * 5,
-            duration: Math.random() * 5 + 10,
-            row: i % 3,
-            label: `Clip ${i+1}`,
-            color: `hsl(${(i / 10) * 360}deg 80% 60%)`
-        });
+        // for(let i = 0; i < 100; i++)
+        // timelineView.timeline.add({
+        //     start: i * 5,
+        //     duration: Math.random() * 5 + 10,
+        //     row: i % 3,
+        //     label: `Clip ${i+1}`,
+        //     color: ["red", "green", "blue", "orange", "purple"][i % 5]
+        // });
+
+        app.currentProject.attachTimelineView(timelineView);
 
         window.timelineView = timelineView;
         window.timeline = timelineView.timeline;

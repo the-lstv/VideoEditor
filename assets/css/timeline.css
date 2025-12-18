@@ -70,7 +70,8 @@
     width: 100%;
     overflow: hidden;
     white-space: nowrap;
-    text-overflow: ellipsis
+    text-overflow: ellipsis;
+    pointer-events: none;
 }
 
 .ls-timeline-item.ls-held {

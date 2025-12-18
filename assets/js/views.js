@@ -16,6 +16,7 @@ class PreviewView extends EditorBaseClasses.View {
                                 tag: "button",
                                 class: "control-button square clear",
                                 inner: { tag: "i", class: "bi-arrow-90deg-left" },
+                                style: "font-size: smaller",
                                 tooltip: "Jump to the beginning <kbd>Home</kbd>",
                                 onclick: () => {}
                             },
@@ -47,7 +48,7 @@ class PreviewView extends EditorBaseClasses.View {
 
                         [
                             { tag: "span", class: "preview-time-current", inner: "0:00", style: { color: "var(--accent)" } },
-                            { tag: "span", inner: " / " },
+                            { tag: "span", inner: "/" },
                             { tag: "span", class: "preview-time-total", inner: "0:00" }
                         ],
 
@@ -55,6 +56,7 @@ class PreviewView extends EditorBaseClasses.View {
                             {
                                 tag: "button",
                                 class: "control-button square clear",
+                                style: "font-size: smaller",
                                 inner: { tag: "i", class: "bi-arrows-fullscreen" },
                                 tooltip: "Fullscreen <kbd>F</kbd>",
                                 onclick: () => {}
@@ -140,10 +142,18 @@ class TimelineView extends EditorBaseClasses.View {
             element: this.container
         });
 
+        this.timeline.on('seek', time => {
+            this.emit('seek', time);
+        });
+
         this.on('destroy', () => {
             this.timeline.destroy();
             this.timeline = null;
         });
+    }
+
+    setData(data) {
+        this.timeline.reset(true, data);
     }
 }
 

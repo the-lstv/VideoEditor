@@ -171,7 +171,17 @@ layout-item:last-of-type {
     padding: 6px;
 }
 
+.preview-controls div {
+    display: flex;
+    align-items: center;
+    gap: 2px;
+}
+
 .editor-view, layout-item {
     min-height: 0;
     min-width: 0;
+}
+
+.control-button {
+    height: 20px !important;
 }

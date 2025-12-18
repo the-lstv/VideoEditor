@@ -54,6 +54,16 @@ class Project extends LS.EventHandler {
         }
     }
 
+    attachTimelineView(id, view) {
+        const timeline = this.timelines.get(id);
+        if (!timeline) return false;
+
+        // Attach the timeline view
+        view.setData(timeline);
+        timelineView.render();
+        return true;
+    }
+
     destroy() {
         // TODO: Proper destruction
         this.renderer.destroy();
@@ -437,6 +447,26 @@ class Resource {
 class Renderer extends LS.GL.Renderer {
     constructor(options) {
         super(options);
+        this.timeline = options.timeline || null;
+    }
+
+    /**
+     * In the future calling WebGL directly (without PIXI) would be much better, the node implementation isn't great for videos
+     * @param {*} index 
+     * @returns 
+     */
+    frame(index) {
+        if(!this.timeline) return;
+        const targets = this.timeline.intersectingAt(index);
+        for(const target of targets) {
+            this.renderer.render(target, {
+                clear: false
+            });
+        }
+    }
+
+    setTimeline(timeline) {
+        this.timeline = timeline;
     }
 }
 
