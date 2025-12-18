@@ -10,7 +10,7 @@ class PreviewView extends EditorBaseClasses.View {
                 class: 'editor-preview',
                 inner: [
                     { class: "preview-container", inner: { class: "preview-source-target" } },
-                    { class: "preview-controls", inner: [
+                    { class: "preview-controls controls-bar", inner: [
                         [
                             {
                                 tag: "button",
@@ -94,11 +94,11 @@ class PreviewView extends EditorBaseClasses.View {
     }
 
     togglePlay() {
-
+        this.renderer.togglePlay();
     }
 
     seek(time) {
-
+        this.renderer.seek(time);
     }
 
     toggleFullscreen() {
@@ -120,18 +120,29 @@ class TimelineView extends EditorBaseClasses.View {
                 class: 'editor-timeline',
                 inner: [
                     {
-                        class: 'timeline-header',
+                        class: 'timeline-header controls-bar',
                         inner: [
-                            { tag: "button", class: "square clear", inner: { tag: "i", class: "bi-scissors" }, tooltip: "Cutting tool <kbd>Ctrl</kbd> + <kbd>X</kbd>", onclick: () => {
-                                // 
-                            } },
-                            { tag: "button", class: "square clear", inner: { tag: "i", class: "bi-plus-lg" }, tooltip: "Add track", onclick: () => {
-                                this.timeline.addTrack();
-                            } },
-                            { tag: "select", tooltip: "Select timeline", onchange: (e) => {
-                                const selectedTrack = e.target.value;
-                                this.timeline.selectTrack(selectedTrack);
-                            } }
+                            [
+                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-scissors" }, tooltip: "Cutting tool <kbd>Ctrl</kbd> + <kbd>X</kbd>", onclick: () => {
+                                    // 
+                                } },
+                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-plus-lg" }, tooltip: "Add track", onclick: () => {
+                                    this.timeline.addTrack();
+                                } },
+                                // { tag: "select", tooltip: "Select timeline", onchange: (e) => {
+                                //     const selectedTrack = e.target.value;
+                                //     this.timeline.selectTrack(selectedTrack);
+                                // } }
+                            ],
+
+                            [
+                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-zoom-in" }, tooltip: "Zoom in <kbd>+</kbd>", onclick: () => {
+                                    this.timeline.zoomIn();
+                                } },
+                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-zoom-out" }, tooltip: "Zoom out <kbd>-</kbd>", onclick: () => {
+                                    this.timeline.zoomOut();
+                                } }
+                            ]
                         ]
                     }
                 ]

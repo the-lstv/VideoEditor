@@ -87,7 +87,7 @@ window.addEventListener('load', async () => {
         //     color: ["red", "green", "blue", "orange", "purple"][i % 5]
         // });
 
-        app.currentProject.attachTimelineView(timelineView);
+        app.currentProject.attachTimelineView("", timelineView);
 
         window.timelineView = timelineView;
         window.timeline = timelineView.timeline;
