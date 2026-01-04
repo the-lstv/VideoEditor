@@ -9,6 +9,10 @@
     overflow: hidden;
 }
 
+.ls-timeline:focus-visible {
+    outline: none;
+}
+
 .ls-timeline-pointer {
     position: absolute;
     top: 0;
@@ -30,7 +34,7 @@
 
 .ls-timeline-row {
     display: block;
-    min-height: 45px;
+    min-height: var(--ls-timeline-row-height, 45px);
     position: relative;
     background: var(--background);
 }
@@ -47,13 +51,39 @@
     top: 0;
     overflow: hidden;
     min-width: 5px;
-    cursor: pointer
+    cursor: pointer;
+    border-radius: var(--timeline-item-radius, var(--border-radius-small));
 }
 
-.ls-timeline-item {
-    margin: 5px 0;
+.ls-timeline-item:not(.ls-timeline-item-automation), .ls-timeline-item-automation > span {
     background: var(--accent);
-    color: var(--color-bg,var(--color))
+    color: var(--accent-90);
+    box-shadow: inset 0 1px 0 0 var(--accent-60), inset 0 -1px 0 0 var(--accent-35);
+}
+
+.ls-timeline-item-automation {
+    background: var(--surface-n1);
+    flex-direction: column;
+}
+
+.ls-timeline-item-automation > span, .ls-timeline-item-automation > .ls-resize-handle {
+    height: 20px;
+    min-height: 20px;
+    max-height: 20px;
+}
+
+.ls-timeline-item-automation > span {
+    pointer-events: none;
+    width: 100%;
+}
+
+.ls-timeline-item-automation > .ls-automation-graph {
+    flex: 1;
+    width: 100%;
+}
+
+.ls-timeline-item[ls-accent="yellow"], .ls-timeline-item[ls-accent="orange"] {
+    color: var(--accent-10);
 }
 
 .ls-timeline-item.selected {
@@ -63,6 +93,10 @@
     filter: brightness(1.2);
     cursor: default;
     z-index: 5;
+}
+
+.ls-timeline-item-automation.selected {
+    background: var(--surface-1);
 }
 
 .ls-timeline-item span {
@@ -160,16 +194,24 @@
     opacity: 0.2;
 }
 
-.ls-drag-snap-line::before, .ls-drag-snap-line::after {
+.ls-timeline-snap-line {
+    left: 0px;
+}
+
+.ls-timeline-snap-line::before, .ls-timeline-snap-line::after {
     content: "\00d7";
     position: absolute;
     transform: translateX(-50%);
 }
 
-.ls-drag-snap-line::before {
+.ls-timeline-snap-line::before {
     top: 0;
 }
 
-.ls-drag-snap-line::after {
+.ls-timeline-snap-line::after {
     bottom: 0;
+}
+
+.ls-automation-graph:not(:hover) :is(.ls-automation-point-handle, .ls-automation-center-handle) {
+    opacity: 0;
 }

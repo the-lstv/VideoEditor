@@ -39,14 +39,14 @@
     overflow: hidden;
 }
 
-layout-item {
+layout-item, .layout-tabs {
     width: 100%;
     height: 100%;
     position: relative;
     outline: 1px solid var(--surface-1);
 }
 
-layout-item:last-of-type {
+layout-item:last-of-type, .layout-tabs:last-of-type {
     flex: 1;
 }
 
@@ -63,9 +63,9 @@ layout-item:last-of-type {
 }
 
 .layout-slot {
-    display: block;
-    min-width: 300px;
+    display: flex;
     min-height: 0;
+    flex-direction: column;
 }
 
 #editor-container {
@@ -97,8 +97,42 @@ layout-item:last-of-type {
 #editor-header, #editor-footer {
     flex: none;
     height: 25px;
-    background: var(--surface-n1);
     display: flex;
+}
+
+#editor-header {
+    align-items: center;
+    padding: 0 10px;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--surface-4);
+}
+
+#editor-footer {
+    background: var(--surface-n1);
+}
+
+#editor-header > div {
+    display: flex;
+    align-items: center;
+    height: 100%;
+}
+
+#editor-header > div > div {
+    height: 100%;
+    padding: 0 8px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+#editor-header > div > div.disabled {
+    cursor: default;
+    opacity: 0.5;
+}
+
+#editor-header > div > div:hover, #editor-header > div > div:focus {
+    background: var(--elevate);
 }
 
 #layout-container {
@@ -114,6 +148,7 @@ layout-item:last-of-type {
     overflow: hidden;
     min-height: 0;
     min-width: 0;
+    flex: 1;
 }
 
 .centered-layout, .layout-slot-empty {
@@ -122,6 +157,66 @@ layout-item:last-of-type {
     justify-content: center;
     height: 100%;
     width: 100%;
+}
+
+.layout-slot-header {
+    height: 25px;
+    display: flex;
+    align-items: center;
+    background: var(--surface-n2);
+    padding: 0 10px;
+    justify-content: space-between;
+}
+
+.layout-slot-header > div {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.layout-slot-drop-target::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.35);
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.layout-slot-drop-target::after {
+    content: "Drop here to Swap";
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: absolute;
+    padding: 10px;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 8px;
+    background: var(--surface-2);
+    border: 1px solid var(--accent);
+    z-index: 1000;
+    pointer-events: none;
+}
+
+.layout-slot-drag-preview {
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 5000;
+    pointer-events: none;
+    outline: 2px solid var(--accent);
+}
+
+.is-being-dragged {
+    opacity: 0.5;
+}
+
+.ls-timeline-item .ls-resize-handle {
+    background: var(--accent-60);
+    transition: none;
+    --ls-resize-anchor: 0;
 }
 
 /* Empty slot */
@@ -191,11 +286,584 @@ layout-item:last-of-type {
     gap: 2px;
 }
 
-.editor-view, layout-item {
+.editor-view, layout-item, .ls-tabs {
     min-height: 0;
     min-width: 0;
 }
 
 .control-button {
     height: 20px !important;
+}
+
+/* Property editor */
+
+.property-editor-container, .asset-manager-content {
+    overflow: auto;
+    height: 100%;
+    padding: 8px 12px;
+}
+
+.property-editor-header {
+    margin-bottom: 12px;
+}
+
+.property-editor-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding: 10px;
+    padding-left: 18px;
+    margin-bottom: 8px;
+    border-radius: var(--border-radius-medium);
+}
+
+.property-editor-container {
+    max-width: 600px;
+    padding-bottom: 100px;
+    margin: auto;
+}
+
+.property-editor-table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 12px;
+}
+
+.ls-table-wrap {
+    box-shadow: none;
+}
+
+code {
+    background: var(--surface-n1);
+    padding: 0px 6px;
+    border-radius: var(--border-radius);
+    user-select: text;
+}
+
+.example-chip {
+    display: block;
+    text-align: center;
+    background: var(--surface-2);
+    padding: 6px 0;
+    border-radius: var(--border-radius-medium);
+    font-size: 0.9em;
+}
+
+.property-editor-group > div {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.property-editor-container ls-box {
+    margin: 12px 0;
+    padding: 12px 16px;
+}
+
+ls-box ul li {
+    margin-bottom: 10px;
+}
+
+.ls-modal-body {
+    max-height: calc(100vh - 200px);
+}
+
+.adding-automation-target-modal {
+    position: fixed;
+    left: 50%;
+    bottom: 100px;
+    transform: translateX(-50%);
+    display: flex !important;
+    align-items: center;
+    gap: 12px;
+    border-radius: var(--border-radius-full) !important;
+    padding-left: 16px !important;
+}
+
+.input-group {
+    display: flex;
+    align-items: center;
+}
+
+.property-editor-container input[type="number"] {
+    width: 80px;
+}
+
+.editor-property-editor > .ls-tabs, .editor-property-editor > .ls-tabs > .ls-tabs-content, .ls-tab-content, .ls-tabs-content {
+    width: 100%;
+    height: 100%;
+}
+
+.editor-tabs {
+    display: flex;
+    flex-direction: column;
+}
+
+.editor-tabs .ls-tabs-list {
+    display: flex;
+    overflow-x: overlay;
+    overflow-y: hidden;
+    min-height: 35px;
+    align-items: center;
+    border-bottom: 1px solid var(--elevate);
+}
+
+.editor-tabs .ls-tab-handle {
+    user-select: none;
+    cursor: pointer;
+    white-space: nowrap;
+    padding: 5px 20px;
+    border-right: 1px solid var(--elevate-n1);
+    border-top: 1px solid var(--elevate-n1);
+    background: var(--elevate);
+}
+
+.editor-tabs .ls-tab-handle.active {
+    cursor: default;
+    background: var(--elevate-n1);
+    padding: 7px 20px 4px;
+    border-top: none;
+    border-bottom: 3px solid var(--accent);
+}
+
+.aidBox {
+    position: fixed;
+    display: none;
+    overflow: hidden;
+    z-index: 5000;
+}
+
+.editAid {
+    position: absolute;
+    outline: 3px solid var(--accent);
+    border: 2px solid #000a;
+    z-index: 5000;
+    pointer-events: none;
+    --ls-resize-anchor: 1;
+    top: 0;
+    left: 0;
+}
+
+.editAid .ls-resize-handle {
+    pointer-events: all;
+}
+
+.editAid:after, .editAid:before {
+    content: "";
+    position: absolute;
+    border: 1px dashed #fffa;
+    z-index: -1;
+}
+
+.editAid:before {
+    left: -100vw;
+    right: -100vw;
+    bottom: -4px;
+    top: -4px;
+}
+
+.editAid::after {
+    top: -100vh;
+    bottom: -100vh;
+    left: -4px;
+    left: -4px;
+    left: -4px;
+    right: -4px;
+}
+
+/* Asset manager */
+
+.editor-asset-manager {
+    display: flex;
+    height: 100%;
+}
+
+.asset-manager-sidebar {
+    width: 40px;
+    min-width: 40px;
+    border-right: 1px solid var(--surface-2);
+    display: flex;
+    flex-direction: column;
+    overflow: auto;
+    height: 100%;
+}
+
+.asset-manager-sidebar > div {
+    height: 40px;
+    padding: 4px 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+}
+
+.asset-manager-sidebar > div:hover {
+    background: var(--elevate);
+}
+
+.asset-manager-sidebar > div.selected {
+    background: var(--elevate);
+}
+
+.asset-manager-content {
+    flex: 1;
+    min-width: 200px;
+}
+
+.asset-library-item {
+    display: flex;
+    padding: 6px 8px;
+    gap: 8px;
+    cursor: pointer;
+    align-items: center;
+    border-radius: var(--border-radius);
+}
+
+.asset-library-item:hover {
+    background: var(--elevate);
+}
+
+.asset-library-item:not(.folder-list-item) * {
+    pointer-events: none;
+}
+
+.asset-library-item span {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* File Browser */
+.empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+}
+
+.asset-library-grid {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+}
+
+.folder-list-grid {
+    display: flex;
+    flex-direction: column;
+    padding: 12px 0;
+}
+
+.folder-list-item, .file-browser-item {
+    justify-content: space-between;
+}
+
+.file-browser {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+}
+
+.file-browser-content-wrapper {
+    overflow: auto;
+    height: 100%;
+    flex: 1;
+}
+
+.file-browser-status {
+    background: var(--surface-1);
+    border-radius: var(--border-radius-full);
+    padding: 8px 18px;
+}
+
+.file-browser {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    height: 100%;
+    min-height: 0;
+}
+
+.file-browser-empty {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.file-browser-status {
+    background: var(--surface-1);
+    border-radius: var(--border-radius-full);
+    padding: 8px 18px;
+    display: flex;
+    justify-content: space-between;
+}
+
+.file-browser-nav {
+    display: flex;
+}
+
+.file-browser-toolbar {
+    display: flex;
+    flex-direction: column;
+}
+
+.file-browser-toolbar-controls {
+    display: flex;
+    justify-content: space-between;
+    margin: 6px 0;
+    flex-wrap: wrap;
+}
+
+.file-browser-search {
+    background: var(--surface-1);
+    border-radius: var(--border-radius-large);
+    padding: 0px 20px;
+    padding-right: 8px;
+    margin-top: 8px;
+    gap: 10px;
+}
+
+.file-browser-breadcrumb, .file-browser-search {
+    display: flex;
+    align-items: center;
+}
+
+.file-browser-breadcrumb {
+    margin-bottom: 8px;
+}
+
+.file-browser-search input {
+    background: none !important;
+    border: none !important;
+}
+
+.file-browser-toolbar > * {
+    flex: 1;
+}
+
+.grid-view .file-item-thumbnail {
+    width: 100%;
+    height: 100px;
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: contain;
+}
+
+.grid-view .file-browser-item {
+    flex-direction: column;
+}
+
+.grid-view .file-browser-items {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    grid-column-gap: 0px;
+    grid-row-gap: 0px;
+}
+
+.asset-library-item.selected {
+    background: var(--surface-1);
+}
+
+/* Preferences Modal */
+.menu {
+    width: 320px;
+    overflow: auto;
+    padding: 15px;
+    --scrollbar-size: 3px;
+}
+
+.menu-category-title {
+    margin: 4px 0;
+    margin-left: 8px;
+    margin-top: 18px;
+    color: var(--accent);
+    display: block;
+}
+
+.sidebar-content {
+    flex: 1;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    padding: 30px;
+    position: relative;
+}
+
+[data-tab-id].active {
+    font-weight: 600;
+    padding-left: 30px !important;
+}
+
+[data-tab-id]::before {
+    content: "";
+    position: absolute;
+    top: 15px;
+    bottom: 15px;
+    width: 5px;
+    left: 18px;
+    background: var(--accent);
+    border-radius: var(--border-radius-full);
+    opacity: 0;
+    transition: opacity 0.2s ease-in-out;
+}
+
+[data-tab-id].active::before {
+    opacity: 1;
+}
+
+[ls-theme=light] .menu .grouped-buttons> :is(button, .ls-button) {
+    background-color: var(--accent-mix-10);
+    --accent-mix-40: var(--accent-mix-20);
+}
+
+.sidebar-content h2 {
+    margin-bottom: 8px;
+    margin-top: 36px;
+}
+
+.sidebar-content h3 {
+    margin-bottom: 8px;
+    margin-top: 24px;
+}
+
+@media screen and (max-width: 760px) {
+    .menu {
+        position: absolute;
+        max-width: 360px;
+        width: unset;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        --elevate-0: var(--surface-0);
+        --elevate-n1: var(--surface-n1);
+        --elevate: var(--surface-2);
+        --elevate-1: var(--surface-3);
+        --elevate-2: var(--surface-4);
+        --elevate-3: var(--surface-5);
+        transform: translateX(-10px);
+        pointer-events: none;
+        opacity: 0;
+        transition: transform 0.2s ease-in-out, opacity 0.2s ease-in-out;
+        z-index: 1000;
+        outline: 1px solid var(--accent-mix-20);
+        box-shadow: 0 10px 20px 0 rgba(0, 0, 0, .133);
+    }
+
+    .menu::before {
+        content: "";
+        position: absolute;
+        top: -10px;
+        left: 0;
+        width: 100%;
+        height: 10px;
+        background:
+            linear-gradient(to bottom,
+                transparent,
+                var(--surface-1));
+    }
+
+    .sidebar-menu-visible .menu {
+        transform: translateX(0);
+        pointer-events: auto;
+        padding-top: 80px;
+        opacity: 1;
+    }
+
+    .container::before {
+        content: "";
+        position: absolute;
+        top: 0;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        z-index: 100;
+        pointer-events: none;
+        transition: opacity 0.2s ease-in-out;
+        background-color: rgba(0, 0, 0, .533);
+        opacity: 0;
+    }
+
+    .container.sidebar-menu-visible::before {
+        opacity: 1;
+    }
+
+    .top {
+        height: 200px;
+    }
+}
+
+.grouped-buttons {
+    display: flex;
+    justify-content: center;
+    flex-direction: column;
+}
+
+.grouped-buttons :is(button, .ls-button) {
+    --padding-control-v: 12px;
+    --padding-control-h: 20px;
+    text-align: left;
+}
+
+.grouped-buttons :is(button, .ls-button)>i:first-child {
+    margin-right: 10px !important;
+    -webkit-text-stroke-width: 0.4px;
+}
+
+.grouped-buttons :is(button, .ls-button) {
+    border-radius: 0 !important;
+    border-bottom: 1px solid var(--accent-mix-40) !important;
+}
+
+.grouped-buttons :is(button, .ls-button):first-child {
+    border-radius: var(--border-radius-xxlarge) var(--border-radius-xxlarge) 0 0 !important;
+}
+
+.grouped-buttons :is(button, .ls-button):last-child {
+    border-radius: 0 0 var(--border-radius-xxlarge) var(--border-radius-xxlarge) !important;
+    border-bottom: none !important;
+}
+
+.grouped-buttons :is(button, .ls-button):only-child {
+    border-radius: var(--border-radius-xxlarge) !important;
+    border-bottom: none !important;
+}
+
+.preferences-modal .ls-modal-body {
+    padding: 0 !important;
+    width: 100%;
+}
+
+.menu-button {
+    position: absolute !important;
+    left: 20px;
+    top: 20px;
+    font-size: x-large;
+    z-index: 1100;
+    display: none;
+}
+
+@media screen and (max-width: 760px) {
+    .menu-button {
+        display: block;
+    }
+
+    .sidebar-content {
+        padding-top: 80px;
+    }
+}
+
+.preferences-modal {
+    min-height: 600px;
+    width: 100%;
+    display: flex;
+}
+
+#preferences-modal {
+    height: 100%;
+    width: 100%;
 }
