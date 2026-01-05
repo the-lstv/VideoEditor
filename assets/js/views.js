@@ -970,7 +970,7 @@ class PropertyEditorView extends EditorBaseClasses.View {
                     if (event.domEvent.altKey) modifier = 0.1;
                 }
 
-                const delta = event.dx * step * modifier;
+                const delta = event.offsetX * step * modifier;
                 let newValue = startValue + delta;
 
                 newValue = Math.max(min, Math.min(max, newValue));
