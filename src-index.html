@@ -1,0 +1,137 @@
+<!--
+    A fully modular, customizeable, hackable and open-source rich video editor with hardware acceleration and shaders.
+    Copyright (C) 2025 lstv.space
+-->
+
+<head>
+    <!-- Preload styles -->
+    <style>
+        :root, body {
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            background: var(--surface-n2) !important;
+            user-select: none;
+        }
+
+        #logo {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(calc(-50% + 92px), calc(-50% + 10px));
+            offset-path: path('M8.24713 23.3995C8.24713 23.3995 42.001 -13.0019 104.001 40.9985C166.001 94.9989 238 404 238 404');
+            offset-distance: 0%;
+            offset-rotate: 0deg;
+            z-index: 90000000005; /* Above everything */
+            pointer-events: none;
+        }
+
+        #app-loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            color: var(--ls-text-secondary);
+        }
+
+        .loader {
+            width: 50px;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            border: 8px solid;
+            border-color: currentColor #0000;
+            animation: l1 1s infinite;
+        }
+
+        @keyframes l1 {to{transform: rotate(.5turn)}}
+    </style>
+
+    <!-- PixiJS and filters -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.13.2/pixi.min.js" integrity="sha512-rOMqai9NIPaFWpmvHUjdOa2dSuaaYo6i7E19jS1ZW9rjnrl4qAOOtsOeTk0QgIflFCe2ZYi/7or3CRF6VfBk9g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.13.2/packages/advanced-blend-modes.min.js" integrity="sha512-jAkKvxtcrrqJ+gUTZXNV4oD9h5sl2297SjKx8zys1qjsJ5Ycem1+PFKHsLr80nEHVJLZbySxzMnBp/1JsuaIEw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script src="https://cdn.jsdelivr.net/npm/pixi-filters@6.1.5/dist/pixi-filters.min.js"></script>
+
+    <!-- fflate (mainly for browsers) -->
+    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
+
+    @use (ls:5.2.7[flat, gl, node, resize, dragdrop, timeline, automationgraph, patcher, tooltips, menu, toast, knob, reactive, tabs, animation, modal], bootstrap-icons, google-fonts["Ubuntu Mono"]);
+
+    <!-- Base classes (core utilities) -->
+    @use (./assets/js/resources.js[defer]);
+    @use (./assets/js/file-browser.js[defer]);
+    @use (./assets/js/base.js[defer]);
+
+    <!-- Views (panels and components) -->
+    @use (./assets/js/views.js[defer]);
+
+    <!-- Third-party libraries -->
+    @use (./assets/js/xxhash.js[defer]);
+
+    <!-- Main (initialization & core management) -->
+    @use (./assets/js/main.js[defer]);
+
+    @use (./assets/css/main.css);
+    @use (./assets/css/timeline.css);
+
+    <!-- Manifest -->
+    @page {
+        title: "Video Editor";
+        font: "Ubuntu Mono, monospace";
+        favicon: "./favicon.svg";
+
+        theme: "dark";
+        style: "flat";
+        accent: "white";
+    }
+</head>
+
+<body .level-0>
+    <img #logo width="200px" src="assets/images/icon.svg" alt="Video Editor Icon">
+
+    <div #app-loading>
+        <div .loader style="margin-top: 150px;"></div>
+    </div>
+
+    <main #editor-container style="display: none">
+        <nav #editor-header .level-2>
+            <div>
+                <img style="height: 1em; margin-right: 8px" src="assets/images/icon-flat.svg" alt="Video Editor Icon">
+                <div tabindex="0" .header-menu-category>File</div>
+                <div tabindex="0" .header-menu-category>Options</div>
+                <div tabindex="0" .header-menu-category>Layout</div>
+                <!-- <div tabindex="0" .header-menu-category>View</div> -->
+                <div tabindex="0" .header-menu-category>Help</div>
+            </div>
+
+            <div>
+                <div tabindex="0" .disabled #undoButton ls-tooltip="Undo"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M236,144a68.07,68.07,0,0,1-68,68H80a12,12,0,0,1,0-24h88a44,44,0,0,0,0-88H61l27.52,27.51a12,12,0,0,1-17,17l-48-48a12,12,0,0,1,0-17l48-48a12,12,0,1,1,17,17L61,76H168A68.08,68.08,0,0,1,236,144Z"></path></svg></div>
+                <div tabindex="0" .disabled #redoButton ls-tooltip="Redo"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M167.51,127.51,195,100H88a44,44,0,0,0,0,88h88a12,12,0,0,1,0,24H88A68,68,0,0,1,88,76H195L167.51,48.49a12,12,0,1,1,17-17l48,48a12,12,0,0,1,0,17l-48,48a12,12,0,0,1-17-17Z"></path></svg></div>
+            </div>
+        </nav>
+
+        <div #layout-container></div>
+
+        <footer #editor-footer></footer>
+
+        <div #preferences-modal style="display: none">
+            <button .menu-button .clear .square><i class="bi-list" /></button>
+
+            <div .menu .sidebar-items .level-n1>
+                <div .grouped-buttons>
+                    <button .elevated data-tab-id="main"><i .bi-house-fill /><span>Main</span></button>
+                </div>
+
+                <span .menu-category-title>Navigation</span>
+
+                <div .grouped-buttons>
+                    <button .elevated data-tab-id="keyboard-shortcuts"><i .bi-keyboard-fill /><span>Keyboard Shortcuts</span></button>
+                </div>
+            </div>
+
+            <div .sidebar-content>
+            </div>
+        </div>
+    </main>
+</body>
