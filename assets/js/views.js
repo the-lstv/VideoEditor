@@ -345,7 +345,7 @@ class TimelineView extends EditorBaseClasses.View {
 
         const seekEventRef = this.prepareEvent("seek");
         this.timeline.on('seek', time => {
-            this.emit(seekEventRef, time);
+            this.quickEmit(seekEventRef, time);
         });
     }
 

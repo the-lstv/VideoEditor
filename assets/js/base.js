@@ -8,7 +8,7 @@ if(isNode) {
  * Project class
  * Currently the main class connecting views and rendering together
  */
-class Project extends LS.EventHandler {
+class Project extends LS.EventEmitter {
     constructor(data) {
         super();
 
@@ -238,7 +238,7 @@ class Project extends LS.EventHandler {
 
                 this.timeline.on('seek', () => {
                     this.frameScheduler.schedule();
-                    this.emit(this.__seekEventRef, [view.timeline.seek]);
+                    this.quickEmit(this.__seekEventRef, view.timeline.seek);
                 });
 
                 this.timeline.on('duration-changed', (duration) => {
@@ -291,7 +291,7 @@ class Project extends LS.EventHandler {
                     }
                 });
 
-                this.emit(this.__seekEventRef, [this.timeline.seek]);
+                this.quickEmit(this.__seekEventRef, this.timeline.seek);
                 this.emit('duration-changed', [this.timeline.duration]);
                 break;
 
@@ -1286,7 +1286,7 @@ class HistoryManager {
  * View class
  * Base class for all views
  */
-class View extends LS.EventHandler {
+class View extends LS.EventEmitter {
     constructor({ container, name, title } = {}) { 
         super();
 

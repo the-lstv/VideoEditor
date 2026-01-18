@@ -5,7 +5,7 @@ const MAX_RESOURCE_SIZE = 50 * 1024 * 1024; // 50 MB
  * Handles access to folders and resources within the project
  * Abstracts browser APIs vs Node.js APIs
  */
-class ResourceManager extends LS.EventHandler {
+class ResourceManager extends LS.EventEmitter {
     constructor(project) {
         if(!(project instanceof EditorBaseClasses.Project)) {
             throw new Error("ResourceManager.constructor: project must be an instance of Project");
