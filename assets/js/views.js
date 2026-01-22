@@ -430,44 +430,36 @@ class PropertyEditorView extends EditorBaseClasses.View {
             class: "editAid",
         });
 
-        const handles = LS.Resize.set(this.__editAid, {
+        const entry = LS.Resize.set(this.__editAid, {
             sides: true,
             corners: true,
             translate: true
         });
 
-        for(const handle in handles) {
-            const doesUpdatePosition = handle.toLowerCase().includes("left") || handle.toLowerCase().includes("top");
+        entry.handler.on("resize", (side, width, height, leftOffset, topOffset, state) => {
+            if(!this.currentTarget) return;
 
-            handles[handle].handler.on("resize-start", (cancel) => {
-                if(!this.currentTarget) return;
-            });
+            const preview = this.parent.connectedViews.get("preview");
+            if(preview) {
+                const contained = preview.getContainedCoords();
+                const isContainer = this.currentTarget.node.constructor === PIXI.Container;
+                width /= contained.scale;
+                height /= contained.scale;
 
-            handles[handle].handler.on("resize", (width, height, state, leftOffset, topOffset) => {
-                if(!this.currentTarget) return;
+                this.#updateProp("scaleX", width / (isContainer ? 1 : this.currentTarget.node?.bounds.width ?? 1));
+                this.#updateProp("scaleY", height / (isContainer ? 1 : this.currentTarget.node?.bounds.height ?? 1));
 
-                const preview = this.parent.connectedViews.get("preview");
-                if(preview) {
-                    const contained = preview.getContainedCoords();
-                    const isContainer = this.currentTarget.node.constructor === PIXI.Container;
-                    width /= contained.scale;
-                    height /= contained.scale;
-
-                    this.#updateProp("scaleX", width / (isContainer ? 1 : this.currentTarget.node?.bounds.width ?? 1));
-                    this.#updateProp("scaleY", height / (isContainer ? 1 : this.currentTarget.node?.bounds.height ?? 1));
-
-                    if(doesUpdatePosition) {
-                        this.#updateProp("positionX", (leftOffset - contained.left) / contained.scale);
-                        this.#updateProp("positionY", (topOffset - contained.top) / contained.scale);
-                    }
+                if(side.toLowerCase().includes("left") || side.toLowerCase().includes("top")) {
+                    this.#updateProp("positionX", (leftOffset - contained.left) / contained.scale);
+                    this.#updateProp("positionY", (topOffset - contained.top) / contained.scale);
                 }
-            });
-
-            handles[handle].handler.on("resize-end", () => {
-                if(!this.currentTarget) return;
-                this.updateAidPosition();
-            });
-        }
+            }
+        });
+        
+        entry.handler.on("resize-end", () => {
+            if(!this.currentTarget) return;
+            this.updateAidPosition();
+        });
 
         this.#updatePreviewWorld();
         
