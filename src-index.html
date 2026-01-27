@@ -56,6 +56,13 @@
     <!-- fflate (mainly for browsers) -->
     <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 
+    <script>
+        window.LS_INIT_OPTIONS = {
+            autoScheme: true,
+            autoAccent: true,
+        }
+    </script>
+
     @use (ls:5.2.9[flat, color, gl, node, resize, dragdrop, timeline, automationgraph, patcher, tooltips, menu, toast, knob, reactive, tabs, animation, modal, ShortcutManager, CompileTemplate], bootstrap-icons, google-fonts["Ubuntu Mono"]);
 
     <!-- Base classes (core utilities) -->

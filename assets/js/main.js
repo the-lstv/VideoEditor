@@ -60,17 +60,6 @@ function updateEditorViewport() {
 
 // --- Initialization ---
 
-LS.Color.autoScheme();
-if (localStorage.hasOwnProperty("ls-accent")) {
-    const accent = localStorage.getItem("ls-accent");
-    if (accent.startsWith("#")) {
-        LS.Color.update("custom", accent);
-        LS.Color.setAccent("custom");
-    } else {
-        LS.Color.setAccent(accent);
-    }
-}
-
 window.addEventListener("beforeunload", (e) => {
     if(app.currentProject.unsavedChanges) {
         e.preventDefault();
