@@ -48,14 +48,6 @@
         @keyframes l1 {to{transform: rotate(.5turn)}}
     </style>
 
-    <!-- PixiJS and filters -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.13.2/pixi.min.js" integrity="sha512-rOMqai9NIPaFWpmvHUjdOa2dSuaaYo6i7E19jS1ZW9rjnrl4qAOOtsOeTk0QgIflFCe2ZYi/7or3CRF6VfBk9g==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.13.2/packages/advanced-blend-modes.min.js" integrity="sha512-jAkKvxtcrrqJ+gUTZXNV4oD9h5sl2297SjKx8zys1qjsJ5Ycem1+PFKHsLr80nEHVJLZbySxzMnBp/1JsuaIEw==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-    <script src="https://cdn.jsdelivr.net/npm/pixi-filters@6.1.5/dist/pixi-filters.min.js"></script>
-
-    <!-- fflate (mainly for browsers) -->
-    <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
-
     <script>
         window.LS_INIT_OPTIONS = {
             autoScheme: true,
@@ -63,7 +55,17 @@
         }
     </script>
 
-    @use (ls[flat, color, gl, node, resize, dragdrop, timeline, automationgraph, patcher, tooltips, menu, toast, knob, reactive, tabs, animation, modal, ShortcutManager, CompileTemplate], bootstrap-icons, google-fonts["Ubuntu Mono"]);
+    <!-- PixiJS and filters -->
+    @use (pixi:8.13.2, pixi-advanced-blend-modes:8.13.2, pixi-filters:6.1.5);
+
+    <!-- fflate (mainly for browsers) -->
+    @use (npm/fflate:0.8.2["umd/index.js"]);
+    
+    <!-- Fonts and icons -->
+    @use (bootstrap-icons, google-fonts[use "Ubuntu Mono"]);
+
+    <!-- LS -->
+    @use (ls[flat, color, gl, node, resize, dragdrop, timeline, automationgraph, patcher, tooltips, menu, toast, knob, reactive, tabs, animation, modal, ShortcutManager, CompileTemplate]);
 
     <!-- Base classes (core utilities) -->
     @use (./assets/js/resources.js[defer]);
