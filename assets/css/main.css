@@ -674,6 +674,28 @@ ls-box ul li {
     overflow: auto;
     padding: 15px;
     --scrollbar-size: 3px;
+
+    [data-tab-id].active {
+        font-weight: 600;
+        padding-left: 30px !important;
+    }
+
+    [data-tab-id]::before {
+        content: "";
+        position: absolute;
+        top: 15px;
+        bottom: 15px;
+        width: 5px;
+        left: 18px;
+        background: var(--accent);
+        border-radius: var(--border-radius-full);
+        opacity: 0;
+        transition: opacity 0.2s ease-in-out;
+    }
+
+    [data-tab-id].active::before {
+        opacity: 1;
+    }
 }
 
 .menu-category-title {
@@ -691,28 +713,6 @@ ls-box ul li {
     overflow: auto;
     padding: 30px;
     position: relative;
-}
-
-[data-tab-id].active {
-    font-weight: 600;
-    padding-left: 30px !important;
-}
-
-[data-tab-id]::before {
-    content: "";
-    position: absolute;
-    top: 15px;
-    bottom: 15px;
-    width: 5px;
-    left: 18px;
-    background: var(--accent);
-    border-radius: var(--border-radius-full);
-    opacity: 0;
-    transition: opacity 0.2s ease-in-out;
-}
-
-[data-tab-id].active::before {
-    opacity: 1;
 }
 
 [ls-theme=light] .menu .grouped-buttons> :is(button, .ls-button) {
