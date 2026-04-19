@@ -639,7 +639,7 @@ class Project extends LS.EventEmitter {
      * @param {Boolean} destroyViews Whether to destroy connected views
      */
     destroy(destroyViews = false) {
-        if(this.__destroyed) return;
+        if(this.destroyed) return;
 
         // TODO: Proper destruction
         // Warning; destroyViews will destroy anything connected to the project, so possibly everything
@@ -670,7 +670,7 @@ class Project extends LS.EventEmitter {
         this.emit('destroy');
         this.events.clear();
         this.config = null;
-        this.__destroyed = true;
+        this.destroyed = true;
     }
 
     /**
@@ -1286,7 +1286,7 @@ class HistoryManager {
  * View class
  * Base class for all views
  */
-class View extends LS.EventEmitter {
+class View extends LS.Context {
     constructor({ container, name, title } = {}) { 
         super();
 
@@ -1300,13 +1300,12 @@ class View extends LS.EventEmitter {
 
     // Subclasses should override with their own destruction logic, but DON'T forget to call super.destroy()
     destroy() {
-        this.emit('destroy');
         this.container.remove();
-        this.events.clear();
-        this.__destroyed = true;
         if(this.currentSlot) {
             this.currentSlot.set(null);
         }
+
+        super.destroy();
     }
 }
 
@@ -1499,10 +1498,10 @@ class Slot {
 
         this.currentView = view;
 
-        if(!view || view.__destroyed) {
+        if(!view || view.destroyed) {
             this.container.appendChild(this.__emptyMessage);
             this.__titleElement.innerText = "Empty slot";
-            if(view && view.__destroyed) {
+            if(view && view.destroyed) {
                 console.warn(`Slot.set: cannot set destroyed view ${view.constructor.name} to slot ${this.name}`);
                 view.currentSlot = null;
                 return;
@@ -1535,7 +1534,7 @@ class Slot {
         this.__emptyMessage = null;
         this.__header = null;
         this.__titleElement = null;
-        this.__destroyed = true;
+        this.destroyed = true;
     }
 }
 
