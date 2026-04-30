@@ -32,8 +32,7 @@ class PreviewView extends EditorBaseClasses.View {
                         onclick: () => {}
                     },
 
-                    (this.__playButton = N({
-                        tag: "button",
+                    (this.__playButton = LS.Create("button", {
                         class: "control-button square clear",
                         inner: { tag: "i", class: "bi-play-fill" },
                         tooltip: "Play/Pause <kbd>Space</kbd>",
@@ -1042,9 +1041,9 @@ class PropertyEditorView extends EditorBaseClasses.View {
         this.editorContainer = LS.Create("ls-tab", { class: "property-editor-container" });
 
         this.tabs.add("Editor", this.editorContainer);
-        this.tabs.add("Pipeline", N());
-        this.tabs.add("Animation", N());
-        this.tabs.add("Behavior", N());
+        this.tabs.add("Pipeline", LS.Create());
+        this.tabs.add("Animation", LS.Create());
+        this.tabs.add("Behavior", LS.Create());
         this.tabs.set(0);
 
         this.container.appendChild(this.emptyMessage);
@@ -1809,13 +1808,12 @@ class AssetManagerView extends EditorBaseClasses.View {
         if (library.name === "Project Folders") {
             this._createFoldersTab(grid);
         } else if (library.name === "Saved items") {
-            grid.appendChild(N("ls-box", {
+            grid.appendChild(LS.Create("ls-box", {
                 inner: "You can save presets you use often here for quick access. To save an item, right click on it and select 'Save to library'.",
             }));
         } else if (library.name === "Project Assets") {
-            grid.appendChild(N("ls-box", {
+            grid.appendChild(LS.Create("ls-box.margin-bottom-medium", {
                 inner: "These assets are embedded in the project file and work anywhere. Note that this increases the project file size and memory usage, so use it for small files only! You can drag and drop files here or to the timeline directly.",
-                class: "margin-bottom-medium"
             }));
 
             this.populateProjectAssets(grid);
@@ -1834,8 +1832,7 @@ class AssetManagerView extends EditorBaseClasses.View {
         const hasCurrentFolder = this._currentFolderHandle !== null;
 
         if(!hasCurrentFolder) {
-            grid.appendChild(N("ls-box", {
-                class: "margin-bottom-medium",
+            grid.appendChild(LS.Create("ls-box.margin-bottom-medium", {
                 inner: "Add folders from your computer to browse and access their content."
             }));
         }

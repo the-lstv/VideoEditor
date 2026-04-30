@@ -1404,7 +1404,7 @@ class Slot {
             tag: "layout-item",
             class: 'layout-slot',
             inner: [
-                this.__header = N({ class: "layout-slot-header", inner: [
+                this.__header = LS.Create(".layout-slot-header", { inner: [
                     [
                         { tag: "svg", attributes: {
                             xmlns: "http://www.w3.org/2000/svg", viewBox: "0 0 256 256",

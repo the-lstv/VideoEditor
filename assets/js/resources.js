@@ -329,7 +329,7 @@ class ResourceManager extends LS.EventEmitter {
                 'unknown': { icon: 'bi-question-circle', color: 'gray', text: 'Unknown' }
             };
 
-            const folderListContainer = N({ class: 'folder-permission-list', style: 'max-height: 300px; overflow-y: auto;' });
+            const folderListContainer = LS.Create({ class: 'folder-permission-list', style: 'max-height: 300px; overflow-y: auto;' });
 
             const renderFolderList = () => {
                 folderListContainer.innerHTML = '';
@@ -337,7 +337,7 @@ class ResourceManager extends LS.EventEmitter {
                 for(const folder of folderStatuses) {
                     const statusInfo = statusIcons[folder.status] || statusIcons.unknown;
 
-                    const folderRow = N({ class: 'folder-permission-row', style: 'display: flex; align-items: center; padding: 8px; border-bottom: 1px solid var(--border-color, #333);', inner: [
+                    const folderRow = LS.Create({ class: 'folder-permission-row', style: 'display: flex; align-items: center; padding: 8px; border-bottom: 1px solid var(--border-color, #333);', inner: [
                         { tag: 'i', class: statusInfo.icon, style: `color: ${statusInfo.color}; margin-right: 10px; font-size: 18px;` },
                         { style: 'flex: 1;', inner: [
                             { tag: 'div', style: 'font-weight: bold;', inner: folder.name },
@@ -349,8 +349,7 @@ class ResourceManager extends LS.EventEmitter {
                     const buttonContainer = folderRow.lastChild;
 
                     if(folder.status === 'prompt' && folder.canRequest) {
-                        buttonContainer.appendChild(N({
-                            tag: 'button',
+                        buttonContainer.appendChild(LS.Create("button", {
                             class: 'small primary',
                             inner: 'Grant Access',
                             onclick: async () => {
@@ -364,8 +363,7 @@ class ResourceManager extends LS.EventEmitter {
                     }
 
                     if(folder.status === 'lost' || folder.status === 'denied') {
-                        buttonContainer.appendChild(N({
-                            tag: 'button',
+                        buttonContainer.appendChild(LS.Create("button", {
                             class: 'small',
                             inner: 'Re-select Folder',
                             onclick: async () => {
@@ -389,8 +387,7 @@ class ResourceManager extends LS.EventEmitter {
                             }
                         }));
 
-                        buttonContainer.appendChild(N({
-                            tag: 'button',
+                        buttonContainer.appendChild(LS.Create("button", {
                             class: 'small danger',
                             inner: 'Remove',
                             onclick: () => {
@@ -407,7 +404,7 @@ class ResourceManager extends LS.EventEmitter {
                 }
 
                 if(folderStatuses.length === 0) {
-                    folderListContainer.appendChild(N({ style: 'padding: 20px; text-align: center; color: gray;', inner: 'No folders configured' }));
+                    folderListContainer.appendChild(LS.Create({ style: 'padding: 20px; text-align: center; color: gray;', inner: 'No folders configured' }));
                 }
             };
 
@@ -428,7 +425,7 @@ class ResourceManager extends LS.EventEmitter {
 
             this.permissionModal = LS.Modal.build({
                 title: 'Folder Permissions Required',
-                content: N({ inner: [
+                content: LS.Create({ inner: [
                     { tag: 'p', inner: 'Some project folders require permission to access. Please grant access or re-select folders that have lost their handles.' },
                     folderListContainer
                 ]}),
