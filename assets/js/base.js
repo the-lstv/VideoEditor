@@ -8,7 +8,7 @@ if(isNode) {
  * Project class
  * Currently the main class connecting views and rendering together
  */
-class Project extends LS.EventEmitter {
+class Project extends LS.Context {
     constructor(data) {
         super();
 
@@ -18,8 +18,6 @@ class Project extends LS.EventEmitter {
         this.timeline = null;
         this.resources = new ResourceManager(this);
         this.historyManager = new HistoryManager(this);
-
-        this.patcher = new LS.Patcher(this);
 
         this.config = {};
         this.initialized = false;
@@ -212,6 +210,10 @@ class Project extends LS.EventEmitter {
     }
 
     render() {
+        if(!this.frameScheduler) {
+            console.log(this, this.frameScheduler, app.currentProject);
+        }
+
         this.frameScheduler.schedule();
     }
 
@@ -236,16 +238,16 @@ class Project extends LS.EventEmitter {
                 this.connectedViews.set('timeline', view);
                 this.setTimeline(this.currentTimeline || "main");
 
-                this.timeline.on('seek', () => {
-                    this.frameScheduler.schedule();
+                this.addExternalEventListener(this.timeline, 'seek', () => {
                     this.quickEmit(this.__seekEventRef, view.timeline.seek);
+                    this.render();
                 });
 
-                this.timeline.on('duration-changed', (duration) => {
+                this.addExternalEventListener(this.timeline, 'duration-changed', (duration) => {
                     this.emit('duration-changed', [duration]);
                 });
 
-                this.timeline.on('item-select', (item) => {
+                this.addExternalEventListener(this.timeline, 'item-select', (item) => {
                     const itemEditor = this.connectedViews.get('propertyEditor');
                     if(itemEditor) {
                         itemEditor.setTarget(item);
@@ -254,7 +256,7 @@ class Project extends LS.EventEmitter {
                     }
                 });
 
-                this.timeline.on('item-deselect', () => {
+                this.addExternalEventListener(this.timeline, 'item-deselect', () => {
                     const itemEditor = this.connectedViews.get('propertyEditor');
                     if(itemEditor) {
                         itemEditor.setTarget(null);
@@ -263,28 +265,28 @@ class Project extends LS.EventEmitter {
                     this.render();
                 });
 
-                this.timeline.on("drag-start", (type) => {
+                this.addExternalEventListener(this.timeline, "drag-start", (type) => {
                     if(type === "seek") {
                         this.prevPlayState = this.playing;
                         this.pause();
                     }
                 });
 
-                this.timeline.on("drag-end", (type) => {
+                this.addExternalEventListener(this.timeline, "drag-end", (type) => {
                     if(type === "seek" && this.prevPlayState) {
                         this.play();
                     }
                 });
 
-                this.timeline.on('file-dropped', async (files, row, offset) => {
+                this.addExternalEventListener(this.timeline, 'file-dropped', async (files, row, offset) => {
                     this.resources.addProjectResources(files, row, offset);
                 });
 
-                this.timeline.on('action', (action) => {
+                this.addExternalEventListener(this.timeline, 'action', (action) => {
                     this.historyManager.execute(action);
                 });
 
-                this.timeline.on("item-cleanup", (item) => {
+                this.addExternalEventListener(this.timeline, "item-cleanup", (item) => {
                     if(item.node) {
                         item.node.destroy({ children: true });
                         item.node = null;
@@ -366,7 +368,7 @@ class Project extends LS.EventEmitter {
         if(this.initialized) return;
         await this.loadFrom(data || {});
 
-        this.renderingCanvas = document.createElement('canvas');
+        this.renderingCanvas = this.addDestroyable(document.createElement('canvas'));
         this.renderer = new LS.GL.Renderer({
             canvas: this.renderingCanvas,
             width: 1280,
@@ -668,15 +670,16 @@ class Project extends LS.EventEmitter {
         this.resources = null;
         this.historyManager.destroy();
         this.emit('destroy');
-        this.events.clear();
         this.config = null;
         this.destroyed = true;
+
+        super.destroy();
     }
 
     /**
      * Replaces this project with another one
      * @param {*} otherProject 
-     * @returns 
+     * @returns {Project} The other project
      */
     replaceWith(otherProject) {
         if(!(otherProject instanceof Project)) {
@@ -689,7 +692,9 @@ class Project extends LS.EventEmitter {
             this.disconnect(view);
             otherProject.connect(view);
         }
+
         this.destroy();
+        return otherProject;
     }
 
     static openFromZipFile(callback) {
@@ -1546,7 +1551,7 @@ const LAYOUT_SCHEMA_PRESETS = {
      * |   |   |
      */
     'default': {
-        title: "Default",
+        title: "Classic",
         direction: 'column',
         inner: [
             // Two horizontal rows
@@ -1561,7 +1566,7 @@ const LAYOUT_SCHEMA_PRESETS = {
      * |   |   |
      */
     'vertical-split': {
-        title: "Vertical Split",
+        title: "Vertical Split (timeline focus)",
         direction: 'row',
         inner: [
             { type: 'slot', view: 'TimelineView' },
@@ -1574,33 +1579,33 @@ const LAYOUT_SCHEMA_PRESETS = {
         ]
     },
 
-    /**
-    * |       |
-    * |-------|
-    * |       |
-    */
-    'simple-horizontal': {
-        title: "Simple Horizontal",
-        direction: 'column',
-        inner: [
-            { type: 'slot', view: 'PreviewView', resize: { height: "50%" } },
-            { type: 'slot', view: 'TimelineView' }
-        ]
-    },
+    // /**
+    // * |       |
+    // * |-------|
+    // * |       |
+    // */
+    // 'simple-horizontal': {
+    //     title: "Simple Horizontal",
+    //     direction: 'column',
+    //     inner: [
+    //         { type: 'slot', view: 'PreviewView', resize: { height: "50%" } },
+    //         { type: 'slot', view: 'TimelineView' }
+    //     ]
+    // },
 
-    /**
-    * |   |   |
-    * |   |   |
-    * |   |   |
-    */
-    'simple-vertical': {
-        title: "Simple Vertical",
-        direction: 'row',
-        inner: [
-            { type: 'slot', view: 'PreviewView', resize: { width: "50%" } },
-            { type: 'slot', view: 'TimelineView' }
-        ]
-    },
+    // /**
+    // * |   |   |
+    // * |   |   |
+    // * |   |   |
+    // */
+    // 'simple-vertical': {
+    //     title: "Simple Vertical",
+    //     direction: 'row',
+    //     inner: [
+    //         { type: 'slot', view: 'PreviewView', resize: { width: "50%" } },
+    //         { type: 'slot', view: 'TimelineView' }
+    //     ]
+    // },
 
     /**
     * |       |
@@ -1615,9 +1620,9 @@ const LAYOUT_SCHEMA_PRESETS = {
             {
                 direction: 'row',
                 inner: [
+                    { type: 'slot', view: 'AssetManagerView', resize: { width: "20%" } },
                     { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
-                    { type: 'slot', view: 'PropertyEditorView', resize: { width: "25%" } },
-                    { type: 'slot', view: 'AssetManagerView' }
+                    { type: 'slot', view: 'PropertyEditorView' }
                 ]
             }
         ]
@@ -1637,7 +1642,13 @@ const LAYOUT_SCHEMA_PRESETS = {
                 direction: 'column',
                 inner: [
                     { type: 'slot', view: 'PreviewView', resize: { height: "60%" } },
-                    { type: 'slot', view: 'TimelineView' }
+                    {
+                        direction: 'row',
+                        inner: [
+                            { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
+                            { type: 'slot', view: 'PropertyEditorView' }
+                        ]
+                    }
                 ]
             }
         ]
@@ -1649,14 +1660,20 @@ const LAYOUT_SCHEMA_PRESETS = {
     * |     |  |
     */
     'sidebar-right': {
-        title: "Sidebar Right",
+        title: "Sidebar Right (properties focus)",
         direction: 'row',
         inner: [
             {
                 direction: 'column',
                 inner: [
                     { type: 'slot', view: 'PreviewView', resize: { height: "60%" } },
-                    { type: 'slot', view: 'TimelineView' }
+                    { 
+                        direction: 'row',
+                        inner: [
+                            { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
+                            { type: 'slot', view: 'AssetManagerView' }
+                        ]
+                    }
                 ]
             },
             { type: 'slot', view: 'PropertyEditorView', resize: { width: 300 } }

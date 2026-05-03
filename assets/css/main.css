@@ -867,3 +867,9 @@ ls-box ul li {
     height: 100%;
     width: 100%;
 }
+
+hr.vertical {
+    margin: 0 var(--hr-spacing, 8px);
+    height: -webkit-fill-available;
+    width: 1px;
+}

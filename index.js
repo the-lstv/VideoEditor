@@ -205,7 +205,7 @@ class ApplicationContext {
                 nodeIntegration: true,
                 contextIsolation: false,
             }
-        }, 'index-generated.html');
+        }, 'index.html');
 
         mainWindow.maximize();
     });

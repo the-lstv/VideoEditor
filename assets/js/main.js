@@ -1,6 +1,6 @@
 // --- Application setup ---
 
-const VERSION = "2.0.0";
+const VERSION = "2.1.0";
 
 /**
  * Central application object
@@ -115,6 +115,11 @@ window.addEventListener('load', async () => {
             OPEN_PREFERENCES: 'ctrl+,',
             UNDO: 'ctrl+z',
             REDO: [ 'ctrl+shift+z', 'ctrl+y' ],
+            TIMELINE_TOOL_SELECT: 'v',
+            TIMELINE_TOOL_SLICE: 'c',
+            TIMELINE_TOOL_PREVIEW: 'p',
+            TIMELINE_TOOL_GROUP: 'g',
+            TIMELINE_TOOL_ERASE: 'e',
 
             ...app.config.get('shortcuts') || {} // Custom shortcuts
         });
@@ -128,10 +133,10 @@ window.addEventListener('load', async () => {
             // Temporary
             EditorBaseClasses.Project.openFromZipFile(project => {
                 project.once('ready', () => {
-                    if(project) {
-                        app.currentProject.replaceWith(project);
-                        app.currentProject = project;
-                    }
+                    if(!project) return;
+
+                    app.currentProject.replaceWith(project);
+                    app.currentProject = project;
                 });
             });
         });
@@ -218,6 +223,12 @@ window.addEventListener('load', async () => {
             settingsModal.open();
         });
 
+        app.shortcutManager.assign("TIMELINE_TOOL_SELECT", () => { app.currentProject.timeline.tool = "select" });
+        app.shortcutManager.assign("TIMELINE_TOOL_SLICE", () => { app.currentProject.timeline.tool = "slice" });
+        app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { app.currentProject.timeline.tool = "preview" });
+        app.shortcutManager.assign("TIMELINE_TOOL_GROUP", () => { app.currentProject.timeline.tool = "group" });
+        app.shortcutManager.assign("TIMELINE_TOOL_ERASE", () => { app.currentProject.timeline.tool = "erase" });
+
         undoButton.addEventListener('click', () => {
             app.currentProject.historyManager.undo();
         });
@@ -233,7 +244,7 @@ window.addEventListener('load', async () => {
                 { text: "Open Project...", action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN"); } },
                 { text: "Save Project", action() { app.shortcutManager.triggerMapping("GLOBAL_SAVE"); } },
                 { type: "separator" },
-                { text: "Export Video...", action() {
+                { text: "Export...", icon: "bi-box-arrow-right", action() {
                     // ... Open export dialog
                 } },
 
@@ -246,7 +257,7 @@ window.addEventListener('load', async () => {
                 // TODO
                 { text: "Preferences", action() {
                     app.shortcutManager.triggerMapping("OPEN_PREFERENCES");
-                } },
+                }, icon: "bi-sliders" },
 
                 { type: "separator" },
                 
@@ -288,6 +299,10 @@ window.addEventListener('load', async () => {
                 { text: "Load Layout From File", action() {} },
             ],
 
+            actions: [
+                { text: "Clean up noise", action() { } },
+            ],
+
             help: [
                 { text: "Report bug", action() {
                     window.open("https://github.com/the-lstv/videoeditor/issues?q=state%3Aopen%20label%3Abug");
@@ -302,7 +317,7 @@ window.addEventListener('load', async () => {
                 { text: "About", icon: "bi-stars", action() {
                     LS.Modal.buildEphemeral({
                         content: [
-                            { tag: 'img', src: 'assets/images/icon-flat.svg', style: 'height: 4em; width: 100%; margin: auto' },
+                            { tag: 'img', src: 'assets/images/icon.svg', style: 'height: 5em; width: 100%; margin: auto' },
                             { tag: 'h2', inner: 'Video Editor', style: 'text-align: center; margin-bottom: 8px' },
                             { tag: 'p', inner: `Version ${VERSION} (Alpha)` },
                             { tag: 'p', inner: 'A professional video editor built with web technologies and the LS framework.' },
