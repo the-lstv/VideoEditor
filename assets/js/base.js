@@ -485,7 +485,7 @@ class Project extends LS.Context {
 
             case "sound":
             case "notes":
-                // No visual node, but (TODO:) should create an audio node
+                // No visual node, but (TODO:) should have a MIDI event stream
                 return null;
 
             // Currently unsupported
@@ -1566,7 +1566,7 @@ const LAYOUT_SCHEMA_PRESETS = {
      * |   |   |
      */
     'vertical-split': {
-        title: "Vertical Split (timeline focus)",
+        title: "Timeline Focused",
         direction: 'row',
         inner: [
             { type: 'slot', view: 'TimelineView' },
@@ -1660,7 +1660,7 @@ const LAYOUT_SCHEMA_PRESETS = {
     * |     |  |
     */
     'sidebar-right': {
-        title: "Sidebar Right (properties focus)",
+        title: "Property Editor Focused",
         direction: 'row',
         inner: [
             {

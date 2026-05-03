@@ -50,10 +50,11 @@ body {
   };
 })();
 </script><script src='https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.13.2/pixi.min.js' integrity='sha512-rOMqai9NIPaFWpmvHUjdOa2dSuaaYo6i7E19jS1ZW9rjnrl4qAOOtsOeTk0QgIflFCe2ZYi/7or3CRF6VfBk9g==' crossorigin='anonymous' referrerpolicy='no-referrer'></script><script src='https://cdnjs.cloudflare.com/ajax/libs/pixi.js/8.13.2/packages/advanced-blend-modes.min.js' integrity='sha512-jAkKvxtcrrqJ+gUTZXNV4oD9h5sl2297SjKx8zys1qjsJ5Ycem1+PFKHsLr80nEHVJLZbySxzMnBp/1JsuaIEw==' crossorigin='anonymous' referrerpolicy='no-referrer'></script><script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script><link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"></noscript><link rel=preconnect href="https://fonts.googleapis.com"><link rel=preconnect href="https://fonts.gstatic.com" crossorigin><link rel=stylesheet href="https://fonts.googleapis.com/css2?family=Ubuntu+Mono&family=use&display=swap"><link rel=stylesheet href="https://cdn-origin.extragon.localhost/ls/beta/flat,knob,timeline/ls.css"><script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,dragdrop,gl,knob,menu,modal,node,patcher,reactive,resize,tabs,timeline,toast,tooltips/ls.js"></script><script src="./assets/js/resources.js?mtime=molmzqsl.fdq" defer></script>
-    <script src="./assets/js/file-browser.js?mtime=moplzkns.1j" defer></script>
-    <script src="./assets/js/base.js?mtime=mopucrlb.re" defer></script><script src="./assets/js/views.js?mtime=mopsvrv2.mbd" defer></script><script src="./assets/js/xxhash.js?mtime=mj8ryn6m.qlr" defer></script><script src="./assets/js/main.js?mtime=mopn63j2.oqp" defer></script>
+    <script src="./assets/js/file-browser.js?mtime=mopv4ush.icc" defer></script>
+    <script src="./assets/js/base.js?mtime=mopukn12.npo" defer></script>
+    <script src="./assets/js/statusbar.js?mtime=mopuxbyx.0da" defer></script><script src="./assets/js/views.js?mtime=mopsvrv2.mbd" defer></script><script src="./assets/js/xxhash.js?mtime=mj8ryn6m.qlr" defer></script><script src="./assets/js/main.js?mtime=mopuyycv.nr" defer></script>
 
-    <link rel=stylesheet href="./assets/css/main.css?mtime=molpajd7.b57" ><meta charset="utf-8"><title>Video Editor</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="shortcut icon" href="./favicon.svg" type="image/svg+xml"></head>
+    <link rel=stylesheet href="./assets/css/main.css?mtime=mopuw2n2.odq" ><meta charset="utf-8"><title>Video Editor</title><meta name="viewport" content="width=device-width, initial-scale=1.0"><link rel="shortcut icon" href="./favicon.svg" type="image/svg+xml"></head>
 <body ls ls-theme="dark" ls-accent="white" ls-style="flat" style="--font:Ubuntu Mono, monospace" class="level-0">
 <img id="logo" width='200px' src='assets/images/icon.svg' alt='Video Editor Icon'>
 <div id="app-loading">
@@ -63,15 +64,15 @@ body {
 <nav id="editor-header" class="level-2">
 <div>
 <img style='height: 1em; margin-right: 8px' src='assets/images/icon-flat.svg' alt='Video Editor Icon'>
-<div tabindex='0' class="header-menu-category">File</div>
-<div tabindex='0' class="header-menu-category">Options</div>
-<div tabindex='0' class="header-menu-category">Layout</div>
+<div tabindex='0' class="nav-menu-item">File</div>
+<div tabindex='0' class="nav-menu-item">Options</div>
+<div tabindex='0' class="nav-menu-item">Layout</div>
 
-<div tabindex='0' class="header-menu-category">Help</div>
+<div tabindex='0' class="nav-menu-item">Help</div>
 </div>
 <div>
-<div tabindex='0' id="undoButton" ls-tooltip='Undo' class="disabled"><svg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' fill='currentColor' viewBox='0 0 256 256'><path d='M236,144a68.07,68.07,0,0,1-68,68H80a12,12,0,0,1,0-24h88a44,44,0,0,0,0-88H61l27.52,27.51a12,12,0,0,1-17,17l-48-48a12,12,0,0,1,0-17l48-48a12,12,0,1,1,17,17L61,76H168A68.08,68.08,0,0,1,236,144Z'></path></svg></div>
-<div tabindex='0' id="redoButton" ls-tooltip='Redo' class="disabled"><svg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' fill='currentColor' viewBox='0 0 256 256'><path d='M167.51,127.51,195,100H88a44,44,0,0,0,0,88h88a12,12,0,0,1,0,24H88A68,68,0,0,1,88,76H195L167.51,48.49a12,12,0,1,1,17-17l48,48a12,12,0,0,1,0,17l-48,48a12,12,0,0,1-17-17Z'></path></svg></div>
+<div tabindex='0' id="undoButton" ls-tooltip='Undo' class="disabled nav-menu-item"><svg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' fill='currentColor' viewBox='0 0 256 256'><path d='M236,144a68.07,68.07,0,0,1-68,68H80a12,12,0,0,1,0-24h88a44,44,0,0,0,0-88H61l27.52,27.51a12,12,0,0,1-17,17l-48-48a12,12,0,0,1,0-17l48-48a12,12,0,1,1,17,17L61,76H168A68.08,68.08,0,0,1,236,144Z'></path></svg></div>
+<div tabindex='0' id="redoButton" ls-tooltip='Redo' class="disabled nav-menu-item"><svg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' fill='currentColor' viewBox='0 0 256 256'><path d='M167.51,127.51,195,100H88a44,44,0,0,0,0,88h88a12,12,0,0,1,0,24H88A68,68,0,0,1,88,76H195L167.51,48.49a12,12,0,1,1,17-17l48,48a12,12,0,0,1,0,17l-48,48a12,12,0,0,1-17-17Z'></path></svg></div>
 </div>
 </nav>
 <div id="layout-container"></div>

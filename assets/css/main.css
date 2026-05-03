@@ -98,17 +98,33 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
     flex: none;
     height: 25px;
     display: flex;
+    justify-content: space-between;
 }
 
 #editor-header {
     align-items: center;
     padding: 0 10px;
-    justify-content: space-between;
     border-bottom: 1px solid var(--surface-4);
 }
 
 #editor-footer {
     background: var(--surface-n1);
+
+    .statusbar-left, .statusbar-right {
+        display: flex;
+        align-items: center;
+        width: max-content;
+        height: 100%;
+        gap: 12px;
+    }
+
+    .statusbar-left {
+        padding-left: 10px;
+    }
+
+    .statusbar-right {
+        padding-right: 10px;
+    }
 }
 
 #editor-header > div {
@@ -117,7 +133,7 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
     height: 100%;
 }
 
-#editor-header > div > div {
+.nav-menu-item {
     height: 100%;
     padding: 0 8px;
     cursor: pointer;
@@ -126,12 +142,12 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
     justify-content: center;
 }
 
-#editor-header > div > div.disabled {
+.nav-menu-item.disabled {
     cursor: default;
     opacity: 0.5;
 }
 
-#editor-header > div > div:hover, #editor-header > div > div:focus {
+.nav-menu-item:hover, .nav-menu-item:focus {
     background: var(--elevate);
 }
 

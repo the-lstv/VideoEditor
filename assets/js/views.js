@@ -1703,7 +1703,7 @@ class AssetManagerView extends EditorBaseClasses.View {
                 { name: "Video", type: "video", item: { type: "video", label: "Video", color: "blue" } },
                 { name: "Image", type: "sprite", item: { type: "sprite", label: "Image" } },
                 { name: "Sound", type: "sound", item: { type: "sound", label: "Sound", color: "purple" } },
-                { name: "MIDI pattern", type: "notes", item: { type: "notes", label: "MIDI pattern", color: "yellow" } }
+                { name: "Pattern", type: "notes", item: { type: "notes", label: "Pattern", color: "yellow" } }
             ]
         },
 

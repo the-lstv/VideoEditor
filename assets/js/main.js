@@ -9,6 +9,7 @@ const appContainer = document.querySelector("#editor-container") || LS.Create({ 
 const layoutContainer = document.querySelector("#layout-container") || LS.Create({ class: 'layout-container' }).addTo(appContainer);
 const settingsContent = document.querySelector("#preferences-modal");
 const headerContainer = document.querySelector("#editor-header");
+const statusBarContainer = document.querySelector("#editor-footer");
 const undoButton = document.querySelector("#undoButton");
 const redoButton = document.querySelector("#redoButton");
 const config = new EditorBaseClasses.ConfigStore();
@@ -30,7 +31,9 @@ const app = {
 
     focusedPreview: null,
     shortcutManager: new LS.ShortcutManager(),
-    config
+    config,
+
+    statusBar: new StatusBar(statusBarContainer)
 }
 
 const mobileWarningSwitch = new LS.Util.Switch(value => {
@@ -110,8 +113,11 @@ window.addEventListener('load', async () => {
             GLOBAL_PREVIOUS_FRAME: 'shift+left',
             GLOBAL_SAVE: 'ctrl+s',
             GLOBAL_OPEN: 'ctrl+o',
+            GLOBAL_PROJECT_MANAGER: 'ctrl+shift+o',
+            GLOBAL_PROJECT_MANAGER: 'ctrl+shift+o',
             GLOBAL_NEW_PROJECT: 'ctrl+n',
             GLOBAL_FOCUS_HEADER: 'alt',
+            GLOBAL_EXPORT_MENU: 'ctrl+e',
             OPEN_PREFERENCES: 'ctrl+,',
             UNDO: 'ctrl+z',
             REDO: [ 'ctrl+shift+z', 'ctrl+y' ],
@@ -195,7 +201,7 @@ window.addEventListener('load', async () => {
             }
 
             previousActive = document.activeElement;
-            document.querySelector("#editor-header .header-menu-category").focus();
+            document.querySelector("#editor-header .nav-menu-item").focus();
         });
 
         app.shortcutManager.assign("UNDO", () => {
@@ -240,6 +246,10 @@ window.addEventListener('load', async () => {
         // Setup menus
         const menus = {
             file: [
+                { text: "Project manager", action() {
+                    // ... Open project manager
+                } },
+                { type: "separator" },
                 { text: "New Project", action() { app.shortcutManager.triggerMapping("GLOBAL_NEW_PROJECT"); } },
                 { text: "Open Project...", action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN"); } },
                 { text: "Save Project", action() { app.shortcutManager.triggerMapping("GLOBAL_SAVE"); } },
@@ -330,7 +340,7 @@ window.addEventListener('load', async () => {
             ],
         };
 
-        for(const menuCategoryElement of headerContainer.querySelectorAll(".header-menu-category")) {
+        for(const menuCategoryElement of headerContainer.querySelectorAll(".nav-menu-item")) {
             const menuTitle = menuCategoryElement.innerText.toLowerCase();
             const menuItems = menus[menuTitle] || [];
 

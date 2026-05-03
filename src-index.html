@@ -75,6 +75,7 @@
     @use (./assets/js/resources.js[defer]);
     @use (./assets/js/file-browser.js[defer]);
     @use (./assets/js/base.js[defer]);
+    @use (./assets/js/statusbar.js[defer]);
 
     <!-- Views (panels and components) -->
     @use (./assets/js/views.js[defer]);
@@ -110,16 +111,16 @@
         <nav #editor-header .level-2>
             <div>
                 <img style="height: 1em; margin-right: 8px" src="assets/images/icon-flat.svg" alt="Video Editor Icon">
-                <div tabindex="0" .header-menu-category>File</div>
-                <div tabindex="0" .header-menu-category>Options</div>
-                <div tabindex="0" .header-menu-category>Layout</div>
-                <!-- <div tabindex="0" .header-menu-category>View</div> -->
-                <div tabindex="0" .header-menu-category>Help</div>
+                <div tabindex="0" .nav-menu-item>File</div>
+                <div tabindex="0" .nav-menu-item>Options</div>
+                <div tabindex="0" .nav-menu-item>Layout</div>
+                <!-- <div tabindex="0" .nav-menu-item>View</div> -->
+                <div tabindex="0" .nav-menu-item>Help</div>
             </div>
 
             <div>
-                <div tabindex="0" .disabled #undoButton ls-tooltip="Undo"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M236,144a68.07,68.07,0,0,1-68,68H80a12,12,0,0,1,0-24h88a44,44,0,0,0,0-88H61l27.52,27.51a12,12,0,0,1-17,17l-48-48a12,12,0,0,1,0-17l48-48a12,12,0,1,1,17,17L61,76H168A68.08,68.08,0,0,1,236,144Z"></path></svg></div>
-                <div tabindex="0" .disabled #redoButton ls-tooltip="Redo"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M167.51,127.51,195,100H88a44,44,0,0,0,0,88h88a12,12,0,0,1,0,24H88A68,68,0,0,1,88,76H195L167.51,48.49a12,12,0,1,1,17-17l48,48a12,12,0,0,1,0,17l-48,48a12,12,0,0,1-17-17Z"></path></svg></div>
+                <div tabindex="0" .disabled .nav-menu-item #undoButton ls-tooltip="Undo"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M236,144a68.07,68.07,0,0,1-68,68H80a12,12,0,0,1,0-24h88a44,44,0,0,0,0-88H61l27.52,27.51a12,12,0,0,1-17,17l-48-48a12,12,0,0,1,0-17l48-48a12,12,0,1,1,17,17L61,76H168A68.08,68.08,0,0,1,236,144Z"></path></svg></div>
+                <div tabindex="0" .disabled .nav-menu-item #redoButton ls-tooltip="Redo"><svg xmlns="http://www.w3.org/2000/svg" width="1em" height="1em" fill="currentColor" viewBox="0 0 256 256"><path d="M167.51,127.51,195,100H88a44,44,0,0,0,0,88h88a12,12,0,0,1,0,24H88A68,68,0,0,1,88,76H195L167.51,48.49a12,12,0,1,1,17-17l48,48a12,12,0,0,1,0,17l-48,48a12,12,0,0,1-17-17Z"></path></svg></div>
             </div>
         </nav>
 
