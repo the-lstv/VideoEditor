@@ -2,21 +2,20 @@
 # VideoEditor (in development)
 A full-featured professional video editor built with [LS](https://github.com/the-lstv/LS).
 
-Features include:
+Features include (work in progress):
 - Entirely hackable
 - Highly customizable
-- Fully customizeable layout and theme
 - Automation & animation clips
-- Hardware acceleration & shader effects
-- Advanced audio
+- 3D support, hardware acceleration & shader effects
+- VR support
+- Advanced audio editing features, MIDI support, and more!
 - Intuitive controls to speed up your workflow
 - Easy to use, modern, but powerful UI
-- Multi-timeline editing
+- Multi-timeline support
 - Highly optimized & lightweight
 
 ## A full modern rewrite of this project is underway!
 It will be much more robust, fully modular and customizable, with hardware acceleration, and hopefully much more!
-
 
 <img src=https://cdn.extragon.cloud/file/16f88ce81a1c169f.webp> <br>
 <img src=https://cdn.extragon.cloud/file/21b130d594cef8dd.webp> <br>
@@ -26,7 +25,7 @@ You can map anything: <br>
 
 <br>
 <details>
-<summary>Old version</summary>
+<summary>See old version (1.x)</summary>
 
 ### Old screenshots
 ![Screenshot from 2024-06-08 15-24-09](https://github.com/the-lstv/VideoEditor/assets/62482747/8ed7e3fe-a054-453d-804a-3be2f4465c77)

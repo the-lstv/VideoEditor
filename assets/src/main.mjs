@@ -1,107 +1,92 @@
-// --- Application setup ---
+/**
+ * Main entry point.
+ */
 
-const VERSION = "2.1.0";
+// Check if we're running in Electron
+window.isNode = typeof process !== "undefined" && process.versions != null && process.versions.node != null;
+
+// --- Core imports
+import * as EditorBaseClasses from "./core/base.mjs";
+import StatusBar from "./core/statusbar.mjs";
+import ConfigStore from "./core/configstore.mjs";
+import Project from "./core/project.mjs";
+
+// --- Video editor flavor
+import VideoEditor from "./flavors/video-editor/main.mjs";
+
+// --- QuickSand flavor
+// import QuickSand from "./flavors/quicksand/main.mjs";
+
+// Small miscellaneous helpers
+function createIfNotExists(selector, whereShouldItGo = document.body) { return document.querySelector(selector) || LS.Create(selector).addTo(whereShouldItGo) }
+function selfInvoke(method) { method(); return method }
+
+const config = new ConfigStore();
+
 
 /**
- * Central application object
+ * Entry UI elements
  */
-const appContainer = document.querySelector("#editor-container") || LS.Create({ id: 'app-container' }).addTo(document.body);
-const layoutContainer = document.querySelector("#layout-container") || LS.Create({ class: 'layout-container' }).addTo(appContainer);
-const settingsContent = document.querySelector("#preferences-modal");
-const headerContainer = document.querySelector("#editor-header");
-const statusBarContainer = document.querySelector("#editor-footer");
-const undoButton = document.querySelector("#undoButton");
-const redoButton = document.querySelector("#redoButton");
-const config = new EditorBaseClasses.ConfigStore();
+const appContainer       = createIfNotExists("#editor-container", document.body);
+const layoutContainer    = createIfNotExists("#layout-container", appContainer);
+const settingsContent    = createIfNotExists("#preferences-modal");
+const headerContainer    = createIfNotExists("#editor-header");
+const statusBarContainer = createIfNotExists("#editor-footer");
+const undoButton         = createIfNotExists("#undoButton");
+const redoButton         = createIfNotExists("#redoButton");
 
-const MIN_EDITOR_WIDTH = 600;
-
-PIXI.Ticker.shared.autoStart = false;
-PIXI.Ticker.shared.stop();
-PIXI.Ticker.system.autoStart = false;
-PIXI.Ticker.system.stop();
-
-const app = {
+/**
+ * Global persistent application state
+ */
+const app = globalThis.app = {
     container: appContainer,
-    currentProject: new EditorBaseClasses.Project(),
-
-    layoutManager: new EditorBaseClasses.LayoutManager(layoutContainer, {
-        layout: config.get("default-layout") || "default",
-    }),
-
-    focusedPreview: null,
-    shortcutManager: new LS.ShortcutManager(),
     config,
 
-    statusBar: new StatusBar(statusBarContainer)
+    // Layout & shortcuts
+    layoutManager: new LS.Multipane(layoutContainer, { layout: config.get("default-layout") || "empty" }),
+    shortcutManager: new LS.ShortcutManager(),
+    statusBar: new StatusBar(statusBarContainer),
+
+    GITHUB_REPO: "https://github.com/the-lstv/videoeditor",
+    VERSION: "2.2.0-alpha",
+
+    enterShade() {
+        app.container.classList.remove('loaded');
+        document.querySelector("#logo").classList.remove("jump");
+    },
+
+    leaveShade() {
+        app.container.style.display = 'flex';
+        document.querySelector("#logo").classList.add("jump");
+        setTimeout(() => app.container.classList.add('loaded'), 0);
+    },
+
+    setIcon(iconSet) {
+        if(typeof iconSet === "string") {
+            iconSet = {
+                icon: iconSet
+            };
+        }
+
+        app.iconSet = iconSet;
+        LS.Select(".flavor-icon, #logo").forEach(el => el.src = el.id === "logo" ? iconSet.icon: iconSet.small || iconSet.favicon || iconSet.icon);
+    }
 }
 
-const mobileWarningSwitch = new LS.Util.Switch(value => {
-    if(value) {
-        app.container.remove();
-        document.body.appendChild(app.mobileDisclaimer || (app.mobileDisclaimer = LS.Create({
-            class: 'disclaimer',
-            inner: [
-                { tag: 'i', class: 'bi-aspect-ratio' },
-                { tag: 'h1', inner: 'Your screen is too small' },
-                { tag: 'p', innerHTML: `You need at least ${MIN_EDITOR_WIDTH} pixels of screen width to use the Video Editor. There is no mobile support at this time (if there is interest however, I am not opposed for adding it - <a href="https://github.com/the-lstv/videoeditor/issues?q=state%3Aopen%20label%3Aenhancement" target="_blank" rel="noopener noreferrer">let me know</a>).` }
-            ]
-        })));
 
-        LS.Modal.closeAll();
-    } else {
-        if(app.mobileDisclaimer) app.mobileDisclaimer.remove();
-        document.body.appendChild(app.container);
-    }
-});
-
-
-function updateEditorViewport() {
-    mobileWarningSwitch.set(window.innerWidth < MIN_EDITOR_WIDTH);
-}
-
-
-// --- Initialization ---
-
-window.addEventListener("beforeunload", (e) => {
-    if(app.currentProject.unsavedChanges) {
-        e.preventDefault();
-        e.returnValue = '';
-        return '';
-    }
-});
+// --- Workspace initialization
 
 window.addEventListener('load', async () => {
     try {
-        if(!window.getxxhash) {
-            throw new Error("getxxhash is missing");
+        // Setup the video editor flavor (prepares views, rendering, etc. for video editing)
+        // This is now the only thing workflow specific in this file
+        VideoEditor.setupIn(app);
+        // QuickSand.setupIn(app);
+
+        // Switch to default layout
+        if(app.layoutManager.options.layout === "empty" && LS.Multipane.PRESETS.default) {
+            app.layoutManager.setSchema("default");
         }
-
-        window.app = app;
-        window.xxhash = await getxxhash();
-
-        // Initialize editor GUI
-        const previewView = new EditorViews.PreviewView();
-        const timelineView = new EditorViews.TimelineView();
-        const assetManagerView = new EditorViews.AssetManagerView();
-        const propertyEditorView = new EditorViews.PropertyEditorView();
-        app.focusedPreview = previewView;
-
-        app.layoutManager.add(previewView, timelineView, assetManagerView, propertyEditorView);
-
-        // Initialize project
-        app.currentProject.once('ready', () => {
-            app.currentProject.connect(previewView);
-            app.currentProject.connect(timelineView);
-            app.currentProject.connect(assetManagerView);
-            app.currentProject.connect(propertyEditorView);
-        });
-
-        window.addEventListener('resize', updateEditorViewport);
-        updateEditorViewport();
-
-        window.timelineView = timelineView;
-        window.timeline = timelineView.timeline;
 
         // Shortcuts
         app.shortcutManager.map({
@@ -130,6 +115,8 @@ window.addEventListener('load', async () => {
             ...app.config.get('shortcuts') || {} // Custom shortcuts
         });
 
+        // --- Shortcut actions
+
         app.shortcutManager.assign("GLOBAL_SAVE", () => {
             // Temporary
             app.currentProject.exportZip(true);
@@ -137,7 +124,7 @@ window.addEventListener('load', async () => {
 
         app.shortcutManager.assign("GLOBAL_OPEN", () => {
             // Temporary
-            EditorBaseClasses.Project.openFromZipFile(project => {
+            Project.openFromZipFile(project => {
                 project.once('ready', () => {
                     if(!project) return;
 
@@ -150,7 +137,7 @@ window.addEventListener('load', async () => {
         app.shortcutManager.assign("GLOBAL_NEW_PROJECT", () => {
             // Temporary
             const oldProject = app.currentProject;
-            app.currentProject = new EditorBaseClasses.Project();
+            app.currentProject = new Project();
             app.currentProject.once('ready', () => {
                 oldProject.replaceWith(app.currentProject);
             });
@@ -212,6 +199,27 @@ window.addEventListener('load', async () => {
             app.currentProject.historyManager.redo();
         });
 
+        app.shortcutManager.assign("OPEN_PREFERENCES", () => {
+            settingsModal.open();
+        });
+
+        app.shortcutManager.assign("TIMELINE_TOOL_SELECT", () =>  { app.flavor.timeline.tool = "select"  });
+        app.shortcutManager.assign("TIMELINE_TOOL_SLICE", () =>   { app.flavor.timeline.tool = "slice"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { app.flavor.timeline.tool = "preview" });
+        app.shortcutManager.assign("TIMELINE_TOOL_GROUP", () =>   { app.flavor.timeline.tool = "group"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_ERASE", () =>   { app.flavor.timeline.tool = "erase"   });
+
+        undoButton.addEventListener('click', () => {
+            app.currentProject.historyManager.undo();
+        });
+
+        redoButton.addEventListener('click', () => {
+            app.currentProject.historyManager.redo();
+        });
+
+
+        // --- Setup settings modal
+
         const settingsModal = LS.Modal.build({
             content: settingsContent
         }, {
@@ -225,25 +233,9 @@ window.addEventListener('load', async () => {
             settingsModal.container.toggleClass("sidebar-menu-visible");
         });
 
-        app.shortcutManager.assign("OPEN_PREFERENCES", () => {
-            settingsModal.open();
-        });
 
-        app.shortcutManager.assign("TIMELINE_TOOL_SELECT", () => { app.currentProject.timeline.tool = "select" });
-        app.shortcutManager.assign("TIMELINE_TOOL_SLICE", () => { app.currentProject.timeline.tool = "slice" });
-        app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { app.currentProject.timeline.tool = "preview" });
-        app.shortcutManager.assign("TIMELINE_TOOL_GROUP", () => { app.currentProject.timeline.tool = "group" });
-        app.shortcutManager.assign("TIMELINE_TOOL_ERASE", () => { app.currentProject.timeline.tool = "erase" });
+        // --- Setup menus
 
-        undoButton.addEventListener('click', () => {
-            app.currentProject.historyManager.undo();
-        });
-
-        redoButton.addEventListener('click', () => {
-            app.currentProject.historyManager.redo();
-        });
-
-        // Setup menus
         const menus = {
             file: [
                 { text: "Project manager", action() {
@@ -291,7 +283,7 @@ window.addEventListener('load', async () => {
             ],
 
             layout: [
-                { text: "Change Layout", items: app.layoutManager.getAvailableLayouts().map(layout => ({
+                { text: "Change Layout", items: app.layoutManager.getAvailableLayouts().filter(layout => layout.name !== "empty").map(layout => ({
                     text: layout.title,
                     action() {
                         app.layoutManager.setSchema(layout.schema);
@@ -309,39 +301,46 @@ window.addEventListener('load', async () => {
                 { text: "Load Layout From File", action() {} },
             ],
 
-            actions: [
-                { text: "Clean up noise", action() { } },
-            ],
-
             help: [
                 { text: "Report bug", action() {
-                    window.open("https://github.com/the-lstv/videoeditor/issues?q=state%3Aopen%20label%3Abug");
+                    window.open(app.GITHUB_REPO + "/issues?q=state%3Aopen%20label%3Abug");
                 } },
 
                 { text: "Request feature", action() {
-                    window.open("https://github.com/the-lstv/videoeditor/issues?q=state%3Aopen%20label%3Aenhancement");
+                    window.open(app.GITHUB_REPO + "/issues?q=state%3Aopen%20label%3Aenhancement");
+                } },
+
+                { type: "separator" },
+
+                { text: "Tutorials", action() {
+                    // ! todo
+                    window.open();
                 } },
 
                 { type: "separator" },
 
                 { text: "About", icon: "bi-stars", action() {
+                    if(app.flavor && app.flavor.onAboutDialog) {
+                        app.flavor.onAboutDialog();
+                        return;
+                    }
+
                     LS.Modal.buildEphemeral({
                         content: [
-                            { tag: 'img', src: 'assets/images/icon.svg', style: 'height: 5em; width: 100%; margin: auto' },
-                            { tag: 'h2', inner: 'Video Editor', style: 'text-align: center; margin-bottom: 8px' },
-                            { tag: 'p', inner: `Version ${VERSION} (Alpha)` },
-                            { tag: 'p', inner: 'A professional video editor built with web technologies and the LS framework.' },
+                            { tag: 'img', src: app.flavor ? app.flavor.icon : document.getElementById('logo').src || 'assets/images/icon.svg', style: 'height: 5em; width: 100%; margin: auto' },
+                            { tag: 'h2', inner: app.flavor ? app.flavor.constructor.name : 'LS interface', style: 'text-align: center' },
+                            { tag: 'p', inner: `Version ${app.VERSION}, running LS ${LS.version}` },
                             { tag: 'p', inner: ['Created with love and hard work by Lukas (', { tag: 'a', href: 'https://lstv.space', target: '_blank', inner: 'https://lstv.space' }, ')'] },
-                            { tag: 'p', inner: ['Source code available on ', { tag: 'a', href: 'https://github.com/the-lstv/videoeditor', target: '_blank', inner: 'GitHub' }] },
+                            { tag: 'p', inner: ['Source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }] },
                         ],
                         buttons: [ { label: "Close" } ]
                     });
-                } },
-            ],
+                } }
+            ]
         };
 
         for(const menuCategoryElement of headerContainer.querySelectorAll(".nav-menu-item")) {
-            const menuTitle = menuCategoryElement.innerText.toLowerCase();
+            const menuTitle = menuCategoryElement.classList.contains("flavor-icon") ? "flavor" : menuCategoryElement.innerText.toLowerCase();
             const menuItems = menus[menuTitle] || [];
 
             if(menuItems.length > 0) {
@@ -349,12 +348,14 @@ window.addEventListener('load', async () => {
                     adjacentElement: menuCategoryElement,
                     items: menuItems,
                     group: "ls-editor-header-menu"
-                })
+                });
             }
         }
+
     } catch(e) {
 
         console.error(e);
+
         LS.Modal.buildEphemeral({
             title: "Fatal error",
             content: "We're sorry, the editor failed to initialize due to this error: " + ( e.message || e.toString() ),
@@ -365,12 +366,42 @@ window.addEventListener('load', async () => {
 
         // Remove loading screen
         document.querySelector("#app-loading").remove();
-        document.querySelector("#logo").classList.add("jump");
-
-        app.container.style.display = 'flex';
-        setTimeout(() => {
-            app.container.classList.add('loaded');
-        }, 0);
+        app.leaveShade();
 
     }
 });
+
+window.addEventListener("beforeunload", (e) => {
+    if(app.currentProject.unsavedChanges) {
+        e.preventDefault();
+        e.returnValue = '';
+        return '';
+    }
+});
+
+
+// --- Mobile screen warning (temporary until mobile support is implemented)
+
+const MIN_EDITOR_WIDTH = 600;
+const mobileWarningSwitch = new LS.Util.Switch(value => {
+    if(value) {
+        app.container.remove();
+        document.body.appendChild(app.mobileDisclaimer || (app.mobileDisclaimer = LS.Create({
+            class: 'disclaimer',
+            inner: [
+                { tag: 'i', class: 'bi-aspect-ratio' },
+                { tag: 'h1', inner: 'Your screen is too small' },
+                { tag: 'p', innerHTML: `You need at least ${MIN_EDITOR_WIDTH} pixels of screen width to use the editor. There is no mobile support at this time (if there is interest however, I am not opposed for adding it - <a href="${app.GITHUB_REPO}/issues?q=state%3Aopen%20label%3Aenhancement" target="_blank" rel="noopener noreferrer">let me know</a>).` }
+            ]
+        })));
+
+        LS.Modal.closeAll();
+    } else {
+        if(app.mobileDisclaimer) app.mobileDisclaimer.remove();
+        document.body.appendChild(app.container);
+    }
+});
+
+window.addEventListener('resize', selfInvoke(() => {
+    mobileWarningSwitch.set(window.innerWidth < MIN_EDITOR_WIDTH);
+}));

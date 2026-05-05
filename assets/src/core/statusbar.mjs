@@ -15,4 +15,4 @@ class StatusBar {
     }
 }
 
-window.StatusBar = StatusBar;
+export default StatusBar;

@@ -1,2 +1,14 @@
-old/
+archive/
 .idea/
+
+node_modules/
+dist/
+build/
+*.log
+*.backup
+
+*.old*
+
+package-lock.json
+yarn.lock
+pnpm-*

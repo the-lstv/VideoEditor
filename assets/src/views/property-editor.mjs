@@ -1,446 +1,9 @@
 /**
- * Video preview class
- */
-class PreviewView extends EditorBaseClasses.View {
-    constructor() {
-        super({
-            name: 'PreviewView',
-            title: 'Preview',
-            container: LS.Create({
-                class: 'editor-preview'
-            })
-        });
-
-        this.container.add([
-            { class: "preview-container", inner: { class: "preview-source-target" } },
-            { class: "preview-controls controls-bar", inner: [
-                [
-                    {
-                        tag: "button",
-                        class: "control-button square clear",
-                        inner: { tag: "i", class: "bi-arrow-90deg-left" },
-                        style: "font-size: smaller",
-                        tooltip: "Jump to the beginning <kbd>Home</kbd>",
-                        onclick: () => this.seek(0, true)
-                    },
-
-                    {
-                        tag: "button",
-                        class: "control-button square clear",
-                        inner: { tag: "i", class: "bi-arrow-left" },
-                        tooltip: "Previous frame <kbd>Shift</kbd> + <kbd>←</kbd>",
-                        onclick: () => {}
-                    },
-
-                    (this.__playButton = LS.Create("button", {
-                        class: "control-button square clear",
-                        inner: { tag: "i", class: "bi-play-fill" },
-                        tooltip: "Play/Pause <kbd>Space</kbd>",
-                        onclick: () => this.togglePlay()
-                    })),
-
-                    {
-                        tag: "button",
-                        class: "control-button square clear",
-                        inner: { tag: "i", class: "bi-arrow-right" },
-                        tooltip: "Next frame <kbd>Shift</kbd> + <kbd>→</kbd>",
-                        onclick: () => {}
-                    },
-
-                    {
-                        tag: "button",
-                        class: "control-button square clear",
-                        inner: { tag: "i", class: "bi-arrow-90deg-right" },
-                        style: "font-size: smaller",
-                        tooltip: "Jump to the end <kbd>End</kbd>",
-                        onclick: () => this.seek(this.details.totalTime)
-                    },
-                ],
-
-                [
-                    { tag: "span", class: "preview-time-current", inner: "0:00", style: { color: "var(--accent)" } },
-                    { tag: "span", inner: "/" },
-                    { tag: "span", class: "preview-time-total", inner: "0:00" }
-                ],
-
-                [
-                    {
-                        tag: "button",
-                        class: "control-button square clear",
-                        style: "font-size: smaller",
-                        inner: { tag: "i", class: "bi-arrows-fullscreen" },
-                        tooltip: "Fullscreen <kbd>F</kbd>",
-                        onclick: () => {
-                            this.toggleFullscreen();
-                        }
-                    }
-                ]
-            ] }
-        ]);
-
-        this.sourceTargetElement = this.container.querySelector(".preview-source-target");
-        this.sourceElement = null;
-
-        this.isAttachedToRenderer = false;
-
-        this.container.addEventListener('click', () => {
-            app.focusedPreview = this;
-        });
-
-        // Event handlers
-        this.__playHandler = null;
-        this.__pauseHandler = null;
-        this.__seekHandler = null;
-
-        const previewTimeCurrent = this.container.querySelector(".preview-time-current");
-        const previewTimeTotal = this.container.querySelector(".preview-time-total");
-
-        this.details = {};
-        this.frameScheduler = new LS.Util.FrameScheduler((delta) => {
-            previewTimeCurrent.textContent = this.#formatTime(this.details.time, true);
-            previewTimeTotal.textContent = this.#formatTime(this.details.totalTime);
-
-            if(this.__playButton) this.__playButton.querySelector("i").className = this.details.playing? "bi-pause-fill": "bi-play-fill";
-        });
-
-        // We limit to 30 FPS to reduce CPU/GPU usage
-        // Since this is not a high priority update
-        this.frameScheduler.limitFPS(30);
-    }
-
-    #formatTime(seconds, decisecond = false) {
-        if(isNaN(seconds) || !isFinite(seconds)) return "0:00";
-        
-        const totalSeconds = Math.floor(seconds);
-        const mins = Math.floor(totalSeconds / 60);
-        const secs = totalSeconds % 60;
-        let timeString = mins + ":" + (secs < 10 ? "0" : "") + secs;
-
-        if(decisecond) {
-            const ds = Math.floor((seconds - totalSeconds) * 10);
-            timeString += "." + ds;
-        }
-
-        return timeString;
-    }
-
-    #updatePlay(playing) {
-        if(playing === this.details.playing) return;
-        this.details.playing = playing;
-        this.frameScheduler.schedule();
-    }
-
-    #updateSeek(time) {
-        if(time === this.details.time) return;
-        this.details.time = time;
-        this.frameScheduler.schedule();
-    }
-
-    #updateDuration(totalTime) {
-        if(totalTime === this.details.totalTime) return;
-        this.details.totalTime = totalTime;
-        this.frameScheduler.schedule();
-    }
-
-    setSource(source) {
-        if(!source) {
-            return this.clearSource();
-        }
-
-        if(!(source instanceof LS.GL.Renderer || source instanceof HTMLMediaElement || source instanceof HTMLCanvasElement)) {
-            console.error("PreviewView.setSource: source must be a Renderer, HTMLMediaElement or HTMLCanvasElement");
-            return;
-        }
-
-        // Clean previous source
-        this.clearSource();
-
-        this.isAttachedToRenderer = source instanceof LS.GL.Renderer;
-        if(this.isAttachedToRenderer) {
-            if(!this.parent) {
-                console.error("PreviewView.setSource: cannot attach to renderer without a parent project");
-                return;
-            }
-
-            this.sourceElement = source.canvas;
-            this.parent?.on('seek', this.__seekHandler = (time) => this.#updateSeek(time));
-            this.parent?.on('duration-changed', this.__durationChangedHandler = (duration) => this.#updateDuration(duration));
-            this.parent?.on('playing-changed', this.__playHandler = (playing) => this.#updatePlay(playing));
-            this.#updatePlay(this.parent?.playing);
-            this.#updateSeek(this.parent?.time || 0);
-            this.#updateDuration(this.parent?.duration || 0);
-        } else {
-            this.sourceElement = source;
-            this.sourceElement.addEventListener('timeupdate', this.__seekHandler = () => this.#updateSeek(this.sourceElement.currentTime));
-            this.sourceElement.addEventListener('play', this.__playHandler = () => this.#updatePlay(true));
-            this.sourceElement.addEventListener('pause', this.__pauseHandler = () => this.#updatePlay(false));
-            this.#updatePlay(!this.sourceElement.paused);
-            this.#updateSeek(this.sourceElement.currentTime);
-            this.#updateDuration(this.sourceElement.duration);
-        }
-
-        this.sourceTargetElement.appendChild(this.sourceElement);
-    }
-
-    clearSource() {
-        if(this.sourceElement) {
-            if(this.isAttachedToRenderer) {
-                this.parent?.off('seek', this.__seekHandler);
-                this.parent?.off('playing-changed', this.__playHandler);
-                this.parent?.off('duration-changed', this.__durationChangedHandler);
-            } else {
-                this.sourceElement.removeEventListener('timeupdate', this.__seekHandler);
-                this.sourceElement.removeEventListener('play', this.__playHandler);
-                this.sourceElement.removeEventListener('pause', this.__pauseHandler);
-                
-                this.sourceElement.remove();
-                this.sourceElement = null;
-            }
-        }
-
-        this.__playHandler = null;
-        this.__pauseHandler = null;
-        this.__seekHandler = null;
-    }
-
-    togglePlay() {
-        if(this.isAttachedToRenderer) {
-            this?.parent?.togglePlay();
-        } else if(this.sourceElement instanceof HTMLMediaElement) {
-            if(this.sourceElement.paused) {
-                this.sourceElement.play();
-            } else {
-                this.sourceElement.pause();
-            }
-        }
-    }
-
-    play() {
-        if(this.isAttachedToRenderer) {
-            this?.parent?.play();
-        } else if(this.sourceElement instanceof HTMLMediaElement) {
-            this.sourceElement.play();
-        }
-    }
-
-    pause() {
-        if(this.isAttachedToRenderer) {
-            this?.parent?.pause();
-        } else if(this.sourceElement instanceof HTMLMediaElement) {
-            this.sourceElement.pause();
-        }
-    }
-
-    stop() {
-        if(this.isAttachedToRenderer) {
-            this?.parent?.pause();
-        } else if(this.sourceElement instanceof HTMLMediaElement) {
-            this.sourceElement.pause();
-            this.sourceElement.currentTime = 0;
-        }
-    }
-
-    seek(time, moveCamera = false) {
-        if(time === -1) time = this.details.totalTime;
-
-        if(this.isAttachedToRenderer) {
-            this?.parent?.seek(time, moveCamera);
-        } else if(this.sourceElement instanceof HTMLMediaElement) {
-            this.sourceElement.currentTime = time;
-        }
-    }
-
-    toggleFullscreen() {
-        document.fullscreenElement === this.container ?
-            document.exitFullscreen() :
-            this.container.requestFullscreen();
-    }
-
-    getContainedCoords() {
-        const canvasWidth = this.sourceElement.offsetWidth;
-        const canvasHeight = this.sourceElement.offsetHeight;
-
-        const contentWidth = this.sourceElement.width;
-        const contentHeight = this.sourceElement.height;
-
-        const canvasAspect = canvasWidth / canvasHeight;
-        const contentAspect = contentWidth / contentHeight;
-
-        let renderedWidth, renderedHeight;
-
-        // Determine which dimension is constrained
-        if (contentAspect > canvasAspect) {
-            renderedWidth = canvasWidth;
-            renderedHeight = canvasWidth / contentAspect;
-        } else {
-            renderedHeight = canvasHeight;
-            renderedWidth = canvasHeight * contentAspect;
-        }
-
-        // Calculate offset (centering)
-        const left = (canvasWidth - renderedWidth) / 2;
-        const top = (canvasHeight - renderedHeight) / 2;
-
-        return {
-            left,
-            top,
-            width: renderedWidth,
-            height: renderedHeight,
-            scale: contentAspect > canvasAspect ? renderedWidth / contentWidth : renderedHeight / contentHeight
-        };
-    }
-
-    destroy() {
-        // Clean up
-        this.clearSource();
-        this.stop();
-        this.sourceTargetElement = null;
-        this.__seekHandler = null;
-        this.__playHandler = null;
-        this.__pauseHandler = null;
-        this.__playButton = null;
-        super.destroy();
-    }
-}
-
-
-/**
- * Timeline class
- */
-class TimelineView extends EditorBaseClasses.View {
-    constructor() {
-        super({
-            name: 'TimelineView',
-            title: 'Timeline',
-            container: LS.Create({
-                class: 'editor-timeline',
-                inner: [
-                    {
-                        class: 'timeline-header controls-bar',
-                        inner: [
-                            [
-                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-plus-lg" }, tooltip: "Add track", onclick: () => {
-                                    this.timeline.addTrack();
-                                } },
-
-                                { emmet: "hr.vertical" },
-
-                                { tag: "button", class: "control-button tool-button tool-select square", inner: { tag: "i", class: "bi-cursor" }, tooltip: "Select tool <kbd>V</kbd>", onclick: () => {
-                                    this.timeline.tool = "select";
-                                } },
-
-                                { tag: "button", class: "control-button tool-button tool-slice square clear", inner: { tag: "i", class: "bi-scissors" }, tooltip: "Slicing tool <kbd>C</kbd><br>Or <kbd>Alt</kbd> while dragging", onclick: () => {
-                                    this.timeline.tool = "slice";
-                                } },
-
-                                { tag: "button", class: "control-button tool-button tool-preview square clear", inner: { tag: "i", class: "bi-eye-fill" }, tooltip: "Preview tool <kbd>P</kbd><br>Or <kbd>Alt</kbd> + right-click", onclick: () => {
-                                    this.timeline.tool = "preview";
-                                } },
-
-                                { tag: "button", class: "control-button tool-button tool-group square clear", inner: { tag: "i", class: "bi-collection" }, tooltip: "Group tool <kbd>G</kbd><br>Or <kbd>Ctrl+G</kbd>", onclick: () => {
-                                    this.timeline.tool = "group";
-                                } },
-
-                                { tag: "button", class: "control-button tool-button tool-erase square clear", inner: { tag: "i", class: "bi-eraser" }, tooltip: "Erase tool <kbd>E</kbd><br>Or <kbd>Right Mouse + Drag</kbd>", onclick: () => {
-                                    this.timeline.tool = "erase";
-                                } },
-
-                                { emmet: "hr.vertical" },
-
-                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-question" }, tooltip: "Help & Tips", onclick: () => {
-                                    LS.Modal.buildEphemeral({
-                                        title: "Timeline controls help",
-                                        content: [
-                                            // { tag: "p", style: "margin-top: 0", html: "You can customize these controls, either directly here or in the settings!" },
-                                            { tag: "h3", inner: "Basics:" },
-                                            { tag: "ul", style: "padding-left: 20px", inner: [
-                                                { tag: "li", inner: ["To add items, drag them from the media library onto the timeline."] },
-                                                { tag: "li", inner: ["To move items, drag them within the timeline or use Shift + Arrow keys."] },
-                                                { tag: "li", inner: ["When moving items, they are by default snapped to a grid (which is customizable in the settings). You can hold ", { tag: "code", inner: "Alt" }, " to enable free movement, or ", { tag: "code", inner: "Shift" }, " to snap to one second."] },
-                                                { tag: "li", inner: ["Click an item to select it."] },
-                                                { tag: "li", inner: ["Hold Ctrl to select multiple items."] },
-                                                { tag: "li", inner: ["To quickly copy items, you can hold ", { tag: "code", inner: "Shift" }, " while dragging."] },
-                                                { tag: "li", inner: ["To repeat items, press ", { tag: "code", inner: "Ctrl + B" }, " on a selected item."] },
-                                            ] },
-                                            { tag: "h3", inner: "Navigation:" },
-                                            { tag: "ul", style: "padding-left: 20px", inner: [
-                                                { tag: "li", inner: ["Panning: ",  { tag: "code", inner: "Middle Mouse + Drag" } ] },
-                                                { tag: "li", inner: ["Horizontal Scrolling: ",  { tag: "code", inner: "Shift + Mouse Wheel" } ] },
-                                                { tag: "li", inner: ["Vertical Scrolling: ",  { tag: "code", inner: "Mouse Wheel" } ] },
-                                                { tag: "li", inner: ["Horizontal zooming: ",  { tag: "code", inner: "Ctrl + Mouse Wheel" } ] },
-                                                { tag: "li", inner: ["Vertical zooming: ",  { tag: "code", inner: "Alt + Mouse Wheel" }, "or", { tag: "code", inner: "Ctrl + Mouse Drag" } ] },
-                                                { tag: "li", inner: ["Selecting clips: ",  { tag: "code", inner: "Ctrl + Click + Drag" } ] },
-                                                { tag: "li", inner: ["Jump to start/end: ",  { tag: "code", inner: "Home / End" } ] },
-                                                { tag: "li", inner: ["Next/previous frame: ",  { tag: "code", inner: "Shift + Arrows" } ] },
-                                            ] },
-                                            { tag: "h3", inner: "Tools:" },
-                                            { tag: "ul", style: "padding-left: 20px", inner: [
-                                                { tag: "li", inner: ["Select tool: ",  { tag: "code", inner: "V" } ] },
-                                                { tag: "li", inner: ["Slice tool: ",  { tag: "code", inner: "C" }, ", or hold Alt" ] },
-                                                { tag: "li", inner: ["Preview tool: ",  { tag: "code", inner: "P" }, ", or hold Alt+Right Click" ] },
-                                                { tag: "li", inner: ["Group tool: ",  { tag: "code", inner: "G" }, ", or Ctrl+G on selected items" ] },
-                                                { tag: "li", inner: ["Erase tool: ",  { tag: "code", inner: "E" }, ", or drag with right mouse button" ] },
-                                            ] },
-                                        ],
-                                        buttons: [{ label: "Close" }]
-                                    });
-                                } },
-
-                                // { tag: "ls-select", tooltip: "Select timeline", onchange: (e) => {
-                                //     const selectedTrack = e.target.value;
-                                //     this.timeline.selectTrack(selectedTrack);
-                                // } }
-                            ],
-
-                            [
-                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-zoom-in" }, tooltip: "Zoom in <kbd>+</kbd>", onclick: () => {
-                                    this.timeline.zoomIn();
-                                } },
-                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-zoom-out" }, tooltip: "Zoom out <kbd>-</kbd>", onclick: () => {
-                                    this.timeline.zoomOut();
-                                } }
-                            ]
-                        ]
-                    }
-                ]
-            })
-        });
-
-        this.timeline = new LS.Timeline({
-            element: this.container,
-            allowAutomationClips: true,
-            autoCreateAutomationClips: true,
-        });
-
-        const seekEventRef = this.prepareEvent("seek");
-        this.timeline.on('seek', time => {
-            this.quickEmit(seekEventRef, time);
-        });
-
-        this.timeline.on('tool-changed', tool => {
-            // TODO: !! Refactor this, I am writing this at 2 am
-            this.container.querySelectorAll(".tool-button").forEach(btn => { btn.classList.add("clear") });
-            const activeBtn = this.container.querySelector(`.tool-${tool}`);
-            if(activeBtn) activeBtn.classList.remove("clear");
-        });
-    }
-
-    setData(data) {
-        this.timeline.reset(true, data);
-    }
-
-    destroy() {
-        this.timeline.destroy();
-        this.timeline = null;
-        super.destroy();
-    }
-}
-
-
-/**
  * Property editor view class
  */
-class PropertyEditorView extends EditorBaseClasses.View {
+class PropertyEditorView extends LS.Multipane.View {
+    static name = "propertyEditor";
+
     constructor() {
         super({
             name: 'PropertyEditorView',
@@ -515,10 +78,12 @@ class PropertyEditorView extends EditorBaseClasses.View {
         entry.handler.on("resize", (side, width, height, leftOffset, topOffset, state) => {
             if(!this.currentTarget) return;
 
-            const preview = this.parent.connectedViews.get("preview");
+            const project = this.#getProject();
+            const preview = project?.connectedViews.get("videoPreview");
             if(preview) {
                 const contained = preview.getContainedCoords();
-                const isContainer = this.currentTarget.node.constructor === PIXI.Container;
+                // TODO:
+                const isContainer = false// this.currentTarget.node.constructor === PIXI.Container;
                 width /= contained.scale;
                 height /= contained.scale;
 
@@ -1088,7 +653,7 @@ class PropertyEditorView extends EditorBaseClasses.View {
                         const propertyName = this.focusedInput.id;
                         if(!propertyName) return;
 
-                        const timeline = this.parent?.timeline;
+                        const timeline = this.#getAttachment()?.timeline;
                         if(!timeline) return;
 
                         const clip = {
@@ -1201,8 +766,9 @@ class PropertyEditorView extends EditorBaseClasses.View {
 
                 this.__automationTargetsBody.innerHTML = "";
 
-                if (this.parent.timeline) for (const [i, t] of (target.data.targets || []).entries()) {
-                    const targetNode = this.parent.timeline.getItemById(t.nodeId);
+                const attachment = this.#getAttachment();
+                if (attachment?.timeline) for (const [i, t] of (target.data.targets || []).entries()) {
+                    const targetNode = attachment.timeline.getItemById(t.nodeId);
                     const targetLabel = targetNode ? (targetNode.label || targetNode.type || targetNode.id) : "Unknown Node";
 
                     const mappingFormulaInput = this.#createInput(`automationTargetMapping${i}`, {
@@ -1269,11 +835,13 @@ class PropertyEditorView extends EditorBaseClasses.View {
         }
 
         if(this.targetNodeIsVisual) {
+            const attachment = this.#getAttachment();
             if(!target.node) {
-                this.parent.createItemNode(target);
+                attachment?.createItemNode?.(target);
             }
 
-            const connectedPreview = this.parent.connectedViews.get("preview");
+            const project = this.#getProject();
+            const connectedPreview = project?.connectedViews.get("videoPreview");
             if(connectedPreview) {
                 const previewContainer = connectedPreview.container.querySelector(".preview-container");
                 previewContainer.appendChild(this.__editAid);
@@ -1294,8 +862,8 @@ class PropertyEditorView extends EditorBaseClasses.View {
                         initialX = event.x - rect.left - worldOffset.left;
                         initialY = event.y - rect.top - worldOffset.top;
 
-                        initialWorldX = this.parent.getSavedNodeProperty(this.currentTarget, "positionX");
-                        initialWorldY = this.parent.getSavedNodeProperty(this.currentTarget, "positionY");
+                        initialWorldX = attachment?.getSavedNodeProperty?.(this.currentTarget, "positionX") ?? 0;
+                        initialWorldY = attachment?.getSavedNodeProperty?.(this.currentTarget, "positionY") ?? 0;
                     },
 
                     onMove: (event) => {
@@ -1318,14 +886,17 @@ class PropertyEditorView extends EditorBaseClasses.View {
 
                     if(evt.ctrlKey) {
                         evt.preventDefault();
-                        this.#updateProp("scaleX", this.parent.getSavedNodeProperty(this.currentTarget, "scaleX") * (evt.deltaY < 0 ? 1.1 : 0.9));
-                        this.#updateProp("scaleY", this.parent.getSavedNodeProperty(this.currentTarget, "scaleY") * (evt.deltaY < 0 ? 1.1 : 0.9));
+                        const baseScaleX = attachment?.getSavedNodeProperty?.(this.currentTarget, "scaleX") ?? 1;
+                        const baseScaleY = attachment?.getSavedNodeProperty?.(this.currentTarget, "scaleY") ?? 1;
+                        this.#updateProp("scaleX", baseScaleX * (evt.deltaY < 0 ? 1.1 : 0.9));
+                        this.#updateProp("scaleY", baseScaleY * (evt.deltaY < 0 ? 1.1 : 0.9));
                         this.updateAidPosition();
                     }
 
                     if(evt.shiftKey) {
                         evt.preventDefault();
-                        this.#updateProp("rotation", (this.parent.getSavedNodeProperty(this.currentTarget, "rotation") + (evt.deltaY < 0 ? 0.1 : -0.1)) % (Math.PI * 2));
+                        const baseRotation = attachment?.getSavedNodeProperty?.(this.currentTarget, "rotation") ?? 0;
+                        this.#updateProp("rotation", (baseRotation + (evt.deltaY < 0 ? 0.1 : -0.1)) % (Math.PI * 2));
                         this.updateAidPosition();
                     }
                 });
@@ -1338,6 +909,14 @@ class PropertyEditorView extends EditorBaseClasses.View {
 
         this.emptyMessage.remove();
         this.container.appendChild(this.tabContainer);
+    }
+
+    #getAttachment() {
+        return this.attachedTo || this.parent;
+    }
+
+    #getProject() {
+        return this.parent || this.attachedTo?.project || null;
     }
 
     /**
@@ -1430,7 +1009,7 @@ class PropertyEditorView extends EditorBaseClasses.View {
         const inputObject = this.inputs.get(id);
         if(inputObject) {
             if(value === undefined && this.currentTarget) {
-                value = this.parent.getSavedNodeProperty(this.currentTarget, id);
+                value = this.#getAttachment()?.getSavedNodeProperty?.(this.currentTarget, id);
             }
 
             if(inputObject.type === "color" && typeof value === "number") {
@@ -1452,7 +1031,7 @@ class PropertyEditorView extends EditorBaseClasses.View {
     }
 
     linkingAutomationTarget() {
-        if (!this.currentTarget || this.currentTarget.type !== "automation" || !this.parent.timeline) return;
+        if (!this.currentTarget || this.currentTarget.type !== "automation" || !this.#getAttachment()?.timeline) return;
 
         this.__addingTarget = this.currentTarget;
         LS._topLayer.appendChild(this.__addingTargetElement || (this.__addingTargetElement = LS.Create({
@@ -1508,7 +1087,7 @@ class PropertyEditorView extends EditorBaseClasses.View {
             // Should not happen, but if it somehow does, this prevents exploding the program
             if(Number.isNaN(value)) value = 0;
 
-            this.parent.applyNodeProperty(this.currentTarget, property, value);
+            this.#getAttachment()?.applyNodeProperty?.(this.currentTarget, property, value);
             this.updateInputValue(property, value);
 
             if(this.targetNodeIsVisual) {
@@ -1520,14 +1099,16 @@ class PropertyEditorView extends EditorBaseClasses.View {
     }
 
     #updateTimeline() {
-        if(this.currentTarget && this.parent && this.parent.timeline) {
-            this.parent.timeline.render(true);
+        const attachment = this.#getAttachment();
+        if(this.currentTarget && attachment?.timeline) {
+            attachment.timeline.render(true);
         }
     }
 
     #updateRender(){
-        if(this.currentTarget && this.parent && this.parent.renderer) {
-            this.parent.render();
+        const attachment = this.#getAttachment();
+        if(this.currentTarget && attachment?.renderer) {
+            attachment.render();
         }
     }
 
@@ -1542,17 +1123,18 @@ class PropertyEditorView extends EditorBaseClasses.View {
             this.__aidDirty = false;
             if (this.currentTarget && this.__editAid) {
                 const t = this.currentTarget;
-                const worldOffset = this.parent.connectedViews.get("preview")?.getContainedCoords();
+                const worldOffset = this.#getProject()?.connectedViews.get("videoPreview")?.getContainedCoords();
                 if (!worldOffset) return;
 
                 // Get values with fallback
-                const x = this.parent.getSavedNodeProperty(t, "positionX");
-                const y = this.parent.getSavedNodeProperty(t, "positionY");
+                const attachment = this.#getAttachment();
+                const x = attachment?.getSavedNodeProperty?.(t, "positionX") ?? 0;
+                const y = attachment?.getSavedNodeProperty?.(t, "positionY") ?? 0;
                 const w = (t.node?.width ?? t.data.width ?? 100);
                 const h = (t.node?.height ?? t.data.height ?? 100);
-                const ax = this.parent.getSavedNodeProperty(t, "anchorX");
-                const ay = this.parent.getSavedNodeProperty(t, "anchorY");
-                const rot = this.parent.getSavedNodeProperty(t, "rotation");
+                const ax = attachment?.getSavedNodeProperty?.(t, "anchorX") ?? 0;
+                const ay = attachment?.getSavedNodeProperty?.(t, "anchorY") ?? 0;
+                const rot = attachment?.getSavedNodeProperty?.(t, "rotation") ?? 0;
 
                 // Calculate anchor offset
                 const anchorOffsetX = -ax * w;
@@ -1580,13 +1162,14 @@ class PropertyEditorView extends EditorBaseClasses.View {
             if(this.currentTarget && this.previewObject) {
                 const t = this.currentTarget.node || this.currentTarget.data;
                 const scalePos = 0.1; 
-                const x = this.parent.getSavedNodeProperty(this.currentTarget, "positionX") * scalePos;
-                const y = this.parent.getSavedNodeProperty(this.currentTarget, "positionY") * scalePos;
-                const rot = this.parent.getSavedNodeProperty(this.currentTarget, "rotation");
-                const sx = this.parent.getSavedNodeProperty(this.currentTarget, "scaleX");
-                const sy = this.parent.getSavedNodeProperty(this.currentTarget, "scaleY");
-                const ax = this.parent.getSavedNodeProperty(this.currentTarget, "anchorX");
-                const ay = this.parent.getSavedNodeProperty(this.currentTarget, "anchorY");
+                const attachment = this.#getAttachment();
+                const x = (attachment?.getSavedNodeProperty?.(this.currentTarget, "positionX") ?? 0) * scalePos;
+                const y = (attachment?.getSavedNodeProperty?.(this.currentTarget, "positionY") ?? 0) * scalePos;
+                const rot = attachment?.getSavedNodeProperty?.(this.currentTarget, "rotation") ?? 0;
+                const sx = attachment?.getSavedNodeProperty?.(this.currentTarget, "scaleX") ?? 1;
+                const sy = attachment?.getSavedNodeProperty?.(this.currentTarget, "scaleY") ?? 1;
+                const ax = attachment?.getSavedNodeProperty?.(this.currentTarget, "anchorX") ?? 0;
+                const ay = attachment?.getSavedNodeProperty?.(this.currentTarget, "anchorY") ?? 0;
                 const w = (t.width || 100) * scalePos;
                 const h = (t.height || 100) * scalePos;
 
@@ -1595,11 +1178,11 @@ class PropertyEditorView extends EditorBaseClasses.View {
                 this.previewObject.style.transformOrigin = `${ax * 100}% ${ay * 100}%`;
                 this.previewObject.style.transform = `translate(${x}px, ${y}px) rotate(${rot}rad) scale(${sx}, ${sy})`;
                 
-                let tint = this.parent.getSavedNodeProperty(this.currentTarget, "tint");
+                let tint = attachment?.getSavedNodeProperty?.(this.currentTarget, "tint");
                 if (typeof tint === 'number') tint = '#' + tint.toString(16).padStart(6, '0');
                 this.previewObject.style.backgroundColor = tint || "var(--accent)";
                 
-                this.previewObject.style.opacity = this.parent.getSavedNodeProperty(this.currentTarget, "opacity");
+                this.previewObject.style.opacity = attachment?.getSavedNodeProperty?.(this.currentTarget, "opacity");
             }
         }
     }
@@ -1666,11 +1249,11 @@ class PropertyEditorView extends EditorBaseClasses.View {
         window.removeEventListener("resize", this.__resizeListener);
         this.__resizeListener = null;
 
-        if(this.__editAidZoomHandler && this.parent) {
-            const connectedPreview = this.parent.connectedViews.get("preview");
+        if(this.__editAidZoomHandler) {
+            const connectedPreview = this.#getProject()?.connectedViews.get("videoPreview");
             if(connectedPreview) {
                 const previewContainer = connectedPreview.container.querySelector(".preview-container");
-                previewContainer.removeEventListener('scroll', this.__editAidZoomHandler);
+                previewContainer.removeEventListener('wheel', this.__editAidZoomHandler);
             }
             this.__editAidZoomHandler = null;
         }
@@ -1684,430 +1267,4 @@ class PropertyEditorView extends EditorBaseClasses.View {
     }
 }
 
-
-/**
- * Asset manager view class
- * Not proud of the state of this code
- */
-class AssetManagerView extends EditorBaseClasses.View {
-    library = {
-        objects: {
-            name: "Object presets",
-            icon: "bi-box",
-            items: [
-                { name: "Container", type: "container", item: { type: "container", label: "Container", color: "white" } },
-                { name: "Text", type: "text", item: { type: "text", label: "Text", data: { text: "Some text" }, color: "aquamarine" } },
-                { name: "Rectangle", type: "sprite", icon: "bi-square", item: { type: "sprite", label: "Rectangle", data: { positionX: 100, positionY: 100, scaleX: 500, scaleY: 500, anchorX: 0, anchorY: 0 } } },
-                { name: "Vector shape", type: "graphics", item: { type: "graphics", label: "Vector shape" } },
-                { name: "Automation clip", type: "automation", item: { type: "automation", label: "Automation clip", data: { value: 1, points: [ { value: 0, type: "linear", time: 1 } ] } } },
-                { name: "Video", type: "video", item: { type: "video", label: "Video", color: "blue" } },
-                { name: "Image", type: "sprite", item: { type: "sprite", label: "Image" } },
-                { name: "Sound", type: "sound", item: { type: "sound", label: "Sound", color: "purple" } },
-                { name: "Pattern", type: "notes", item: { type: "notes", label: "Pattern", color: "yellow" } }
-            ]
-        },
-
-        folders: {
-            name: "Project Folders",
-            icon: "bi-folder",
-        },
-
-        projectAssets: {
-            name: "Project Assets",
-            icon: "bi-file-earmark-binary-fill",
-        },
-
-        // remoteAssets: {
-        //     name: "Remote Assets",
-        //     icon: "bi-cloud-upload",
-        // },
-
-        saved: {
-            name: "Saved items",
-            icon: "bi-star-fill",
-        }
-    }
-
-    constructor() {
-        super({
-            name: 'AssetManagerView',
-            title: 'Content library',
-            container: LS.Create({
-                class: 'editor-asset-manager',
-                inner: []
-            })
-        });
-
-        this.container.add([
-            this.__sidebar = LS.Create({ class: 'asset-manager-sidebar' }),
-            this.__contentContainer = LS.Create({ class: 'asset-manager-content' })
-        ]);
-
-        for(const [tabName, tabData] of Object.entries(this.library)) {
-            const tabButton = LS.Create({ attributes: { role: "button", "data-tab": tabName }, inner: { tag: 'i', class: tabData.icon }, tooltip: tabData.name, onclick: () => { this.setTab(tabName) } });
-            this.__sidebar.appendChild(tabButton);
-        }
-
-        this.previewElement = LS.Create({ class: 'asset-drop-preview' });
-
-        // File browser instance (created lazily)
-        this.fileBrowser = null;
-        this._currentFolderHandle = null;
-
-        let dragItemType = null;
-        this.handle = new LS.Util.TouchHandle(this.__contentContainer, {
-            cursor: 'grabbing',
-            onStart: (event) => {
-                const obj = event.domEvent.target.targetObject || event.domEvent.target._fileData;
-                if(!obj) return event.cancel();
-
-                dragItemType = event.domEvent.target.targetObject ? 'library-object' : 'project-asset';
-
-                obj.icon = this.getIcon(obj);
-                EditorBaseClasses.dragState.start(obj, event.x, event.y);
-            },
-
-            onMove: (event) => EditorBaseClasses.dragState.setPosition(event.x, event.y),
-
-            onEnd: (event) => {
-                const x = EditorBaseClasses.dragState.x;
-                const y = EditorBaseClasses.dragState.y;
-                EditorBaseClasses.dragState.stop();
-
-                const elementsFromPoint = document.elementsFromPoint(x, y);
-                const timeline = elementsFromPoint.find(el => el.classList.contains('ls-timeline'))?.__lsComponent || null;
-
-                if(timeline) {
-                    if(!(timeline instanceof LS.Timeline) || (dragItemType === 'library-object' && !EditorBaseClasses.dragState.target?.item)) {
-                        LS.Toast.show("Sorry, something went wrong while adding the item.", { timeout: 3000, accent: "red" });
-                        return;
-                    }
-
-                    const { time, row } = timeline.transformCoords(x, y);
-
-                    if(dragItemType === 'library-object') {
-                        const newItem = timeline.cloneItem(EditorBaseClasses.dragState.target.item);
-                        newItem.start = time;
-                        newItem.row = row;
-                        newItem.duration = newItem.duration || 1;
-
-                        timeline.add(newItem);
-                    } else if(dragItemType === 'project-asset') {
-                        this.parent.resources.addProjectResources([EditorBaseClasses.dragState.target], row, time);
-                    }
-                }
-            }
-        });
-
-        this.__contentContainer.addEventListener("dragover", (e) => {
-            if(this.currentTab !== 'projectAssets') return;
-
-            e.preventDefault();
-            this.__contentContainer.classList.add("drag-over");
-        });
-
-        this.__contentContainer.addEventListener("dragleave", (e) => {
-            if(this.currentTab !== 'projectAssets') return;
-
-            e.preventDefault();
-            this.__contentContainer.classList.remove("drag-over");
-        });
-
-        this.__contentContainer.addEventListener("drop", (e) => {
-            if(this.currentTab !== 'projectAssets') return;
-
-            e.preventDefault();
-            this.__contentContainer.classList.remove("drag-over");
-            this.parent?.resources.addProjectResources(e.dataTransfer.files);
-        });
-
-        this._boundRefreshFolders = () => this.refreshTab('folders');
-        this._boundRefreshProjectAssets = () => this.refreshTab('projectAssets');
-
-        this.setTab('objects');
-    }
-
-    onAttached() {
-        if (this.parent?.resources) {
-            this.parent.resources.on('folder-added', this._boundRefreshFolders);
-            this.parent.resources.on('folder-removed', this._boundRefreshFolders);
-            this.parent.resources.on('resource-added', this._boundRefreshProjectAssets);
-            this.parent.resources.on('resource-removed', this._boundRefreshProjectAssets);
-            this.parent.resources.on('resources-loaded', () => {
-                this.refreshTab('folders');
-                this.refreshTab('projectAssets');
-            });
-        }
-    }
-
-    onDetached() {
-        if (this.parent?.resources) {
-            this.parent.resources.off('folder-added', this._boundRefreshFolders);
-            this.parent.resources.off('folder-removed', this._boundRefreshFolders);
-            this.parent.resources.off('resource-added', this._boundRefreshProjectAssets);
-            this.parent.resources.off('resource-removed', this._boundRefreshProjectAssets);
-        }
-    }
-
-    refreshTab(tabName) {
-        const library = this.library[tabName];
-        if (library.__element) {
-            library.__element.remove();
-            library.__element = null;
-        }
-        if (this.currentTab === tabName) {
-            this.__contentContainer.innerHTML = '';
-            this.__contentContainer.appendChild(this.createTab(library));
-        }
-    }
-
-    setTab(tabName) {
-        const library = this.library[tabName];
-        const tabs = this.__sidebar.children;
-
-        for(const tab of tabs) {
-            tab.classList.toggle('selected', tab.getAttribute('data-tab') === tabName);
-        }
-
-        // Clean up file browser if switching away from folders
-        if (this.currentTab === 'folders' && tabName !== 'folders' && this.fileBrowser) {
-            this._currentFolderHandle = null;
-        }
-
-        this.currentTab = tabName;
-        this.__contentContainer.innerHTML = '';
-        this.__contentContainer.appendChild(this.createTab(library));
-    }
-
-    createTab(library) {
-        const grid = library.__element = LS.Create({ class: 'asset-library-grid' });
-
-        if (library.name === "Project Folders") {
-            this._createFoldersTab(grid);
-        } else if (library.name === "Saved items") {
-            grid.appendChild(LS.Create("ls-box", {
-                inner: "You can save presets you use often here for quick access. To save an item, right click on it and select 'Save to library'.",
-            }));
-        } else if (library.name === "Project Assets") {
-            grid.appendChild(LS.Create("ls-box.margin-bottom-medium", {
-                inner: "These assets are embedded in the project file and work anywhere. Note that this increases the project file size and memory usage, so use it for small files only! You can drag and drop files here or to the timeline directly.",
-            }));
-
-            this.populateProjectAssets(grid);
-        }
-
-        if (library.items) for (const obj of library.items) {
-            const itemElement = obj.__element || this.createAssetPreview(obj);
-            grid.appendChild(itemElement);
-        }
-
-        return grid;
-    }
-
-    // FIXME: I know this isnt clean but im tired :(
-    _createFoldersTab(grid) {
-        const hasCurrentFolder = this._currentFolderHandle !== null;
-
-        if(!hasCurrentFolder) {
-            grid.appendChild(LS.Create("ls-box.margin-bottom-medium", {
-                inner: "Add folders from your computer to browse and access their content."
-            }));
-        }
-
-        grid.appendChild(LS.Create({
-            tag: 'button',
-            class: 'elevated',
-            inner: [{ tag: 'i', class: hasCurrentFolder? 'bi-arrow-left': 'bi-folder-plus' }, hasCurrentFolder? ' Back to folders': ' Add folder'],
-            onclick: () => {
-                if(hasCurrentFolder) {
-                    this._currentFolderHandle = null;
-                    this.refreshTab('folders');
-                } else {
-                    this.parent?.resources.addFolder();
-                }
-            }
-        }));
-
-        if (hasCurrentFolder) {
-            this._showFileBrowser(grid);
-        } else {
-            this._populateFolderList(grid);
-        }
-    }
-
-    _populateFolderList(grid) {
-        const folders = this.parent?.resources?.projectFolders;
-        if (!folders || folders.size === 0) {
-            grid.appendChild(LS.Create({
-                class: 'empty-state',
-                inner: [
-                    { tag: 'i', class: 'bi-folder2-open', style: 'font-size: 3em; opacity: 0.3;' },
-                    { tag: 'p', inner: 'No folders added yet' }
-                ]
-            }));
-            return;
-        }
-
-        const folderGrid = LS.Create({ class: 'folder-list-grid' });
-
-        for (const [name, folderData] of folders) {
-            const folderElement = folderData.__element || (folderData.__element = LS.Create({
-                class: 'folder-list-item asset-library-item',
-                inner: [
-                    [{ tag: 'i', class: 'bi-folder-fill' }, " " + folderData.name],
-                    { class: 'folder-actions', inner: [
-                        LS.Create({
-                            tag: 'button',
-                            class: 'square clear small',
-                            inner: { tag: 'i', class: 'bi-trash' },
-                            tooltip: 'Remove folder',
-                            onclick: (e) => {
-                                e.stopPropagation();
-                                this.parent?.resources.removeFolder(name);
-                            }
-                        })
-                    ]}
-                ],
-                onclick: () => this._openFolder(folderData.handle, folderData.name)
-            }));
-
-            folderGrid.appendChild(folderElement);
-        }
-
-        grid.appendChild(folderGrid);
-    }
-
-    _openFolder(handle, name) {
-        this._currentFolderHandle = handle;
-        this._currentFolderName = name;
-        this.refreshTab('folders');
-    }
-
-    _showFileBrowser(grid) {
-        if (!this.fileBrowser) {
-            this.fileBrowser = new FileBrowser({
-                onFileSelect: (files) => this._onFileSelect(files),
-                onFileOpen: (file) => this._onFileOpen(file)
-            });
-        }
-
-        grid.appendChild(this.fileBrowser.element);
-        this.fileBrowser.setRootFolder(this._currentFolderHandle);
-    }
-
-    _onFileSelect(files) {
-        // Could show preview panel someday
-    }
-
-    _onFileOpen(file) {
-        // Add to timeline or open preview (someday)
-        // Yes it is this r*tarded
-        // The whole file system is r*tarded
-        // I hate resource management in browsers
-        file.folder = this._currentFolderName;
-        file.sourceType = 'folder';
-        this.parent?.resources.addProjectResources(file);
-    }
-
-    populateFolders(grid) {
-        // Deprecated - now using _populateFolderList
-        this._populateFolderList(grid);
-    }
-
-    populateProjectAssets(grid) {
-        const resources = this.parent?.resources?.resources;
-        if (!resources || resources.size === 0) return;
-
-        for (const [hash, fileData] of resources) {
-            if (fileData.sourceType !== 'project_folder') continue;
-
-            const obj = {
-                name: fileData.name,
-                type: fileData.type,
-                hash: fileData.hash,
-                path: fileData.path,
-                mimeType: fileData.mimeType,
-                size: fileData.size,
-                sourceType: fileData.sourceType,
-                item: this.createItemFromFileData(fileData)
-            };
-
-            const itemElement = this.createAssetPreview(obj);
-            grid.appendChild(itemElement);
-        }
-    }
-
-    createItemFromFileData(fileData) {
-        const baseItem = {
-            label: fileData.name,
-            resourceHash: fileData.hash
-        };
-
-        switch (fileData.type) {
-            case 'sprite':
-                return { type: 'sprite', ...baseItem };
-            case 'video':
-                return { type: 'video', ...baseItem, color: 'blue' };
-            case 'sound':
-                return { type: 'sound', ...baseItem, color: 'purple' };
-            default:
-                return { type: fileData.type || 'sprite', ...baseItem };
-        }
-    }
-
-    createAssetPreview(obj) {
-        if(!obj.__element) {
-            obj.__element = LS.Create({
-                class: 'asset-library-item',
-                inner: [
-                    { tag: 'i', class: this.getIcon(obj) },
-                    { tag: 'span', inner: obj.name }
-                ]
-            });
-
-            obj.__element.targetObject = obj;
-        }
-
-        return obj.__element;
-    }
-
-    getIcon(obj) {
-        if(obj.mimeType) {
-            if (obj.mimeType.startsWith("image/")) return "bi-image";
-            if (obj.mimeType.startsWith("video/")) return "bi-film";
-            if (obj.mimeType.startsWith("audio/")) return "bi-music-note-beamed";
-        }
-
-        return obj.icon || ({
-            "container": "bi-archive",
-            "sprite": "bi-image",
-            "graphics": "bi-vector-pen",
-            "text": "bi-textarea-t",
-            "video": "bi-film",
-            "sound": "bi-music-note-beamed",
-            "automation": "bi-bezier2",
-            "notes": "bi-music-note-list"
-        }[obj.type] || "bi-file")
-    }
-
-    destroy() {
-        this.onDetached();
-        this.handle.destroy();
-        this.handle = null;
-        this.previewElement.remove();
-        this.previewElement = null;
-        this.library = null;
-        if (this.fileBrowser) {
-            this.fileBrowser.destroy();
-            this.fileBrowser = null;
-        }
-        super.destroy();
-    }
-}
-
-window.EditorViews = {
-    PreviewView,
-    TimelineView,
-    AssetManagerView,
-    PropertyEditorView
-};
+export default PropertyEditorView;
