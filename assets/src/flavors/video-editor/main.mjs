@@ -42,6 +42,8 @@ class VideoEditor extends FlavorBase {
         desktopIcon: 'assets/src/flavors/video-editor/images/favicon.png'
     };
 
+    static version = "0.2.0-alpha";
+
     constructor(project) {
         super(project);
 
@@ -55,6 +57,10 @@ class VideoEditor extends FlavorBase {
         this.activeRenderItems = new Set();
 
         this.__renderTargets = [];
+
+        // TODO
+        this.__currentMediaItems = new Set();
+        this.activeMediaItems = new Set();
 
         this.editingItem = null;
 
@@ -163,11 +169,9 @@ class VideoEditor extends FlavorBase {
 
                     this.addExternalEventListener(this.timelineInstance, "item-cleanup", (item) => {
                         if(item.node) {
-                            this.constructor.disposeObject3D(item.node);
-                            item.node.removeFromParent();
+                            ThreeRendererAdapter.disposeObject(item.node);
                             item.node = null;
                         }
-                        this.releaseItemMedia(item);
                     });
 
                     this.quickEmit(this.__seekEventRef, this.timelineInstance.seek);
@@ -276,7 +280,7 @@ class VideoEditor extends FlavorBase {
     }
 
     #exportTo(data) {
-        if(!data.flavorId) data.flavorId = "video-editor";
+        if(!data.savedFlavorId) data.savedFlavorId = "video-editor";
 
         const exportedTimelines = {};
         for(const [id, timeline] of this.timelines) {
@@ -291,9 +295,9 @@ class VideoEditor extends FlavorBase {
     onAboutDialog() {
         LS.Modal.buildEphemeral({
             content: [
-                { tag: 'img', src: 'assets/images/icon.svg', style: 'height: 5em; width: 100%; margin: auto' },
+                { tag: 'img', src: this.constructor.iconSet.icon, style: 'height: 5em; width: 100%; margin: auto' },
                 { tag: 'h2', inner: 'Video Editor', style: 'text-align: center' },
-                { tag: 'p', inner: `Version ${app.VERSION}, running LS ${LS.version}` },
+                { tag: 'p', html: `Version <code>${this.constructor.version}</code><br>Editor version <code>${app.VERSION}</code><br>LS version <code>${LS.version}</code>` },
                 { tag: 'p', inner: 'A professional video editor built on the universal LS creative engine with web technologies and the LS framework.' },
                 { tag: 'p', inner: ['Created with love and hard work by Lukas (', { tag: 'a', href: 'https://lstv.space', target: '_blank', inner: 'https://lstv.space' }, ')'] },
                 { tag: 'p', inner: ['Source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }] },
@@ -411,7 +415,7 @@ class VideoEditor extends FlavorBase {
             }
 
             if(item.type === "sound") {
-                if(item.resourceUpdated !== false) this.updateNodeResource(item);
+                if(item.resourceUpdated !== false) this.renderer.updateNodeResource(item);
                 this.syncMediaItem(item, time, true);
                 currentMediaItems.add(item);
                 continue;
@@ -422,11 +426,11 @@ class VideoEditor extends FlavorBase {
                 continue;
             }
 
-            if(!item.node) this.createItemNode(item);
+            if(!item.node) this.renderer.createObject(item);
             if(!item.node) continue;
 
             if(item.resourceUpdated !== false) {
-                this.updateNodeResource(item);
+                this.renderer.updateNodeResource(item);
             }
 
             if(item.data.animations) {
@@ -512,7 +516,7 @@ class VideoEditor extends FlavorBase {
 
             const targetNode = target.nodeId? this.timelineInstance.getItemById(target.nodeId): null;
             if(!targetNode) continue;
-            if(!targetNode.node) this.createItemNode(targetNode);
+            if(!targetNode.node) ThreeRendererAdapter.createObject(targetNode);
             if(!targetNode.node && targetNode.type !== "sound") continue;
 
             const setter = this.constructor.nodePropertySetters[target.property];
@@ -537,228 +541,6 @@ class VideoEditor extends FlavorBase {
 
         item.__cTargets = compiled;
         item.__dirty = false;
-    }
-
-    /**
-     * Create the render-able node for a given item for the given backend.
-     * @param {*} item The timeline/project item to create a node for
-     * @returns The created node, or null
-     */
-    createItemNode(item) {
-        if(!item || item.node) return null;
-        if(!item.data) item.data = {};
-
-        if(item.type === "automation") {
-            return null;
-        }
-
-        switch(item.type) {
-            case "container":
-                item.node = new THREE.Group();
-                item.node.userData.editorType = "container";
-                break;
-
-            /* Vector graphics node */
-            case "graphics":
-                const data = item.data || {};
-                const node = this.constructor.createSurfaceNode("graphics", data);
-                const material = node.userData.material;
-
-                material.color.set(data.fill ?? data.color ?? data.tint ?? 0xffffff);
-                material.opacity = data.opacity ?? data.alpha ?? 1;
-                material.transparent = material.opacity < 1 || data.transparent !== false;
-
-                if(data.shape === "circle") {
-                    const radius = data.radius ?? Math.max(data.width ?? 100, data.height ?? 100) / 2;
-                    const geometry = new THREE.CircleGeometry(radius, data.segments || 64);
-                    geometry.translate(radius, radius, 0);
-                    node.userData.surface.geometry = geometry;
-                    node.userData.width = radius * 2;
-                    node.userData.height = radius * 2;
-                }
-
-                item.node = node;
-                break;
-
-            /* Sprite/image/video (2D surface) node */
-            case "sprite":
-            case "image":
-            case "video":
-                if(item.type === "image") item.type = "sprite"; // Normalize
-                item.node = this.constructor.createSurfaceNode(item.type, item.data);
-                break;
-
-            case "text":
-                // item.node = this.constructor.createTextNode(item);
-                // TBA again
-                break;
-
-            /* Mesh node */
-            case "mesh":
-                item.node = this.constructor.createMeshNode(item);
-                break;
-
-            /* Camera node */
-            case "camera":
-                item.node = this.constructor.createCameraNode(item);
-                break;
-
-            /* Audio related */
-            case "sound":
-            case "notes":
-                // No visual node, but sound items should carry an audio stream with a connectable output
-                return null;
-
-            default:
-                console.warn(`this.constructor.createItemNode: Unsupported item type ${item.type}`);
-                return null;
-        }
-
-        item.node.visible = false;
-        item.node.matrixAutoUpdate = true;
-
-        // ! todo: scene editor
-        if(this.renderer?.root) {
-            this.renderer.root.add(item.node);
-        }
-
-        this.applyInitialNodeProperties(item);
-        return item.node;
-    }
-
-    async applyInitialNodeProperties(item) {
-        if(!item) return;
-        if(!item.data) item.data = {};
-
-        // Apply all saved properties
-        for(const property in item.data) {
-            this.constructor.nodePropertySetters[property]?.(item, item.data[property]);
-        }
-
-        await this.updateNodeResource(item);
-    }
-
-    async updateNodeResource(item) {
-        if(!item.data.resource || item.resourceUpdated === false) return;
-        item.resourceUpdated = false;
-
-        const resource = await this.project.resources.getAssetObject(item.data.resource);
-
-        if(!resource) return;
-
-        item.__resourceObject = resource;
-
-        if(item.type === "sound") {
-            await this.ensureItemMediaElement(item, resource, "audio");
-            return;
-        }
-
-        if(item.type === "video") {
-            const media = await this.ensureItemMediaElement(item, resource, "video");
-            if(media && item.node) {
-                const texture = item.__videoTexture || this.constructor.createTextureFromMedia(media, true);
-                item.__videoTexture = texture;
-                this.constructor.setNodeTexture(item, texture, media);
-            }
-            return;
-        }
-
-        if(item.node) {
-            const texture = await this.constructor.createTextureFromResource(resource);
-            if(texture) {
-                this.constructor.setNodeTexture(item, texture);
-            }
-        }
-    }
-
-    applyNodeProperty(item, property, value) {
-        if(!item) return;
-
-        const applier = this.constructor.nodePropertySetters[property];
-        if(applier) {
-            applier(item, value);
-
-            if(property !== "tileColor" && property !== "clipDuration" && property !== "clipStartTime") {
-                item.data[property] = value;
-            }
-        } else {
-            console.warn(`this.constructor.applyNodeProperty: Unsupported property ${property}`);
-        }
-    }
-
-    getNodeProperty(item, property) {
-        if(!item) return null;
-
-        const getter = this.constructor.nodePropertyGetters[property];
-        if(getter) {
-            return getter(item);
-        } else {
-            console.warn(`this.constructor.getNodeProperty: Unsupported property ${property}`);
-            return null;
-        }
-    }
-
-    getSavedNodeProperty(item, property, fallback = true) {
-        if(!item || !item.data) return null;
-        return item.data[property] || (fallback ? this.getNodeProperty(item, property) : null); // Fallback to reading from node
-    }
-
-    static createSurfaceNode(type, data = {}) {
-        const node = new THREE.Group();
-        const material = new THREE.MeshBasicMaterial({
-            color: data.tint ?? data.materialColor ?? 0xffffff,
-            transparent: true,
-            opacity: data.opacity ?? data.alpha ?? 1,
-            depthTest: !!data.depthTest,
-            depthWrite: !!data.depthWrite,
-            side: THREE.DoubleSide
-        });
-
-        const mesh = new THREE.Mesh(this.getUnitPlaneGeometry(), material);
-
-        mesh.frustumCulled = false;
-        mesh.matrixAutoUpdate = false;
-
-        node.add(mesh);
-        node.userData.editorType = type;
-        node.userData.surface = mesh;
-        node.userData.material = material;
-        node.userData.width = data.width ?? data.w ?? 1;
-        node.userData.height = data.height ?? data.h ?? 1;
-        node.userData.anchorX = data.anchorX ?? 0;
-        node.userData.anchorY = data.anchorY ?? 0;
-        node.userData.skewX = data.skewX ?? 0;
-        node.userData.skewY = data.skewY ?? 0;
-
-        this.updateNodeLocalShape(node);
-        return node;
-    }
-
-    static UNIT_PLANE_GEOMETRY = null;
-    static TEXT_TEXTURE_SCALE = 2;
-
-    static getUnitPlaneGeometry() {
-        if(this.UNIT_PLANE_GEOMETRY) return this.UNIT_PLANE_GEOMETRY;
-
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-            0, 0, 0,
-            1, 0, 0,
-            1, 1, 0,
-            0, 1, 0
-        ], 3));
-        geometry.setAttribute('uv', new THREE.Float32BufferAttribute([
-            0, 1,
-            1, 1,
-            1, 0,
-            0, 0
-        ], 2));
-        geometry.setIndex([0, 1, 2, 0, 2, 3]);
-        geometry.computeVertexNormals();
-        geometry.userData.sharedEditorGeometry = true;
-
-        this.UNIT_PLANE_GEOMETRY = geometry;
-        return geometry;
     }
 
     /**
@@ -820,42 +602,42 @@ class VideoEditor extends FlavorBase {
         "anchorX": (item, v) => {
             if (item.node?.userData) {
                 item.node.userData.anchorX = v;
-                this.updateNodeLocalShape(item.node);
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
             }
         },
 
         "anchorY": (item, v) => {
             if (item.node?.userData) {
                 item.node.userData.anchorY = v;
-                this.updateNodeLocalShape(item.node);
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
             }
         },
 
         "skewX": (item, v) => {
             if (item.node?.userData) {
                 item.node.userData.skewX = v;
-                this.updateNodeLocalShape(item.node);
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
             }
         },
 
         "skewY": (item, v) => {
             if (item.node?.userData) {
                 item.node.userData.skewY = v;
-                this.updateNodeLocalShape(item.node);
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
             }
         },
 
         "width": (item, v) => {
             if (item.node?.userData) {
                 item.node.userData.width = v;
-                this.updateNodeLocalShape(item.node);
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
             }
         },
 
         "height": (item, v) => {
             if (item.node?.userData) {
                 item.node.userData.height = v;
-                this.updateNodeLocalShape(item.node);
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
             }
         },
 

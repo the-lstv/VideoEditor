@@ -32,6 +32,20 @@ class TemplateFlavor extends FlavorBase {
     async #init() { }
 
     /**
+     * This gets called when the "About" option is selected in the app menu.
+     */
+    onAboutDialog() {
+        LS.Modal.buildEphemeral({
+            content: [
+                { tag: 'img', src: this.constructor.iconSet.icon, style: 'height: 5em; width: 100%; margin: auto' },
+                { tag: 'h2', inner: 'Example Flavor', style: 'text-align: center' },
+                { tag: 'p', inner: `Editor version ${app.VERSION}, running LS ${LS.version}` },
+            ],
+            buttons: [ { label: "Close" } ]
+        });
+    }
+
+    /**
      * The default setup for this flavor.
      * Here you can setup views
      * @param {*} app 

@@ -15,7 +15,7 @@ import Project from "./core/project.mjs";
 import VideoEditor from "./flavors/video-editor/main.mjs";
 
 // --- QuickSand flavor
-// import QuickSand from "./flavors/quicksand/main.mjs";
+import QuickSand from "./flavors/quicksand/main.mjs";
 
 // Small miscellaneous helpers
 function createIfNotExists(selector, whereShouldItGo = document.body) { return document.querySelector(selector) || LS.Create(selector).addTo(whereShouldItGo) }

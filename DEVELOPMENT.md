@@ -122,12 +122,14 @@ Extra utilities and base classes, including HistoryManager, etc.
 
 Backends are modules that provide an interface to a specific API or technology.
 
+For example, they provide an unified interface for a rendering library, and then flavors use that interface to determine how they get rendered. This way flavors can all understand the same object item and API, while handling them howevery they want.
+
 Included backends:
 
 - `video/`: Video encoding and decoding; this module handles video data processing.
-- `audio/`: Basic audio encoding and decoding.
-- `rendering/`: Rendering adapters
-- `compilers/`: Various compiler tools
+- `audio/`: Basic audio encoding and decoding, as well as DSP processing.
+- `rendering/`: Rendering adapters. Currently implements THREE.js, originally provided PIXI.js. We intend to implement a custom WebGPU backend/engine in the future, but this is good enough for now.
+- `compilers/`: Various compiler/language/packaging tools for JS, Glitter, and some other DSLs, perhaps. (direction undecided for now).
 
 ---
 

@@ -15,6 +15,66 @@ import Project from "../../core/project.mjs";
 
 import { Variable, mappingCompiler } from "../../core/variable.mjs";
 
+// --- Video editor flavor
+class QuickSand extends FlavorBase {
+    static name = "quicksand";
+
+    static iconSet = {
+        icon: 'assets/src/flavors/quicksand/images/icon.svg',
+        small: 'assets/src/flavors/quicksand/images/icon-flat.svg',
+        favicon: 'assets/src/flavors/quicksand/images/favicon.svg',
+        desktopIcon: 'assets/src/flavors/quicksand/images/favicon.png'
+    };
+
+    static version = "0.1.0-alpha";
+
+    constructor(project) {
+        super(project);
+
+        // When the projects starts initializing
+        this.project.once("initializing", async () => {
+            await this.#init();
+        });
+
+        // When the project data has loaded
+        this.project.on("project-data-loaded", (data) => { });
+
+        // When a view connects to the project
+        this.project.on("view-connected", (view) => { });
+
+        // When a view disconnects from the project
+        this.project.on("view-disconnected", (view) => { });
+
+        // When the project data is being exported
+        this.project.on("export", (data) => { });
+    }
+
+    async #init() { }
+
+    onAboutDialog() {
+        LS.Modal.buildEphemeral({
+            content: [
+                { tag: 'img', src: this.constructor.iconSet.icon, style: 'height: 5em; width: 100%; margin: auto' },
+                { tag: 'h2', inner: 'Quicksand', style: 'text-align: center' },
+                { tag: 'p', html: `Version <code>${this.constructor.version}</code><br>Editor version <code>${app.VERSION}</code><br>LS version <code>${LS.version}</code>` },
+                { tag: 'p', inner: '' },
+                { tag: 'p', inner: ['Created with love and hard work by Lukas (', { tag: 'a', href: 'https://lstv.space', target: '_blank', inner: 'https://lstv.space' }, ')'] },
+                { tag: 'p', inner: ['Source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }] },
+            ],
+            buttons: [ { label: "Close" } ]
+        });
+    }
+
+    /**
+     * The default setup for the video editor flavor.
+     * @param {*} app 
+     */
+    static setupIn(app) {
+        app.setIcon(this.iconSet);
+        app.flavor = new QuickSand(app.currentProject || (app.currentProject = new Project()));
+    }
+}
+
 
 // TODO: separate layouts
 
@@ -221,49 +281,5 @@ Object.assign(LS.Multipane.PRESETS,  {
         ]
     },
 });
-
-// --- Video editor flavor
-class QuickSand extends FlavorBase {
-    static name = "quicksand";
-
-    static iconSet = {
-        icon: 'assets/src/flavors/quicksand/images/icon.svg',
-        small: 'assets/src/flavors/quicksand/images/icon-flat.svg',
-        favicon: 'assets/src/flavors/quicksand/images/favicon.svg',
-        desktopIcon: 'assets/src/flavors/quicksand/images/favicon.png'
-    };
-
-    constructor(project) {
-        super(project);
-
-        // When the projects starts initializing
-        this.project.once("initializing", async () => {
-            await this.#init();
-        });
-
-        // When the project data has loaded
-        this.project.on("project-data-loaded", (data) => { });
-
-        // When a view connects to the project
-        this.project.on("view-connected", (view) => { });
-
-        // When a view disconnects from the project
-        this.project.on("view-disconnected", (view) => { });
-
-        // When the project data is being exported
-        this.project.on("export", (data) => { });
-    }
-
-    async #init() { }
-
-    /**
-     * The default setup for the video editor flavor.
-     * @param {*} app 
-     */
-    static setupIn(app) {
-        app.setIcon(this.iconSet);
-        app.flavor = new QuickSand(app.currentProject || (app.currentProject = new Project()));
-    }
-}
 
 export default QuickSand;

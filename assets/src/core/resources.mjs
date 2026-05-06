@@ -218,6 +218,14 @@ class ResourceManager extends LS.EventEmitter {
         return false;
     }
 
+    export() {
+        const exportedResources = [];
+        for(const resource of this.resources.values()) {
+            exportedResources.push(resource.export());
+        }
+        return exportedResources;
+    }
+
     destroy() {
         // Destroy all resources
         this.disposeAll();

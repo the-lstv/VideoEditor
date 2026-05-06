@@ -14,13 +14,16 @@ class AssetManagerView extends LS.Multipane.View {
             items: [
                 { name: "Container", type: "container", item: { type: "container", label: "Container", color: "white" } },
                 { name: "Text", type: "text", item: { type: "text", label: "Text", data: { text: "Some text" }, color: "aquamarine" } },
-                { name: "Rectangle", type: "sprite", icon: "bi-square", item: { type: "sprite", label: "Rectangle", data: { positionX: 100, positionY: 100, scaleX: 500, scaleY: 500, anchorX: 0, anchorY: 0 } } },
+                { name: "Simple shape", type: "sprite", icon: "bi-square", item: { type: "sprite", label: "Shape", data: { positionX: 100, positionY: 100, scaleX: 500, scaleY: 500, anchorX: 0, anchorY: 0 } } },
                 { name: "Vector shape", type: "graphics", item: { type: "graphics", label: "Vector shape" } },
                 { name: "Automation clip", type: "automation", item: { type: "automation", label: "Automation clip", data: { value: 1, points: [ { value: 0, type: "linear", time: 1 } ] } } },
                 { name: "Video", type: "video", item: { type: "video", label: "Video", color: "blue" } },
                 { name: "Image", type: "sprite", item: { type: "sprite", label: "Image" } },
                 { name: "Sound", type: "sound", item: { type: "sound", label: "Sound", color: "purple" } },
-                { name: "Pattern", type: "notes", item: { type: "notes", label: "Pattern", color: "yellow" } }
+                { name: "Pattern", type: "notes", item: { type: "notes", label: "Pattern", color: "yellow" } },
+                { name: "Mesh", type: "mesh", item: { type: "mesh", label: "Mesh" } },
+                { name: "Camera", type: "camera", item: { type: "camera", label: "Camera", color: "orange" } },
+                { name: "Empty item", type: "empty", item: { type: "empty", label: "Empty item" } }
             ]
         },
 
@@ -403,7 +406,10 @@ class AssetManagerView extends LS.Multipane.View {
             "video": "bi-film",
             "sound": "bi-music-note-beamed",
             "automation": "bi-bezier2",
-            "notes": "bi-music-note-list"
+            "notes": "bi-music-note-list",
+            "camera": "bi-camera-video",
+            "empty": "bi-file-earmark",
+            "mesh": "bi-box"
         }[obj.type] || "bi-file")
     }
 

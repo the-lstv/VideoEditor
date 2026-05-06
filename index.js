@@ -7,6 +7,7 @@ const fs = require('fs');
 const path = require('path');
 
 app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder');
+app.commandLine.appendSwitch('ignore-certificate-errors');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
 // Flavors have different icons. TODO; update icons dynamically

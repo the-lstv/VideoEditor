@@ -44,7 +44,8 @@ class TimelineView extends LS.Multipane.View {
 
                                 { emmet: "hr.vertical" },
 
-                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-question" }, tooltip: "Help & Tips", onclick: () => {
+                                localStorage.getItem("hideTimelineHelp") === "true" ? null :
+                                { tag: "button", class: "control-button clear", inner: [{ tag: "i", class: "bi-question" }, "Controls"], tooltip: "Help & Tips", onclick: (btnEvent) => {
                                     LS.Modal.buildEphemeral({
                                         title: "Timeline controls help",
                                         content: [
@@ -56,7 +57,7 @@ class TimelineView extends LS.Multipane.View {
                                                 { tag: "li", inner: ["When moving items, they are by default snapped to a grid (which is customizable in the settings). You can hold ", { tag: "code", inner: "Alt" }, " to enable free movement, or ", { tag: "code", inner: "Shift" }, " to snap to one second."] },
                                                 { tag: "li", inner: ["Click an item to select it."] },
                                                 { tag: "li", inner: ["Hold Ctrl to select multiple items."] },
-                                                { tag: "li", inner: ["To quickly copy items, you can hold ", { tag: "code", inner: "Shift" }, " while dragging."] },
+                                                { tag: "li", inner: ["To quickly copy items, grag items while pressing ", { tag: "code", inner: "Shift" }, "."] },
                                                 { tag: "li", inner: ["To repeat items, press ", { tag: "code", inner: "Ctrl + B" }, " on a selected item."] },
                                             ] },
                                             { tag: "h3", inner: "Navigation:" },
@@ -65,8 +66,8 @@ class TimelineView extends LS.Multipane.View {
                                                 { tag: "li", inner: ["Horizontal Scrolling: ",  { tag: "code", inner: "Shift + Mouse Wheel" } ] },
                                                 { tag: "li", inner: ["Vertical Scrolling: ",  { tag: "code", inner: "Mouse Wheel" } ] },
                                                 { tag: "li", inner: ["Horizontal zooming: ",  { tag: "code", inner: "Ctrl + Mouse Wheel" } ] },
-                                                { tag: "li", inner: ["Vertical zooming: ",  { tag: "code", inner: "Alt + Mouse Wheel" }, "or", { tag: "code", inner: "Ctrl + Mouse Drag" } ] },
-                                                { tag: "li", inner: ["Selecting clips: ",  { tag: "code", inner: "Ctrl + Click + Drag" } ] },
+                                                { tag: "li", inner: ["Vertical zooming: ",  { tag: "code", inner: "Alt + Mouse Wheel" }, "or", { tag: "code", inner: "Ctrl + Middle Mouse Drag" } ] },
+                                                { tag: "li", inner: ["Selecting clips: ",  { tag: "code", inner: "Ctrl + Drag" } ] },
                                                 { tag: "li", inner: ["Jump to start/end: ",  { tag: "code", inner: "Home / End" } ] },
                                                 { tag: "li", inner: ["Next/previous frame: ",  { tag: "code", inner: "Shift + Arrows" } ] },
                                             ] },
@@ -80,7 +81,12 @@ class TimelineView extends LS.Multipane.View {
                                                 { tag: "li", inner: ["Erase tool: ",  { tag: "code", inner: "E" }, ", or drag with right mouse button" ] },
                                             ] },
                                         ],
-                                        buttons: [{ label: "Close" }]
+
+                                        buttons: [{ label: "Don't show again", class: "elevated", onclick: (event) => {
+                                            localStorage.setItem("hideTimelineHelp", "true");
+                                            event.target.closest(".ls-modal").lsComponent.close();
+                                            btnEvent.target.remove();
+                                        }}, { label: "Close" }]
                                     });
                                 } },
 

@@ -3,7 +3,7 @@
  */
 
 export default class Flavor extends LS.Context {
-    name = "base";
+    static name = "default";
 
     constructor(project) {
         super();
@@ -20,14 +20,16 @@ export default class Flavor extends LS.Context {
     }
 
     get flavorConfig() {
+        const name = this.constructor.name || this.name || "default";
+
         if(!this.project.config.flavorSpecific) {
             this.project.config.flavorSpecific = {};
         }
 
-        if(!this.project.config.flavorSpecific[this.name]) {
-            this.project.config.flavorSpecific[this.name] = {};
+        if(!this.project.config.flavorSpecific[name]) {
+            this.project.config.flavorSpecific[name] = {};
         }
 
-        return this.project.config.flavorSpecific[this.name] || {};
+        return this.project.config.flavorSpecific[name] || {};
     }
 }
