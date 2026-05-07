@@ -50,17 +50,26 @@ const app = globalThis.app = {
     GITHUB_REPO: "https://github.com/the-lstv/videoeditor",
     VERSION: "2.2.0-alpha",
 
+    /**
+     * Enters the loading/transition shade
+     */
     enterShade() {
         app.container.classList.remove('loaded');
         document.querySelector("#logo").classList.remove("jump");
     },
-
+    
+    /**
+     * Leaves the loading/transition shade & plays the logo animation
+     */
     leaveShade() {
         app.container.style.display = 'flex';
         document.querySelector("#logo").classList.add("jump");
         setTimeout(() => app.container.classList.add('loaded'), 0);
     },
 
+    /**
+     * Sets the application icon/iconSet
+     */
     setIcon(iconSet) {
         if(typeof iconSet === "string") {
             iconSet = {
@@ -88,7 +97,7 @@ window.addEventListener('load', async () => {
             app.layoutManager.setSchema("default");
         }
 
-        // Shortcuts
+        // Global shortcuts
         app.shortcutManager.map({
             GLOBAL_PAUSE: 'space',
             GLOBAL_SEEK_HOME: 'home',

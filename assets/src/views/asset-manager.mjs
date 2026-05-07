@@ -21,8 +21,12 @@ class AssetManagerView extends LS.Multipane.View {
                 { name: "Image", type: "sprite", item: { type: "sprite", label: "Image" } },
                 { name: "Sound", type: "sound", item: { type: "sound", label: "Sound", color: "purple" } },
                 { name: "Pattern", type: "notes", item: { type: "notes", label: "Pattern", color: "yellow" } },
-                { name: "Mesh", type: "mesh", item: { type: "mesh", label: "Mesh" } },
+                { name: "3D Mesh", type: "mesh", item: { type: "mesh", label: "3D Mesh", color: "lapis" } },
                 { name: "Camera", type: "camera", item: { type: "camera", label: "Camera", color: "orange" } },
+                { name: "Light", type: "light", item: { type: "light", label: "Light", color: "yellow" } },
+                { name: "Particle emitter", type: "particles", item: { type: "particles", label: "Particle emitter", color: "pink" } },
+                { name: "Events", type: "events", item: { type: "events", label: "Events" } },
+                { name: "Timeline script", type: "script", item: { type: "script", label: "Timeline script" } },
                 { name: "Empty item", type: "empty", item: { type: "empty", label: "Empty item" } }
             ]
         },
@@ -409,7 +413,11 @@ class AssetManagerView extends LS.Multipane.View {
             "notes": "bi-music-note-list",
             "camera": "bi-camera-video",
             "empty": "bi-file-earmark",
-            "mesh": "bi-box"
+            "mesh": "bi-box",
+            "light": "bi-lightbulb",
+            "events": "bi-toggles",
+            "particles": "bi-stars",
+            "script": "bi-braces-asterisk"
         }[obj.type] || "bi-file")
     }
 

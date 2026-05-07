@@ -1,4 +1,6 @@
 ## TODO List
+- [ ] Make Three.js rendering work..
+- [ ] Resize modes
 - [ ] Video encoding/decoding
 - [ ] Better resource management
 - [ ] Effects and transitions

@@ -172,7 +172,9 @@ class PropertyEditorView extends LS.Multipane.View {
                                 { tag: "label", inner: "X", class: "input-label-small" },
                                 this.#createInput("positionX", { type: "number", attributes: { step: 1 }, defaultValue: 0 }),
                                 { tag: "label", inner: "Y", class: "input-label-small" },
-                                this.#createInput("positionY", { type: "number", attributes: { step: 1 }, defaultValue: 0 })
+                                this.#createInput("positionY", { type: "number", attributes: { step: 1 }, defaultValue: 0 }),
+                                { tag: "label", inner: "Z", class: "input-label-small" },
+                                this.#createInput("positionZ", { type: "number", attributes: { step: 1 }, defaultValue: 0 })
                             ]
                         }
                     ],
@@ -184,14 +186,18 @@ class PropertyEditorView extends LS.Multipane.View {
                                 { tag: "label", inner: "X", class: "input-label-small" },
                                 this.#createInput("scaleX", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 }),
                                 { tag: "label", inner: "Y", class: "input-label-small" },
-                                this.#createInput("scaleY", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 })
+                                this.#createInput("scaleY", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 }),
+                                { tag: "label", inner: "Z", class: "input-label-small" },,
+                                this.#createInput("scaleZ", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 })
                             ]
                         }
                     ],
                     // Rotation
                     [
                         { tag: "span", inner: [{ tag: "i", class: "bi-arrow-clockwise" }, { tag: "label", inner: " Rotation:" }] },
-                        this.#createInput("rotation", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 })
+                        this.#createInput("rotationX", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
+                        this.#createInput("rotationY", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
+                        this.#createInput("rotationZ", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 })
                     ],
                     // Skew Group
                     [
@@ -737,7 +743,7 @@ class PropertyEditorView extends LS.Multipane.View {
             case "video":
                 this.targetNodeIsVisual = true;
 
-                for(const prop of ["positionX", "positionY", "scaleX", "scaleY", "rotation", "anchorX", "anchorY", "opacity", "visible", "blendMode", "tint", "skewX", "skewY"]) {
+                for(const prop of ["positionX", "positionY", "scaleX", "scaleY", "scaleZ", "rotationX", "rotationY", "rotationZ", "anchorX", "anchorY", "opacity", "visible", "blendMode", "tint", "skewX", "skewY"]) {
                     this.updateInputValue(prop);
                 }
 
@@ -1087,7 +1093,7 @@ class PropertyEditorView extends LS.Multipane.View {
             // Should not happen, but if it somehow does, this prevents exploding the program
             if(Number.isNaN(value)) value = 0;
 
-            this.#getAttachment()?.applyNodeProperty?.(this.currentTarget, property, value);
+            this.#getAttachment()?.renderer?.applyNodeProperty?.(this.currentTarget, property, value);
             this.updateInputValue(property, value);
 
             if(this.targetNodeIsVisual) {

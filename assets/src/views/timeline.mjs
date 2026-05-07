@@ -11,6 +11,8 @@ class TimelineView extends LS.Multipane.View {
             title: 'Timeline',
             container: LS.Create({
                 class: 'editor-timeline',
+
+                // Controls & help button
                 inner: [
                     {
                         class: 'timeline-header controls-bar',

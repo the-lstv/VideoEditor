@@ -155,3 +155,28 @@ There used to be an experimental filesystem access module for browsers, but it w
 
 ### Packaging for production:
 Work in progress
+
+## APIs
+
+Flavors have multiple APIs available.
+
+For example, to register a shortcut (same API as LS.ShortcutManager):
+```js
+app.shortcutManager.map({
+    // Can be an array, and you can take it from anywhere, such as an user config
+    MY_SHORTCUT: 'ctrl+a'
+});
+
+// Then listen for it:
+app.shortcutManager.assign('MY_SHORTCUT', () => {
+    // Do something
+});
+
+// To reassign, simply call .map again with a new keybind:
+app.shortcutManager.map({
+    MY_SHORTCUT: 'ctrl+b'
+});
+
+// And more methods are available. You can also register simple static shortcuts without assigning.
+```
+

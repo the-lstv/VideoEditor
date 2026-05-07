@@ -112,7 +112,7 @@ class ThreeRendererAdapter extends RendererAdapter {
         if(!item || item.node) return null;
         if(!item.data) item.data = {};
 
-        if(item.type === "automation") {
+        if(item.type === "automation" || item.type === "events" || item.type === "script") {
             return null;
         }
 
@@ -153,8 +153,7 @@ class ThreeRendererAdapter extends RendererAdapter {
                 break;
 
             case "text":
-                // item.node = this.constructor.createTextNode(item);
-                // TBA again
+                // TBA ***again***
                 break;
 
             /* Mesh node */
@@ -182,8 +181,9 @@ class ThreeRendererAdapter extends RendererAdapter {
         item.node.matrixAutoUpdate = true;
 
         // ! todo: scene editor
-        if(this.renderer?.root) {
-            this.renderer.root.add(item.node);
+        if(this?.root) {
+            this.root.add(item.node);
+            console.log(`Added node for item ${item.id} to root`);
         }
 
         this.applyInitialNodeProperties(item);
@@ -267,6 +267,7 @@ class ThreeRendererAdapter extends RendererAdapter {
         return item.data[property] || (fallback ? this.getNodeProperty(item, property) : null); // Fallback to reading from node
     }
 
+    // Cached plane geometry for surface nodes (sprites, graphics, text)
     static UNIT_PLANE_GEOMETRY = null;
     static TEXT_TEXTURE_SCALE = 2;
 
@@ -286,7 +287,9 @@ class ThreeRendererAdapter extends RendererAdapter {
             1, 0,
             0, 0
         ], 2));
+
         geometry.setIndex([0, 1, 2, 0, 2, 3]);
+
         geometry.computeVertexNormals();
         geometry.userData.sharedEditorGeometry = true;
 
@@ -307,8 +310,8 @@ class ThreeRendererAdapter extends RendererAdapter {
 
         const mesh = new THREE.Mesh(this.getUnitPlaneGeometry(), material);
 
-        mesh.frustumCulled = false;
-        mesh.matrixAutoUpdate = false;
+        // mesh.frustumCulled = false;
+        // mesh.matrixAutoUpdate = false;
 
         node.add(mesh);
         node.userData.editorType = type;
@@ -316,16 +319,24 @@ class ThreeRendererAdapter extends RendererAdapter {
         node.userData.material = material;
         node.userData.width = data.width ?? data.w ?? 1;
         node.userData.height = data.height ?? data.h ?? 1;
-        node.userData.anchorX = data.anchorX ?? 0;
-        node.userData.anchorY = data.anchorY ?? 0;
-        node.userData.skewX = data.skewX ?? 0;
-        node.userData.skewY = data.skewY ?? 0;
 
         this.updateNodeLocalShape(node);
         return node;
     }
 
     static updateNodeLocalShape(node) {
+        // TODO: separate dimensions with scale
+        node.scale.set(node.userData.width || 1, node.userData.height || 1, 1);
+
+        // const anchorX = node.userData.anchorX || 0;
+        // const anchorY = node.userData.anchorY || 0;
+        // const skewX = node.userData.skewX || 0;
+        // const skewY = node.userData.skewY || 0;
+
+        // geometry.translate(0.5, -0.5, 0); // Anchor but dawg why per gaymetry ts complicates it sum
+
+        node.updateMatrix();                 // local
+        node.updateMatrixWorld(true);        // world
     }
 
     static disposeObject(object) {
@@ -342,6 +353,450 @@ class ThreeRendererAdapter extends RendererAdapter {
 
     render(camera = null) {
         this.renderer.render(this.scene, camera || this.camera);
+    }
+
+    /**
+     * @type {Object.<string, function(AnimatedItem, *): void>}
+     */
+    static nodePropertySetters = {
+        "tileColor": (item, v) => {
+            item.color = v;
+        },
+
+        "clipDuration": (item, v) => {
+            item.duration = v;
+        },
+
+        "clipStartTime": (item, v) => {
+            item.start = v;
+        },
+
+        "positionX": (item, v) => {
+            if (item.node) item.node.position.x = v;
+        },
+
+        "positionY": (item, v) => {
+            if (item.node) item.node.position.y = v;
+        },
+
+        "positionZ": (item, v) => {
+            if (item.node) item.node.position.z = v;
+        },
+
+        "scaleX": (item, v) => {
+            if (item.node) item.node.scale.x = v;
+        },
+
+        "scaleY": (item, v) => {
+            if (item.node) item.node.scale.y = v;
+        },
+
+        "scaleZ": (item, v) => {
+            if (item.node) item.node.scale.z = v;
+        },
+
+        "rotationX": (item, v) => {
+            if (item.node) item.node.rotation.x = v;
+        },
+
+        "rotationY": (item, v) => {
+            if (item.node) item.node.rotation.y = v;
+        },
+
+        "rotationZ": (item, v) => {
+            if (item.node) item.node.rotation.z = v;
+        },
+
+        "anchorX": (item, v) => {
+            if (item.node?.userData) {
+                item.node.userData.anchorX = v;
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
+            }
+        },
+
+        "anchorY": (item, v) => {
+            if (item.node?.userData) {
+                item.node.userData.anchorY = v;
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
+            }
+        },
+
+        "skewX": (item, v) => {
+            if (item.node?.userData) {
+                item.node.userData.skewX = v;
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
+            }
+        },
+
+        "skewY": (item, v) => {
+            if (item.node?.userData) {
+                item.node.userData.skewY = v;
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
+            }
+        },
+
+        "width": (item, v) => {
+            if (item.node?.userData) {
+                item.node.userData.width = v;
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
+            }
+        },
+
+        "height": (item, v) => {
+            if (item.node?.userData) {
+                item.node.userData.height = v;
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
+            }
+        },
+
+        "depth": (item, v) => {
+            item.data.depth = v;
+        },
+
+        "visible": (item, v) => {
+            v = !!v;
+            if (item.node) item.node.visible = v;
+        },
+
+        "tint": (item, v) => {
+            this.setMaterialColor(item, v);
+        },
+
+        "color": (item, v) => {
+            this.setMaterialColor(item, v);
+        },
+
+        "fill": (item, v) => {
+            this.setMaterialColor(item, v);
+        },
+
+        "materialColor": (item, v) => {
+            this.setMaterialColor(item, v);
+        },
+
+        "opacity": (item, v) => {
+            this.setMaterialOpacity(item, v);
+        },
+
+        "alpha": (item, v) => {
+            this.setMaterialOpacity(item, v);
+        },
+
+        "blendMode": (item, v) => {
+            this.setBlendMode(item, v);
+        },
+
+        "wireframe": (item, v) => {
+            if(item.node) this.forEachMaterial(item.node, (material) => material.wireframe = !!v);
+        },
+
+        "castShadow": (item, v) => {
+            if(item.node) item.node.castShadow = !!v;
+        },
+
+        "receiveShadow": (item, v) => {
+            if(item.node) item.node.receiveShadow = !!v;
+        },
+
+        "textContent": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                item.node.userData.textState.text = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyle": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                item.node.userData.textState.style = v || {};
+                item.data.textStyle = v || {};
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleWeight": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.fontWeight = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleStyle": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.fontStyle = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleFontSize": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.fontSize = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleFontFamily": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.fontFamily = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleFill": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.fill = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleAlignment": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.align = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleLineHeight": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.lineHeight = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleWrapWidth": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.wordWrapWidth = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleWrap": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.wordWrap = !!v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleLetterSpacing": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.letterSpacing = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleStroke": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.stroke = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleStrokeThickness": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.strokeThickness = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleStrokeLinejoin": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.lineJoin = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleDropShadow": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.dropShadow = !!v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleDropShadowColor": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.dropShadowColor = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleDropShadowDistance": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.dropShadowDistance = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleDropShadowAngle": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.dropShadowAngle = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleDropShadowBlur": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.dropShadowBlur = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "textStyleDropShadowOpacity": (item, v) => {
+            if (item.node?.userData?.editorType === "text") {
+                this.ensureTextStyle(item);
+                item.node.userData.textState.style.dropShadowAlpha = v;
+                this.updateTextNode(item);
+            }
+        },
+
+        "volume": (item, v) => {
+            item.data.volume = v;
+            if(item.__mediaElement) item.__mediaElement.volume = Math.min(Math.max(v, 0), 1);
+        },
+
+        "muted": (item, v) => {
+            item.data.muted = !!v;
+            if(item.__mediaElement) item.__mediaElement.muted = !!v;
+        },
+
+        "playbackRate": (item, v) => {
+            item.data.playbackRate = v;
+            if(item.__mediaElement && v > 0) item.__mediaElement.playbackRate = v;
+        },
+
+        "loop": (item, v) => {
+            item.data.loop = !!v;
+            if(item.__mediaElement) item.__mediaElement.loop = !!v;
+        },
+
+        "mediaStartTime": (item, v) => {
+            item.data.mediaStartTime = v;
+        },
+
+        "cameraFov": (item, v) => {
+            if(item.node?.isPerspectiveCamera) {
+                item.node.fov = v;
+                item.node.updateProjectionMatrix();
+            }
+        },
+
+        "cameraNear": (item, v) => {
+            if(item.node?.isCamera) {
+                item.node.near = v;
+                item.node.updateProjectionMatrix();
+            }
+        },
+
+        "cameraFar": (item, v) => {
+            if(item.node?.isCamera) {
+                item.node.far = v;
+                item.node.updateProjectionMatrix();
+            }
+        },
+
+        "automationEnabled": (item, v) => item.data.automationEnabled = !!v,
+
+        "automationBaseValue": (item, v) => {
+            item.data.automationBaseValue = v;
+            if(item.__automationClip) {
+                item.__automationClip.startPoint.value = v;
+                item.__automationClip.render();
+            }
+        },
+
+        "automationFunction": (item, v) => {
+            if(typeof v === "string") {
+                item.data.automationFunction = v;
+                item.__dirtyMapping = true;
+            } else if (typeof v === "function") {
+                item.mappingFn = v;
+                item.__dirtyMapping = false;
+            }
+        }
+    }
+
+    /**
+     * @property {Object.<string, function>} nodePropertyGetters - A mapping of property names to functions that retrieve those properties from a given item.
+     */
+    static nodePropertyGetters = {
+        "tileColor": (item) => item.color,
+        "clipDuration": (item) => item.duration,
+        "clipStartTime": (item) => item.start,
+        "positionX": (item) => item.node? item.node.position.x: (item.data.positionX || 0),
+        "positionY": (item) => item.node? item.node.position.y: (item.data.positionY || 0),
+        "positionZ": (item) => item.node? item.node.position.z: (item.data.positionZ || 0),
+        "scaleX": (item) => item.node? item.node.scale.x: (item.data.scaleX || 1),
+        "scaleY": (item) => item.node? item.node.scale.y: (item.data.scaleY || 1),
+        "scaleZ": (item) => item.node? item.node.scale.z: (item.data.scaleZ || 1),
+        "rotationX": (item) => item.node? item.node.rotation.x: (item.data.rotationX || 0),
+        "rotationY": (item) => item.node? item.node.rotation.y: (item.data.rotationY || 0),
+        "rotationZ": (item) => item.node? item.node.rotation.z: (item.data.rotationZ || item.data.rotation || 0),
+        "anchorX": (item) => item.node?.userData? item.node.userData.anchorX: (item.data.anchorX?? 0),
+        "anchorY": (item) => item.node?.userData? item.node.userData.anchorY: (item.data.anchorY?? 0),
+        "skewX": (item) => item.node?.userData? item.node.userData.skewX: (item.data.skewX || 0),
+        "skewY": (item) => item.node?.userData? item.node.userData.skewY: (item.data.skewY || 0),
+        "width": (item) => item.node?.userData? item.node.userData.width: (item.data.width || 1),
+        "height": (item) => item.node?.userData? item.node.userData.height: (item.data.height || 1),
+        "depth": (item) => item.data.depth || 1,
+        "visible": (item) => item.node? item.node.visible: (item.data.visible !== undefined? item.data.visible: true),
+        "tint": (item) => item.data.tint || item.data.materialColor || 0xFFFFFF,
+        "color": (item) => item.data.color || item.data.tint || 0xFFFFFF,
+        "fill": (item) => item.data.fill || item.data.color || item.data.tint || 0xFFFFFF,
+        "materialColor": (item) => item.data.materialColor || item.data.color || item.data.tint || 0xFFFFFF,
+        "opacity": (item) => item.data.opacity !== undefined? item.data.opacity: (item.data.alpha !== undefined? item.data.alpha: 1),
+        "alpha": (item) => item.data.alpha !== undefined? item.data.alpha: (item.data.opacity !== undefined? item.data.opacity: 1),
+        "blendMode": (item) => item.data.blendMode || 0,
+        "wireframe": (item) => !!item.data.wireframe,
+        "castShadow": (item) => !!(item.node? item.node.castShadow: item.data.castShadow),
+        "receiveShadow": (item) => !!(item.node? item.node.receiveShadow: item.data.receiveShadow),
+        "textContent": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.text: (item.data.textContent || ""),
+        "textStyle": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style: (item.data.textStyle || {}),
+        "textStyleWeight": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.fontWeight: (item.data.textStyleWeight || 'normal'),
+        "textStyleStyle": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.fontStyle: (item.data.textStyleStyle || 'normal'),
+        "textStyleFontSize": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.fontSize: (item.data.textStyleFontSize || 26),
+        "textStyleFontFamily": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.fontFamily: (item.data.textStyleFontFamily || 'Arial'),
+        "textStyleFill": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.fill: (item.data.textStyleFill || '#ffffff'),
+        "textStyleAlignment": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.align: (item.data.textStyleAlignment || 'left'),
+        "textStyleLineHeight": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.lineHeight: (item.data.textStyleLineHeight || 0),
+        "textStyleWrapWidth": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.wordWrapWidth: (item.data.textStyleWrapWidth || 100),
+        "textStyleWrap": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.wordWrap: (!!item.data.textStyleWrap),
+        "textStyleLetterSpacing": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.letterSpacing: (item.data.textStyleLetterSpacing || 0),
+        "textStyleStroke": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.stroke: (item.data.textStyleStroke || '#000000'),
+        "textStyleStrokeThickness": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.strokeThickness: (item.data.textStyleStrokeThickness || 0),
+        "textStyleStrokeLinejoin": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.lineJoin: (item.data.textStyleStrokeLinejoin || 'miter'),
+        "textStyleDropShadow": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.dropShadow: (!!item.data.textStyleDropShadow),
+        "textStyleDropShadowColor": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.dropShadowColor: (item.data.textStyleDropShadowColor || '#000000'),
+        "textStyleDropShadowDistance": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.dropShadowDistance: (item.data.textStyleDropShadowDistance || 5),
+        "textStyleDropShadowAngle": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.dropShadowAngle: (item.data.textStyleDropShadowAngle || Math.PI / 6),
+        "textStyleDropShadowBlur": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.dropShadowBlur: (item.data.textStyleDropShadowBlur || 0),
+        "textStyleDropShadowOpacity": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.dropShadowAlpha: (item.data.textStyleDropShadowAlpha || 1),
+        "volume": (item) => item.__mediaElement? item.__mediaElement.volume: (item.data.volume ?? 1),
+        "muted": (item) => item.__mediaElement? item.__mediaElement.muted: !!item.data.muted,
+        "playbackRate": (item) => item.__mediaElement? item.__mediaElement.playbackRate: (item.data.playbackRate || 1),
+        "loop": (item) => item.__mediaElement? item.__mediaElement.loop: !!item.data.loop,
+        "mediaStartTime": (item) => item.data.mediaStartTime || 0,
+        "cameraFov": (item) => item.node?.isPerspectiveCamera? item.node.fov: (item.data.cameraFov || item.data.fov || 50),
+        "cameraNear": (item) => item.node?.isCamera? item.node.near: (item.data.cameraNear || item.data.near || 0.1),
+        "cameraFar": (item) => item.node?.isCamera? item.node.far: (item.data.cameraFar || item.data.far || 10000),
+        "automationEnabled": (item) => !!item.data.automationEnabled,
+        "automationBaseValue": (item) => item.data.automationBaseValue || 0,
+        "automationFunction": (item) => item.data.automationFunction || ""
     }
 
     destroy() {
