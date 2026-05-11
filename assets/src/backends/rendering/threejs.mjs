@@ -1,4 +1,5 @@
 import RendererAdapter from "./adapter-base.mjs";
+import AcceleratedTextRenderer from "./text.mjs";
 
 // import * as THREE from "three";
 
@@ -23,11 +24,17 @@ import RendererAdapter from "./adapter-base.mjs";
 
 
 class ThreeRendererAdapter extends RendererAdapter {
-    constructor(options = {}) {
+    constructor(options = {}, parent) {
         super();
 
         if(typeof THREE === "undefined") {
             throw new Error("ThreeRendererAdapter: THREE.js is required");
+        }
+
+        this.parent = parent;
+
+        if(!this.parent) {
+            throw new Error("ThreeRendererAdapter: Parent Project must be passed in constructor as of now.");
         }
 
         this.canvas = options.canvas || document.createElement('canvas');
@@ -125,7 +132,7 @@ class ThreeRendererAdapter extends RendererAdapter {
             /* Vector graphics node */
             case "graphics":
                 const data = item.data || {};
-                const node = this.constructor.createSurfaceNode("graphics", data);
+                const node = this.constructor.createSurfaceNode("graphics", data, this.parent);
                 const material = node.userData.material;
 
                 material.color.set(data.fill ?? data.color ?? data.tint ?? 0xffffff);
@@ -149,11 +156,27 @@ class ThreeRendererAdapter extends RendererAdapter {
             case "image":
             case "video":
                 if(item.type === "image") item.type = "sprite"; // Normalize
-                item.node = this.constructor.createSurfaceNode(item.type, item.data);
+                item.node = this.constructor.createSurfaceNode(item.type, item.data, this.parent);
                 break;
 
+            /* Using the native dynamic text renderer (good for dynamic text) */
             case "text":
-                // TBA ***again***
+                const renderer = new AcceleratedTextRenderer({
+                    THREE,
+                    threeRenderer: this.renderer,
+                    cols: 120,
+                    rows: 40,
+                    fontSrc: "assets/fonts/JetBrainsMono",
+                    init: true
+                });
+
+                item.textRenderer = renderer; // Here options could get uploaded, & these could be shared
+                item.node = renderer.getObject3D();
+                break;
+
+            /* Using canvas text rendering & a static texture (good for static text) */
+            case "static_text":
+                // TBA
                 break;
 
             /* Mesh node */
@@ -206,31 +229,14 @@ class ThreeRendererAdapter extends RendererAdapter {
         if(!item.data.resource || item.resourceUpdated === false) return;
         item.resourceUpdated = false;
 
-        const resource = await this.project.resources.getAssetObject(item.data.resource);
-
+        const resource = this.parent.resources.getResource(item.data.resource);
         if(!resource) return;
 
-        item.__resourceObject = resource;
-
-        if(item.type === "sound") {
-            await this.ensureItemMediaElement(item, resource, "audio");
-            return;
-        }
-
-        if(item.type === "video") {
-            const media = await this.ensureItemMediaElement(item, resource, "video");
-            if(media && item.node) {
-                const texture = item.__videoTexture || this.constructor.createTextureFromMedia(media, true);
-                item.__videoTexture = texture;
-                this.constructor.setNodeTexture(item, texture, media);
-            }
-            return;
-        }
-
         if(item.node) {
-            const texture = await this.constructor.createTextureFromResource(resource);
-            if(texture) {
-                this.constructor.setNodeTexture(item, texture);
+            if(resource.type === "image") {
+                const texture = await resource.getTexture();
+                item.node.userData.material.map = texture;
+                item.node.userData.material.needsUpdate = true;
             }
         }
     }
@@ -267,38 +273,9 @@ class ThreeRendererAdapter extends RendererAdapter {
         return item.data[property] || (fallback ? this.getNodeProperty(item, property) : null); // Fallback to reading from node
     }
 
-    // Cached plane geometry for surface nodes (sprites, graphics, text)
-    static UNIT_PLANE_GEOMETRY = null;
-    static TEXT_TEXTURE_SCALE = 2;
-
-    static getUnitPlaneGeometry() {
-        if(this.UNIT_PLANE_GEOMETRY) return this.UNIT_PLANE_GEOMETRY;
-
-        const geometry = new THREE.BufferGeometry();
-        geometry.setAttribute('position', new THREE.Float32BufferAttribute([
-            0, 0, 0,
-            1, 0, 0,
-            1, 1, 0,
-            0, 1, 0
-        ], 3));
-        geometry.setAttribute('uv', new THREE.Float32BufferAttribute([
-            0, 1,
-            1, 1,
-            1, 0,
-            0, 0
-        ], 2));
-
-        geometry.setIndex([0, 1, 2, 0, 2, 3]);
-
-        geometry.computeVertexNormals();
-        geometry.userData.sharedEditorGeometry = true;
-
-        this.UNIT_PLANE_GEOMETRY = geometry;
-        return geometry;
-    }
-
-    static createSurfaceNode(type, data = {}) {
+    static createSurfaceNode(type, data = {}, parent = null) {
         const node = new THREE.Group();
+
         const material = new THREE.MeshBasicMaterial({
             color: data.tint ?? data.materialColor ?? 0xffffff,
             transparent: true,
@@ -310,8 +287,7 @@ class ThreeRendererAdapter extends RendererAdapter {
 
         const mesh = new THREE.Mesh(this.getUnitPlaneGeometry(), material);
 
-        // mesh.frustumCulled = false;
-        // mesh.matrixAutoUpdate = false;
+        mesh.matrixAutoUpdate = false;
 
         node.add(mesh);
         node.userData.editorType = type;
@@ -343,6 +319,47 @@ class ThreeRendererAdapter extends RendererAdapter {
         object.removeFromParent();
         if(object.geometry && !object.geometry.userData?.sharedEditorGeometry) {
             object.geometry.dispose();
+        }
+    }
+
+    // Cached plane geometry for surface nodes (sprites, graphics, text)
+    static UNIT_PLANE_GEOMETRY = null;
+    static TEXT_TEXTURE_SCALE = 2;
+
+    static getUnitPlaneGeometry() {
+        if(this.UNIT_PLANE_GEOMETRY) return this.UNIT_PLANE_GEOMETRY;
+
+        const geometry = new THREE.BufferGeometry();
+        geometry.setAttribute('position', new THREE.Float32BufferAttribute([
+            0, 0, 0,
+            1, 0, 0,
+            1, 1, 0,
+            0, 1, 0
+        ], 3));
+        geometry.setAttribute('uv', new THREE.Float32BufferAttribute([
+            0, 1,
+            1, 1,
+            1, 0,
+            0, 0
+        ], 2));
+
+        geometry.setIndex([0, 1, 2, 0, 2, 3]);
+
+        geometry.computeVertexNormals();
+        geometry.userData.sharedEditorGeometry = true;
+
+        this.UNIT_PLANE_GEOMETRY = geometry;
+        return geometry;
+    }
+
+    static setMaterialColor(item, value) {
+        if(!item.node) return;
+
+        // hmm
+        const material = item.node.userData.material;
+        if(material) {
+            material.color.set(value || 0xffffff);
+            // material.needsUpdate = true;
         }
     }
 

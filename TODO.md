@@ -14,16 +14,37 @@
 - [ ] Scripting API
 - [ ] Plugin system
 - [ ] 3D objects and compositing
+- [ ] 3D tools & viewport
 - [ ] VR editing
 - [ ] Collaboration features
-- [ ] Color grading tools
+- [ ] Color grading, correction, color curves tools
+- [ ] Smart color sampling/analysis & matching tools
 - [ ] Motion tracking
 - [ ] Shaders
 - [ ] Paint mode
 - [ ] Audio mixer
 - [ ] Modular controllers
 - [ ] Physics simulation
-- No.
+- [ ] Drop snapping & preview
+- [ ] Playhead snapping
+- [ ] Customizable keyboard shortcuts
+- [ ] Enhance Undo/Redo system
+- [ ] Remote sources
+- [ ] Efficient sync system & remote editing (multiplayer/collaboration mode maybe?)
+- [ ] External controllers mapping for positioning etc.
+- [ ] Acid Kaiju
+- [ ] Groups & scene graphs
+- [ ] Timeline to scene & vice versa
+- [ ] Pixel-perfect previewing tools
+- [ ] Ready to use effects
+- [ ] Shader interface & modules & library
+- [ ] Welcome screen
 - [ ] General UI improvements
+- [ ] Pop asset preview
+- [ ] Multiple switchable timelines, timeline references in composition
+- [ ] Custom color picker
+- [ ] Custom file picker
+- [ ] Static text objects
+- [ ] Dynamic text objects
 
 ## Bugs

@@ -13,7 +13,8 @@ class AssetManagerView extends LS.Multipane.View {
             icon: "bi-box",
             items: [
                 { name: "Container", type: "container", item: { type: "container", label: "Container", color: "white" } },
-                { name: "Text", type: "text", item: { type: "text", label: "Text", data: { text: "Some text" }, color: "aquamarine" } },
+                { name: "Dynamic text", type: "text", helpText: "A dynamic text object.\n\nIt uses a custom text rendering engine optimized for this platform. Text can be updated at any time and can be written anywhere on the screen quickly and at any scale. Also supports realtime effects and syntax highlighting.\n\nCons:\n- Fonts need to be converted to a special format limited to a set of characters, and text shaping is not currently supported.\n- Currently only works well with monospace fonts.\n- Larger overhead per instance; it's recommended to reuse it.\n- Slightly more complex to use.\n\nPros:\n- Crisp at any scale\n- Great for dynamic content and per-character effects\n- A more versatile API.\n\nSuitable when you change text or text styles often and need high performance text rendering with advanced per-character effects.", item: { type: "text", label: "Dynamic text", data: { text: "Some text" }, color: "aquamarine" } },
+                { name: "Static text", type: "static_text", helpText: "A static text object that uses the browser's native text rendering, and then applies it as a texture to a sprite.\n\nCons:\n- Updates are expensive, meaning changing text or styles often may cause performance issues.\n- Handles less textthan dynamic text (performance and memory usage worsens with more text).\n- Less flexible scripting interface and styling is limited to one block (no individual character styling).\n- Does not handle scaling automatically, so changing text size requires re-rendering, otherwise the text will be distorted/pixelated.\n\nPros:\n- Simpler to use\n- More efficient for fixed text content\n- Handles font features (ligatures, kerning) better and works with any supported language.\n\nSuitable when you have short to medium fixed text content that doesn't need frequent updates and stays more-or-less the same size.", item: { type: "static_text", label: "Static text", data: { text: "Some text" }, color: "aquamarine" } },
                 { name: "Simple shape", type: "sprite", icon: "bi-square", item: { type: "sprite", label: "Shape", data: { positionX: 100, positionY: 100, scaleX: 500, scaleY: 500, anchorX: 0, anchorY: 0 } } },
                 { name: "Vector shape", type: "graphics", item: { type: "graphics", label: "Vector shape" } },
                 { name: "Automation clip", type: "automation", item: { type: "automation", label: "Automation clip", data: { value: 1, points: [ { value: 0, type: "linear", time: 1 } ] } } },
@@ -40,11 +41,6 @@ class AssetManagerView extends LS.Multipane.View {
             name: "Project Assets",
             icon: "bi-file-earmark-binary-fill",
         },
-
-        // remoteAssets: {
-        //     name: "Remote Assets",
-        //     icon: "bi-cloud-upload",
-        // },
 
         saved: {
             name: "Saved items",
@@ -73,10 +69,6 @@ class AssetManagerView extends LS.Multipane.View {
         }
 
         this.previewElement = LS.Create({ class: 'asset-drop-preview' });
-
-        // File browser instance (created lazily)
-        this.fileBrowser = null;
-        this._currentFolderHandle = null;
 
         let dragItemType = null;
         this.handle = new LS.Util.TouchHandle(this.__contentContainer, {
@@ -179,6 +171,7 @@ class AssetManagerView extends LS.Multipane.View {
             library.__element.remove();
             library.__element = null;
         }
+
         if (this.currentTab === tabName) {
             this.__contentContainer.innerHTML = '';
             this.__contentContainer.appendChild(this.createTab(library));
@@ -191,11 +184,6 @@ class AssetManagerView extends LS.Multipane.View {
 
         for(const tab of tabs) {
             tab.classList.toggle('selected', tab.getAttribute('data-tab') === tabName);
-        }
-
-        // Clean up file browser if switching away from folders
-        if (this.currentTab === 'folders' && tabName !== 'folders' && this.fileBrowser) {
-            this._currentFolderHandle = null;
         }
 
         this.currentTab = tabName;
@@ -217,7 +205,7 @@ class AssetManagerView extends LS.Multipane.View {
                 inner: "These assets are embedded in the project file and work anywhere. Note that this increases the project file size and memory usage, so use it for small files only! You can drag and drop files here or to the timeline directly.",
             }));
 
-            this.populateProjectAssets(grid);
+            this.refreshProjectAssets(grid);
         }
 
         if (library.items) for (const obj of library.items) {
@@ -230,37 +218,69 @@ class AssetManagerView extends LS.Multipane.View {
 
     // FIXME: I know this isnt clean but im tired :(
     _createFoldersTab(grid) {
-        const hasCurrentFolder = this._currentFolderHandle !== null;
-
-        if(!hasCurrentFolder) {
-            grid.appendChild(LS.Create("ls-box.margin-bottom-medium", {
-                inner: "Add folders from your computer to browse and access their content."
-            }));
-        }
+        grid.appendChild(LS.Create("ls-box.margin-bottom-medium", {
+            inner: "Add folders from your computer to browse and access their content."
+        }));
 
         grid.appendChild(LS.Create({
             tag: 'button',
             class: 'elevated',
-            inner: [{ tag: 'i', class: hasCurrentFolder? 'bi-arrow-left': 'bi-folder-plus' }, hasCurrentFolder? ' Back to folders': ' Add folder'],
-            onclick: () => {
-                if(hasCurrentFolder) {
-                    this._currentFolderHandle = null;
-                    this.refreshTab('folders');
-                } else {
-                    this.parent?.resources.addFolder();
-                }
-            }
+            inner: [{ tag: 'i', class: 'bi-folder-plus' }, ' Add folder to project'],
+            onclick: () => { this.parent.resources.addFolder() }
         }));
 
-        if (hasCurrentFolder) {
-            this._showFileBrowser(grid);
-        } else {
-            this._populateFolderList(grid);
-        }
+        grid.appendChild(LS.Create({
+            tag: 'button',
+            class: 'elevated',
+            inner: [{ tag: 'i', class: 'bi-folder-plus' }, ' Add folder (global)'],
+            onclick: () => { this.parent.resources.addFolder() }
+        }));
+
+        this.refreshFolders(grid);
     }
 
-    _populateFolderList(grid) {
+    /**
+     * Expands or collapses a folder in the folders tab, showing or hiding its content.
+     * @warning This is experimental and not clean at all yet. I don't have much time sadly. Life is hard.
+     * 
+     * @param {*} folderData 
+     * @returns 
+     */
+    toggleExpandFolder(folderData) {
+        if (!folderData) return;
+
+        this.parent.resources.listDirectory(folderData.name, "/").then(files => {
+            if (!folderData.__element) return;
+
+            let fileList = folderData.__fileList;
+            if (fileList) {
+                fileList.remove();
+                folderData.__fileList = null;
+                return;
+            }
+
+            fileList = folderData.__fileList = LS.Create({ class: 'folder-file-list' });
+
+            for (const file of files) {
+                const fileElement = this.createAssetPreview({
+                    name: file.name,
+                    type: file.type,
+                });
+
+                fileList.appendChild(fileElement);
+            }
+
+            folderData.__element.appendChild(fileList);
+        });
+    }
+
+    /**
+     * Refreshes the folder list in the asset library.
+     * @param {*} grid The grid element to refresh the folder list in
+     */
+    refreshFolders(grid) {
         const folders = this.parent?.resources?.projectFolders;
+
         if (!folders || folders.size === 0) {
             grid.appendChild(LS.Create({
                 class: 'empty-state',
@@ -276,15 +296,17 @@ class AssetManagerView extends LS.Multipane.View {
 
         for (const [name, folderData] of folders) {
             const folderElement = folderData.__element || (folderData.__element = LS.Create({
-                class: 'folder-list-item asset-library-item',
+                class: 'folder-list-item treeview-item',
                 inner: [
-                    [{ tag: 'i', class: 'bi-folder-fill' }, " " + folderData.name],
+                    [{ tag: 'i', class: 'bi-folder-fill' }, " " + (folderData.name || folderData.path || "Unnamed folder")],
+
                     { class: 'folder-actions', inner: [
                         LS.Create({
                             tag: 'button',
                             class: 'square clear small',
                             inner: { tag: 'i', class: 'bi-trash' },
                             tooltip: 'Remove folder',
+
                             onclick: (e) => {
                                 e.stopPropagation();
                                 this.parent?.resources.removeFolder(name);
@@ -292,7 +314,8 @@ class AssetManagerView extends LS.Multipane.View {
                         })
                     ]}
                 ],
-                onclick: () => this._openFolder(folderData.handle, folderData.name)
+
+                onclick: () => this.toggleExpandFolder(folderData)
             }));
 
             folderGrid.appendChild(folderElement);
@@ -301,50 +324,15 @@ class AssetManagerView extends LS.Multipane.View {
         grid.appendChild(folderGrid);
     }
 
-    _openFolder(handle, name) {
-        this._currentFolderHandle = handle;
-        this._currentFolderName = name;
-        this.refreshTab('folders');
-    }
-
-    _showFileBrowser(grid) {
-        if (!this.fileBrowser) {
-            this.fileBrowser = new FileBrowser({
-                onFileSelect: (files) => this._onFileSelect(files),
-                onFileOpen: (file) => this._onFileOpen(file)
-            });
-        }
-
-        grid.appendChild(this.fileBrowser.element);
-        this.fileBrowser.setRootFolder(this._currentFolderHandle);
-    }
-
-    _onFileSelect(files) {
-        // Could show preview panel someday
-    }
-
-    _onFileOpen(file) {
-        // Add to timeline or open preview (someday)
-        // Yes it is this r*tarded
-        // The whole file system is r*tarded
-        // I hate resource management in browsers
-        file.folder = this._currentFolderName;
-        file.sourceType = 'folder';
-        this.parent?.resources.addProjectResources(file);
-    }
-
-    populateFolders(grid) {
-        // Deprecated - now using _populateFolderList
-        this._populateFolderList(grid);
-    }
-
-    populateProjectAssets(grid) {
+    /**
+     * Refreshes the project assets in the asset library.
+     * @param {*} grid The grid element to refresh the project assets in
+     */
+    refreshProjectAssets(grid) {
         const resources = this.parent?.resources?.resources;
         if (!resources || resources.size === 0) return;
 
         for (const [hash, fileData] of resources) {
-            if (fileData.sourceType !== 'project_folder') continue;
-
             const obj = {
                 name: fileData.name,
                 type: fileData.type,
@@ -385,7 +373,13 @@ class AssetManagerView extends LS.Multipane.View {
                 class: 'asset-library-item',
                 inner: [
                     { tag: 'i', class: this.getIcon(obj) },
-                    { tag: 'span', inner: obj.name }
+                    { tag: 'span', inner: obj.name },
+                    obj.helpText ? { tag: 'i', class: 'bi-info-circle', onclick() {
+                        LS.Modal.buildEphemeral({
+                            title: obj.name,
+                            content: { style: "white-space: pre-wrap;", inner: obj.helpText }
+                        });
+                    }, style: 'margin-left: auto; opacity: 0.5;' } : null
                 ]
             });
 
@@ -407,6 +401,7 @@ class AssetManagerView extends LS.Multipane.View {
             "sprite": "bi-image",
             "graphics": "bi-vector-pen",
             "text": "bi-textarea-t",
+            "static_text": "bi-fonts",
             "video": "bi-film",
             "sound": "bi-music-note-beamed",
             "automation": "bi-bezier2",
@@ -428,10 +423,6 @@ class AssetManagerView extends LS.Multipane.View {
         this.previewElement.remove();
         this.previewElement = null;
         this.library = null;
-        if (this.fileBrowser) {
-            this.fileBrowser.destroy();
-            this.fileBrowser = null;
-        }
         super.destroy();
     }
 }

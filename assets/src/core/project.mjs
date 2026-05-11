@@ -144,7 +144,10 @@ class Project extends LS.Context {
 
         this.config = data.config || {};
 
-        if(!resourcesLoaded) await this.resources.loadFrom(data.resources || {});
+        if(!resourcesLoaded) await this.resources.loadFrom(data.resources || {
+            resources: [],
+            folders: {}
+        });
 
         this.emit("project-data-loaded", [data]);
         this.loaded = true;

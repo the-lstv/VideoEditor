@@ -2,7 +2,7 @@
  * This file is for the electron version of the application
  */
 
-const { app, BrowserWindow, ipcMain } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog } = require('electron');
 const fs = require('fs');
 const path = require('path');
 
@@ -29,6 +29,20 @@ function createWindow() {
     mainWindow.maximize();
     mainWindow.loadFile('index.html');
 }
+
+ipcMain.handle('select-directory', async (event, operation) => {
+    const properties = operation === 'export' ? ['openDirectory', 'createDirectory'] : ['openDirectory'];
+    const result = await dialog.showOpenDialog({
+        properties: properties
+    });
+
+    if (result.canceled) {
+        return null;
+    } else {
+        return result.filePaths[0];
+    }
+});
+
 
 app.whenReady().then(() => {
     createWindow();

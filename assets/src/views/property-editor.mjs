@@ -41,29 +41,6 @@ class PropertyEditorView extends LS.Multipane.View {
             styled: false
         });
 
-        // --- 3D Preview
-        this.previewRotation = { x: -15, y: 30 };
-        this.previewContainer = LS.Create({
-            class: "property-preview-container",
-            style: "height: 120px; background: var(--surface-2); perspective: 800px; overflow: hidden; position: relative; margin: 10px; border-radius: 4px; border: 1px solid var(--surface-4); cursor: grab;",
-            inner: [
-                this.previewWorld = LS.Create({
-                    class: "property-preview-world",
-                    style: "width: 100%; height: 100%; transform-style: preserve-3d; display: flex; align-items: center; justify-content: center;",
-                    inner: [
-                        // Axes
-                        { style: "position: absolute; width: 100px; height: 1px; background: #ff5555; transform: translateX(50px);" }, // X
-                        { style: "position: absolute; width: 1px; height: 100px; background: #55ff55; transform: translateY(-50px);" }, // Y
-                        // Object
-                        this.previewObject = LS.Create({
-                            class: "property-preview-object",
-                            style: "width: 40px; height: 40px; background: var(--accent); opacity: 0.8; border: 1px solid white; position: absolute;"
-                        })
-                    ]
-                })
-            ]
-        });
-
         // --- Edit aid (moving and resizing)
         this.__editAid = LS.Create({
             class: "editAid",
@@ -102,8 +79,6 @@ class PropertyEditorView extends LS.Multipane.View {
             this.updateAidPosition();
         });
 
-        this.#updatePreviewWorld();
-        
         this.propertyGroups = {};
 
         this.propertyGroups.general = LS.Create([
@@ -235,7 +210,7 @@ class PropertyEditorView extends LS.Multipane.View {
                         this.#createInput("visible", { type: "checkbox", defaultValue: true })
                     ],
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette-fill" }, { tag: "label", inner: " Tint color:" }] },
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette-fill" }, { tag: "label", inner: " Color:" }] },
                         this.#createInput("tint", { type: "color", defaultValue: "#ffffff" })
                     ],
 
@@ -566,16 +541,6 @@ class PropertyEditorView extends LS.Multipane.View {
         ]);
 
         // --- Handles
-        this.__previewHandle = new LS.Util.TouchHandle(this.previewContainer, {
-            cursor: 'grabbing',
-            pointerLock: true,
-
-            onMove: (event) => {
-                this.previewRotation.y += event.dx * 0.5;
-                this.previewRotation.x -= event.dy * 0.5;
-                this.#updatePreviewWorld();
-            }
-        });
 
         let startValue, min, max, input, step, precision;
         this.__valueHandle = new LS.Util.TouchHandle(this.editorContainer, {
@@ -747,7 +712,6 @@ class PropertyEditorView extends LS.Multipane.View {
                     this.updateInputValue(prop);
                 }
 
-                this.editorContainer.prepend(this.previewContainer);
                 this.editorContainer.appendChild(this.propertyGroups.transform);
 
                 if(target.type === "text") {
@@ -868,8 +832,8 @@ class PropertyEditorView extends LS.Multipane.View {
                         initialX = event.x - rect.left - worldOffset.left;
                         initialY = event.y - rect.top - worldOffset.top;
 
-                        initialWorldX = attachment?.getSavedNodeProperty?.(this.currentTarget, "positionX") ?? 0;
-                        initialWorldY = attachment?.getSavedNodeProperty?.(this.currentTarget, "positionY") ?? 0;
+                        initialWorldX = attachment?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionX") ?? 0;
+                        initialWorldY = attachment?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionY") ?? 0;
                     },
 
                     onMove: (event) => {
@@ -892,8 +856,8 @@ class PropertyEditorView extends LS.Multipane.View {
 
                     if(evt.ctrlKey) {
                         evt.preventDefault();
-                        const baseScaleX = attachment?.getSavedNodeProperty?.(this.currentTarget, "scaleX") ?? 1;
-                        const baseScaleY = attachment?.getSavedNodeProperty?.(this.currentTarget, "scaleY") ?? 1;
+                        const baseScaleX = attachment?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleX") ?? 1;
+                        const baseScaleY = attachment?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleY") ?? 1;
                         this.#updateProp("scaleX", baseScaleX * (evt.deltaY < 0 ? 1.1 : 0.9));
                         this.#updateProp("scaleY", baseScaleY * (evt.deltaY < 0 ? 1.1 : 0.9));
                         this.updateAidPosition();
@@ -901,14 +865,12 @@ class PropertyEditorView extends LS.Multipane.View {
 
                     if(evt.shiftKey) {
                         evt.preventDefault();
-                        const baseRotation = attachment?.getSavedNodeProperty?.(this.currentTarget, "rotation") ?? 0;
-                        this.#updateProp("rotation", (baseRotation + (evt.deltaY < 0 ? 0.1 : -0.1)) % (Math.PI * 2));
+                        const baseRotation = attachment?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationZ") ?? 0;
+                        this.#updateProp("rotationZ", (baseRotation + (evt.deltaY < 0 ? 0.1 : -0.1)) % (Math.PI * 2));
                         this.updateAidPosition();
                     }
                 });
             }
-
-            this.updatePreviewObject();
         } else {
             this.__editAid.remove();
         }
@@ -1015,7 +977,7 @@ class PropertyEditorView extends LS.Multipane.View {
         const inputObject = this.inputs.get(id);
         if(inputObject) {
             if(value === undefined && this.currentTarget) {
-                value = this.#getAttachment()?.getSavedNodeProperty?.(this.currentTarget, id);
+                value = this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, id);
             }
 
             if(inputObject.type === "color" && typeof value === "number") {
@@ -1098,7 +1060,6 @@ class PropertyEditorView extends LS.Multipane.View {
 
             if(this.targetNodeIsVisual) {
                 this.#updateRender();
-                this.updatePreviewObject();
                 this.updateAidPosition();
             }
         }
@@ -1118,12 +1079,6 @@ class PropertyEditorView extends LS.Multipane.View {
         }
     }
 
-    #updatePreviewWorld() {
-        if(this.previewWorld) {
-            this.previewWorld.style.transform = `rotateX(${this.previewRotation.x}deg) rotateY(${this.previewRotation.y}deg)`;
-        }
-    }
-
     #render() {
         if (this.__aidDirty) {
             this.__aidDirty = false;
@@ -1134,13 +1089,16 @@ class PropertyEditorView extends LS.Multipane.View {
 
                 // Get values with fallback
                 const attachment = this.#getAttachment();
-                const x = attachment?.getSavedNodeProperty?.(t, "positionX") ?? 0;
-                const y = attachment?.getSavedNodeProperty?.(t, "positionY") ?? 0;
-                const w = (t.node?.width ?? t.data.width ?? 100);
-                const h = (t.node?.height ?? t.data.height ?? 100);
-                const ax = attachment?.getSavedNodeProperty?.(t, "anchorX") ?? 0;
-                const ay = attachment?.getSavedNodeProperty?.(t, "anchorY") ?? 0;
-                const rot = attachment?.getSavedNodeProperty?.(t, "rotation") ?? 0;
+                const x = attachment?.renderer?.getSavedNodeProperty?.(t, "positionX") ?? 0;
+                const y = attachment?.renderer?.getSavedNodeProperty?.(t, "positionY") ?? 0;
+                // ! todo: width/height
+                // const w = (t.node?.width ?? t.data.width ?? 100);
+                // const h = (t.node?.height ?? t.data.height ?? 100);
+                const w = attachment?.renderer?.getSavedNodeProperty?.(t, "scaleX") ?? 0;
+                const h = attachment?.renderer?.getSavedNodeProperty?.(t, "scaleY") ?? 0;
+                const ax = attachment?.renderer?.getSavedNodeProperty?.(t, "anchorX") ?? 0;
+                const ay = attachment?.renderer?.getSavedNodeProperty?.(t, "anchorY") ?? 0;
+                const rot = attachment?.renderer?.getSavedNodeProperty?.(t, "rotationZ") ?? 0;
 
                 // Calculate anchor offset
                 const anchorOffsetX = -ax * w;
@@ -1161,36 +1119,6 @@ class PropertyEditorView extends LS.Multipane.View {
                 this.__editAid.style.height = (h * worldOffset.scale) + "px";
             }
         }
-
-        if(this.__previewDirty) {
-            this.__previewDirty = false;
-
-            if(this.currentTarget && this.previewObject) {
-                const t = this.currentTarget.node || this.currentTarget.data;
-                const scalePos = 0.1; 
-                const attachment = this.#getAttachment();
-                const x = (attachment?.getSavedNodeProperty?.(this.currentTarget, "positionX") ?? 0) * scalePos;
-                const y = (attachment?.getSavedNodeProperty?.(this.currentTarget, "positionY") ?? 0) * scalePos;
-                const rot = attachment?.getSavedNodeProperty?.(this.currentTarget, "rotation") ?? 0;
-                const sx = attachment?.getSavedNodeProperty?.(this.currentTarget, "scaleX") ?? 1;
-                const sy = attachment?.getSavedNodeProperty?.(this.currentTarget, "scaleY") ?? 1;
-                const ax = attachment?.getSavedNodeProperty?.(this.currentTarget, "anchorX") ?? 0;
-                const ay = attachment?.getSavedNodeProperty?.(this.currentTarget, "anchorY") ?? 0;
-                const w = (t.width || 100) * scalePos;
-                const h = (t.height || 100) * scalePos;
-
-                this.previewObject.style.width = w + "px";
-                this.previewObject.style.height = h + "px";
-                this.previewObject.style.transformOrigin = `${ax * 100}% ${ay * 100}%`;
-                this.previewObject.style.transform = `translate(${x}px, ${y}px) rotate(${rot}rad) scale(${sx}, ${sy})`;
-                
-                let tint = attachment?.getSavedNodeProperty?.(this.currentTarget, "tint");
-                if (typeof tint === 'number') tint = '#' + tint.toString(16).padStart(6, '0');
-                this.previewObject.style.backgroundColor = tint || "var(--accent)";
-                
-                this.previewObject.style.opacity = attachment?.getSavedNodeProperty?.(this.currentTarget, "opacity");
-            }
-        }
     }
 
     updateAidPosition() {
@@ -1198,17 +1126,7 @@ class PropertyEditorView extends LS.Multipane.View {
         this.frameScheduler.schedule();
     }
 
-    updatePreviewObject() {
-        this.__previewDirty = true;
-        this.frameScheduler.schedule();
-    }
-
     destroy() {
-        if(this.__previewHandle) {
-            this.__previewHandle.destroy();
-            this.__previewHandle = null;
-        }
-
         if(this.__valueHandle) {
             this.__valueHandle.destroy();
             this.__valueHandle = null;
@@ -1241,9 +1159,6 @@ class PropertyEditorView extends LS.Multipane.View {
         this.editorContainer = null;
         this.currentTarget = null;
         this.focusedInput = null;
-        this.previewContainer = null;
-        this.previewWorld = null;
-        this.previewObject = null;
         this.__valueContextMenu_createAutomationButton = null;
         this.inputs.clear();
 

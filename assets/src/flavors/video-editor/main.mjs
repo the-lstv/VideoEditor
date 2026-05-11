@@ -235,7 +235,7 @@ class VideoEditor extends FlavorBase {
                 directionalLightIntensity: rendererOptions.directionalLightIntensity,
                 toneMapping: rendererOptions.toneMapping,
                 toneMappingExposure: rendererOptions.toneMappingExposure
-            });
+            }, this.project);
         } catch (e) {
             LS.Modal.buildEphemeral({
                 title: "Renderer Initialization Failed",
@@ -419,9 +419,7 @@ class VideoEditor extends FlavorBase {
             }
 
             if(item.type === "sound") {
-                if(item.resourceUpdated !== false) this.renderer.updateNodeResource(item);
-                this.syncMediaItem(item, time, true);
-                currentMediaItems.add(item);
+                console.log("TODO: implement sound rendering");
                 continue;
             }
 

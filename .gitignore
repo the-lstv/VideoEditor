@@ -12,3 +12,11 @@ build/
 package-lock.json
 yarn.lock
 pnpm-*
+
+node_modules
+.vs
+*.ttf
+
+# The generator binary
+msdf-atlas-gen
+*.exe

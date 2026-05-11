@@ -534,13 +534,20 @@ ls-box ul li {
     cursor: pointer;
     align-items: center;
     border-radius: var(--border-radius);
+    width: 100%;
+}
+
+.folder-list-item {
+    padding: 4px 8px;
+    cursor: pointer;
+    justify-content: space-between;
 }
 
 .asset-library-item:hover {
     background: var(--elevate);
 }
 
-.asset-library-item:not(.folder-list-item) * {
+.asset-library-item:not(.folder-list-item) *:not(.bi-info-circle) {
     pointer-events: none;
 }
 
@@ -548,6 +555,12 @@ ls-box ul li {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+}
+
+.asset-library-grid {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
 }
 
 /* File Browser */
