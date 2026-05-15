@@ -181,6 +181,60 @@ class VideoEditor extends FlavorBase {
                 case "videoPreview":
                     view.setSource(this.renderer);
                     break;
+                
+                case "assetManager":
+                    this.addExternalEventListener(view, 'asset-dropped', (event) => {
+                        const elementsFromPoint = document.elementsFromPoint(event.x, event.y);
+
+                        // Dropped on a timeline
+                        // TODO: This is quite hacky
+                        const timeline = elementsFromPoint.find(el => el.classList.contains('ls-timeline'))?.__lsComponent || null;
+                        if(timeline) {
+                            if(!(timeline instanceof LS.Timeline)) {
+                                LS.Toast.show("Sorry, something went wrong while adding the item to a timeline.", { timeout: 3000, accent: "red" });
+                                return;
+                            }
+
+                            const { time, row } = timeline.transformCoords(event.x, event.y);
+
+                            console.log("Adding item to timeline at time", time, "row", row);
+
+                            // It is a timeline item/template, we can simply clone it.
+                            if(event.data.item) {
+                                const newItem = timeline.cloneItem(event.data.item);
+                                newItem.start = time;
+                                newItem.row = row;
+                                newItem.duration = newItem.duration || 1;
+
+                                timeline.add(newItem);
+                            }
+
+                            // External file dropped, so we need to ensure it is saved as a resource,
+                            // and then create a new timeline item.
+                            else {
+                                event.data.isExternal = true;
+                                event.data.type = null; // :shrug:
+    
+                                this.project.resources.addResource(event.data);
+    
+                                console.log(event.data, this.project.resources);
+    
+                                // Now we need to make an item for the asset
+                                // TODO: this is temporary, just testing
+                                const newItem = {
+                                    type: "image",
+                                    // resourceHash: event.data.resourceHash,
+                                    resource: event.data,
+                                    label: event.data.label,
+                                    start: time,
+                                    row,
+                                    duration: 1
+                                };
+    
+                                timeline.add(newItem);
+                            }
+                        }
+                    });
             }
         });
 

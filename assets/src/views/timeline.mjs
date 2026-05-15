@@ -98,14 +98,14 @@ class TimelineView extends LS.Multipane.View {
                                 // } }
                             ],
 
-                            [
-                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-zoom-in" }, tooltip: "Zoom in <kbd>+</kbd>", onclick: () => {
-                                    this.timeline.zoomIn();
-                                } },
-                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-zoom-out" }, tooltip: "Zoom out <kbd>-</kbd>", onclick: () => {
-                                    this.timeline.zoomOut();
-                                } }
-                            ]
+                            // [
+                            //     { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-zoom-in" }, tooltip: "Zoom in <kbd>+</kbd>", onclick: () => {
+                            //         this.timeline.zoomIn();
+                            //     } },
+                            //     { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-zoom-out" }, tooltip: "Zoom out <kbd>-</kbd>", onclick: () => {
+                            //         this.timeline.zoomOut();
+                            //     } }
+                            // ]
                         ]
                     }
                 ]

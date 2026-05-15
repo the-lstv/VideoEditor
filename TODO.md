@@ -1,15 +1,16 @@
 ## TODO List
-- [ ] Make Three.js rendering work..
+- [-] Make Three.js rendering work..
 - [ ] Resize modes
 - [ ] Video encoding/decoding
-- [ ] Better resource management
-- [ ] Effects and transitions
+- [-] Better resource management
 - [ ] Backup system
 - [ ] Hardware accelerated timeline
-- [ ] Timeline previews
+    - [ ] Timeline previews
+    - [ ] Multiple switchable timelines, timeline references in composition
+    - [ ] Timeline to scene & vice versa
 - [ ] Audio editing
+- [ ] Audio mixer
 - [ ] Keyframe animation
-- [ ] Effect pipelies
 - [ ] Data pipelines
 - [ ] Scripting API
 - [ ] Plugin system
@@ -17,14 +18,17 @@
 - [ ] 3D tools & viewport
 - [ ] VR editing
 - [ ] Collaboration features
+- [ ] Shaders
+- [ ] Groups & scene graphs
+- [ ] Effects and transitions
+- [ ] Effect pipelies
+- [ ] Ready to use effects
+- [ ] Physics simulation
 - [ ] Color grading, correction, color curves tools
 - [ ] Smart color sampling/analysis & matching tools
 - [ ] Motion tracking
-- [ ] Shaders
 - [ ] Paint mode
-- [ ] Audio mixer
 - [ ] Modular controllers
-- [ ] Physics simulation
 - [ ] Drop snapping & preview
 - [ ] Playhead snapping
 - [ ] Customizable keyboard shortcuts
@@ -33,20 +37,24 @@
 - [ ] Efficient sync system & remote editing (multiplayer/collaboration mode maybe?)
 - [ ] External controllers mapping for positioning etc.
 - [ ] Acid Kaiju
-- [ ] Groups & scene graphs
-- [ ] Timeline to scene & vice versa
 - [ ] Pixel-perfect previewing tools
-- [ ] Ready to use effects
 - [ ] Shader interface & modules & library
 - [ ] Welcome screen
 - [ ] General UI improvements
 - [ ] Pop asset preview
-- [ ] Multiple switchable timelines, timeline references in composition
 - [ ] Custom color picker
 - [ ] Custom file picker
 - [ ] Static text objects
 - [ ] Dynamic text objects
+- [ ] Subtitles editing tools
+- [ ] Motion graphics templates
+- [ ] Auto-captioning
+- [ ] Smart editing tools
+- [ ] No, I don't want to add AI features, stop asking
+- [ ] Glamorous entity
+- [ ] Drop directly on the preview
 
 ## Bugs
 
 The resource management is currently one big mess.
+Update; I slightly improved it and now have a better idea on how it should be structured, but it is still far from complete. I need more people :(

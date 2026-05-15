@@ -541,16 +541,6 @@ ls-box ul li {
     min-width: 200px;
 }
 
-.asset-library-item {
-    display: flex;
-    padding: 6px 8px;
-    gap: 8px;
-    cursor: pointer;
-    align-items: center;
-    border-radius: var(--border-radius);
-    width: 100%;
-}
-
 .file-browser-header > div {
     display: flex;
     gap: 4px
@@ -561,33 +551,6 @@ ls-box ul li {
     --padding-control-v: 4px;
 }
 
-.file-browser-item {
-    padding: 4px 8px;
-    cursor: pointer;
-    justify-content: space-between;
-}
-
-.asset-library-item:hover {
-    background: var(--elevate);
-}
-
-.asset-library-item:not(.file-browser-item) *:not(.bi-info-circle) {
-    pointer-events: none;
-}
-
-.asset-library-item span {
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.asset-library-grid {
-    display: flex;
-    flex-direction: column;
-    height: 100%;
-    padding: 8px 12px;
-}
-
 /* File Browser */
 .empty-state {
     display: flex;
@@ -595,13 +558,6 @@ ls-box ul li {
     align-items: center;
     justify-content: center;
     height: 100%;
-}
-
-pre.log-message {
-    background: var(--elevate-n1);
-    padding: 4px 8px;
-    user-select: text;
-    border-radius: var(--border-radius);
 }
 
 .file-browser, .file-browser-content, .file-browser-content .ls-tree {
@@ -627,4 +583,23 @@ pre.log-message {
     height: 100%;
     display: flex;
     flex-direction: column;
+}
+
+.file-browser .ls-tree-node[ls-accent] {
+    color: var(--accent-60);
+}
+
+.file-browser .ls-tree-node {
+    padding-left: 4px !important;
+}
+
+[ls-theme="light"] .file-browser .ls-tree-node[ls-accent] {
+    color: var(--accent-40);
+}
+
+pre.log-message {
+    background: var(--elevate-n1);
+    padding: 4px 8px;
+    user-select: text;
+    border-radius: var(--border-radius);
 }
