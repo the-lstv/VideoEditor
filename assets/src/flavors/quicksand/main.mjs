@@ -6,7 +6,7 @@ import FlavorBase from "../../core/flavor.mjs";
 import ThreeRendererAdapter from "../../backends/rendering/threejs.mjs";
 
 // --- Views
-import AssetManagerView from "../../views/asset-manager.mjs";
+import { AssetManagerView } from "../../views/asset-manager.mjs";
 import PreviewView from "../../views/preview.mjs";
 import PropertyEditorView from "../../views/property-editor.mjs";
 import TimelineView from "../../views/timeline.mjs";

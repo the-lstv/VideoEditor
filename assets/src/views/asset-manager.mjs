@@ -1,7 +1,157 @@
 import * as EditorBaseClasses from "../core/base.mjs";
 
 /**
- * Asset manager view class
+ * FileBrowser used in the AssetManager & by other views as a component
+ */
+class FileBrowser extends LS.Context {
+    constructor(parent) {
+        super();
+
+        this.parent = parent;
+
+        if(!this.parent) {
+            console.warn("FileBrowser initialized without a parent project. Project specific functionality will not be available.");
+        }
+
+        this.addExternalEventListener(parent, "destroy", () => this.destroy());
+
+        this.container = LS.Create({ class: 'file-browser', inner: [
+            {
+                class: "file-browser-header",
+                style: "display: flex; justify-content: space-between; gap: 8px",
+                // inner: "Add folders from your computer to browse and access their content."
+                inner: [
+                    [
+                        {
+                            tag: 'button',
+                            class: 'clear square',
+                            inner: [{ tag: 'i', class: 'bi-arrows-collapse' }],
+                            tooltip: "Collapse all folders",
+                            onclick: () => {
+                                this.tree.collapseAll();
+                            }
+                        },
+
+                        {
+                            tag: 'button',
+                            class: 'clear square',
+                            inner: [{ tag: 'i', class: 'bi-arrow-clockwise' }],
+                            tooltip: "Refresh folders",
+                            onclick: () => {
+                                // !todo
+                                this.refreshFolders();
+                            }
+                        },
+                    ],
+
+                    [
+                        {
+                            tag: 'button',
+                            class: 'elevated',
+                            inner: [{ tag: 'i', class: 'bi-folder-plus' }, ' Project'],
+                            tooltip: "Add a project folder",
+                            onclick: () => { this.parent.resources.addFolder() }
+                        },
+
+                        {
+                            tag: 'button',
+                            class: 'elevated',
+                            inner: [{ tag: 'i', class: 'bi-folder-plus' }, ' Global'],
+                            tooltip: "Add a global folder (",
+                            onclick: () => { this.parent.resources.addFolder() }
+                        }
+                    ]
+                ]
+            },
+
+            { class: 'file-browser-content' }
+        ] });
+
+        this.emptyStateElement = LS.Create({
+            class: 'empty-state',
+            inner: [
+                { tag: 'i', class: 'bi-folder2-open', style: 'font-size: 3em; opacity: 0.3;' },
+                { tag: 'p', inner: 'No folders added yet' }
+            ]
+        });
+
+        const tree = this.tree = new LS.Tree({
+            async loadData(node) {
+                console.log(node);
+                
+                if (node.type === 'folder') {
+                    return (await parent.resources.listDirectory(node.folderName, node.path)).map(item => ({
+                        id: item.path,
+                        label: item.name,
+                        path: item.relativePath,
+                        fullPath: item.path,
+                        folderName: node.folderName, //! there needs to be a better way
+                        type: item.isDirectory ? 'folder' : 'file',
+                        lazy: item.isDirectory,
+                        icon: item.isDirectory ? undefined : AssetManagerView.getIcon(item)
+                    }));
+                }
+            }
+        });
+
+        tree.on("click", (node) => {
+            // ...
+            console.log("Clicked node:", node);
+            this.quickEmit("file-clicked", node);
+        });
+
+        this.refreshFolders();
+    }
+
+    refreshFolders() {
+        const folders = this.parent?.resources?.projectFolders;
+        if (!folders) return;
+
+        const contentContainer = this.container.querySelector('.file-browser-content');
+
+        if (!folders || folders.size === 0) {
+            contentContainer.replaceChildren(this.emptyStateElement);
+            return;
+        }
+
+        contentContainer.replaceChildren(this.tree.container);
+
+        const treeData = [];
+        for (const [id, folder] of folders) {
+            treeData.push({
+                id,
+                folderName: folder.name,
+                label: folder.name || "Untitled folder",
+                type: 'folder',
+                lazy: true
+            });
+        }
+
+        this.tree.loadData(treeData);
+        console.log("Loaded folders into tree:", treeData);
+    }
+
+    destroy() {
+        if(this.destroyed) return;
+
+        if(this.tree) {
+            this.tree.destroy();
+            this.tree = null;
+        }
+
+        if(this.container) {
+            this.container.remove();
+            this.container = null;
+        }
+
+        this.emptyStateElement = null;
+        this.parent = null;
+        super.destroy();
+    }
+}
+
+/**
+ * Asset manager view class (standalone)
  * Not proud of the state of this code
  */
 class AssetManagerView extends LS.Multipane.View {
@@ -33,7 +183,7 @@ class AssetManagerView extends LS.Multipane.View {
         },
 
         folders: {
-            name: "Project Folders",
+            name: "File browser",
             icon: "bi-folder",
         },
 
@@ -73,13 +223,29 @@ class AssetManagerView extends LS.Multipane.View {
         let dragItemType = null;
         this.handle = new LS.Util.TouchHandle(this.__contentContainer, {
             cursor: 'grabbing',
+            buttons: [0],
+
             onStart: (event) => {
-                const obj = event.domEvent.target.targetObject || event.domEvent.target._fileData;
+                const target = event.domEvent.target;
+
+                const treeNodeElement = target.closest('.ls-tree-node');
+                if(treeNodeElement) {
+                    const nodeData = this.fileBrowser.tree.getNodeDataByElement(treeNodeElement);
+                    if(nodeData?.type === 'file') {
+                        dragItemType = 'project-asset';
+                        EditorBaseClasses.dragState.start(nodeData, event.x, event.y);
+                        return;
+                    } else {
+                        return event.cancel();
+                    }
+                }
+
+                const obj = target.targetObject || target._fileData;
                 if(!obj) return event.cancel();
 
-                dragItemType = event.domEvent.target.targetObject ? 'library-object' : 'project-asset';
+                dragItemType = target.targetObject ? 'library-object' : 'project-asset';
 
-                obj.icon = this.getIcon(obj);
+                obj.icon = AssetManagerView.getIcon(obj);
                 EditorBaseClasses.dragState.start(obj, event.x, event.y);
             },
 
@@ -109,7 +275,27 @@ class AssetManagerView extends LS.Multipane.View {
 
                         timeline.add(newItem);
                     } else if(dragItemType === 'project-asset') {
-                        this.parent.resources.addProjectResources([EditorBaseClasses.dragState.target], row, time);
+                        EditorBaseClasses.dragState.target.isExternal = true;
+                        EditorBaseClasses.dragState.target.type = null; // :shrug:
+
+                        this.parent.resources.addResource(EditorBaseClasses.dragState.target);
+
+                        console.log(EditorBaseClasses.dragState.target, this.parent.resources);
+                        
+
+                        // Now we need to make an item for the asset
+                        // TODO: this is temporary, just testing
+                        const newItem = {
+                            type: "image",
+                            // resourceHash: EditorBaseClasses.dragState.target.resourceHash,
+                            resource: EditorBaseClasses.dragState.target,
+                            label: EditorBaseClasses.dragState.target.label,
+                            start: time,
+                            row,
+                            duration: 1
+                        };
+
+                        timeline.add(newItem);
                     }
                 }
             }
@@ -167,14 +353,21 @@ class AssetManagerView extends LS.Multipane.View {
 
     refreshTab(tabName) {
         const library = this.library[tabName];
+        
+        if(tabName === "folders" && this.fileBrowser) {
+            this.fileBrowser.refreshFolders();
+            this.__contentContainer.replaceChildren(this.fileBrowser.container);
+            return;
+        }
+
         if (library.__element) {
             library.__element.remove();
             library.__element = null;
         }
 
         if (this.currentTab === tabName) {
-            this.__contentContainer.innerHTML = '';
-            this.__contentContainer.appendChild(this.createTab(library));
+            // what the actual fuck is this code
+            this.__contentContainer.replaceChildren(this.createTab(library));
         }
     }
 
@@ -187,22 +380,27 @@ class AssetManagerView extends LS.Multipane.View {
         }
 
         this.currentTab = tabName;
-        this.__contentContainer.innerHTML = '';
-        this.__contentContainer.appendChild(this.createTab(library));
+        this.__contentContainer.replaceChildren(library.__element || this.createTab(library));
     }
 
     createTab(library) {
-        const grid = library.__element = LS.Create({ class: 'asset-library-grid' });
+        if (library.name === "File browser") {
+            if(!this.fileBrowser) {
+                this.fileBrowser = new FileBrowser(this.parent);
+                return library.__element = this.fileBrowser.container;
+            }
+        }
 
-        if (library.name === "Project Folders") {
-            this._createFoldersTab(grid);
-        } else if (library.name === "Saved items") {
+        // say wallahi bro
+        const grid = library.__element = LS.Create({ class: 'asset-library-grid' });
+        
+        if (library.name === "Saved items") {
             grid.appendChild(LS.Create("ls-box", {
                 inner: "You can save presets you use often here for quick access. To save an item, right click on it and select 'Save to library'.",
             }));
         } else if (library.name === "Project Assets") {
             grid.appendChild(LS.Create("ls-box.margin-bottom-medium", {
-                inner: "These assets are embedded in the project file and work anywhere. Note that this increases the project file size and memory usage, so use it for small files only! You can drag and drop files here or to the timeline directly.",
+                inner: "These are the assets used in your project.",
             }));
 
             this.refreshProjectAssets(grid);
@@ -217,112 +415,6 @@ class AssetManagerView extends LS.Multipane.View {
     }
 
     // FIXME: I know this isnt clean but im tired :(
-    _createFoldersTab(grid) {
-        grid.appendChild(LS.Create("ls-box.margin-bottom-medium", {
-            inner: "Add folders from your computer to browse and access their content."
-        }));
-
-        grid.appendChild(LS.Create({
-            tag: 'button',
-            class: 'elevated',
-            inner: [{ tag: 'i', class: 'bi-folder-plus' }, ' Add folder to project'],
-            onclick: () => { this.parent.resources.addFolder() }
-        }));
-
-        grid.appendChild(LS.Create({
-            tag: 'button',
-            class: 'elevated',
-            inner: [{ tag: 'i', class: 'bi-folder-plus' }, ' Add folder (global)'],
-            onclick: () => { this.parent.resources.addFolder() }
-        }));
-
-        this.refreshFolders(grid);
-    }
-
-    /**
-     * Expands or collapses a folder in the folders tab, showing or hiding its content.
-     * @warning This is experimental and not clean at all yet. I don't have much time sadly. Life is hard.
-     * 
-     * @param {*} folderData 
-     * @returns 
-     */
-    toggleExpandFolder(folderData) {
-        if (!folderData) return;
-
-        this.parent.resources.listDirectory(folderData.name, "/").then(files => {
-            if (!folderData.__element) return;
-
-            let fileList = folderData.__fileList;
-            if (fileList) {
-                fileList.remove();
-                folderData.__fileList = null;
-                return;
-            }
-
-            fileList = folderData.__fileList = LS.Create({ class: 'folder-file-list' });
-
-            for (const file of files) {
-                const fileElement = this.createAssetPreview({
-                    name: file.name,
-                    type: file.type,
-                });
-
-                fileList.appendChild(fileElement);
-            }
-
-            folderData.__element.appendChild(fileList);
-        });
-    }
-
-    /**
-     * Refreshes the folder list in the asset library.
-     * @param {*} grid The grid element to refresh the folder list in
-     */
-    refreshFolders(grid) {
-        const folders = this.parent?.resources?.projectFolders;
-
-        if (!folders || folders.size === 0) {
-            grid.appendChild(LS.Create({
-                class: 'empty-state',
-                inner: [
-                    { tag: 'i', class: 'bi-folder2-open', style: 'font-size: 3em; opacity: 0.3;' },
-                    { tag: 'p', inner: 'No folders added yet' }
-                ]
-            }));
-            return;
-        }
-
-        const folderGrid = LS.Create({ class: 'folder-list-grid' });
-
-        for (const [name, folderData] of folders) {
-            const folderElement = folderData.__element || (folderData.__element = LS.Create({
-                class: 'folder-list-item treeview-item',
-                inner: [
-                    [{ tag: 'i', class: 'bi-folder-fill' }, " " + (folderData.name || folderData.path || "Unnamed folder")],
-
-                    { class: 'folder-actions', inner: [
-                        LS.Create({
-                            tag: 'button',
-                            class: 'square clear small',
-                            inner: { tag: 'i', class: 'bi-trash' },
-                            tooltip: 'Remove folder',
-
-                            onclick: (e) => {
-                                e.stopPropagation();
-                                this.parent?.resources.removeFolder(name);
-                            }
-                        })
-                    ]}
-                ],
-
-                onclick: () => this.toggleExpandFolder(folderData)
-            }));
-
-            folderGrid.appendChild(folderElement);
-        }
-
-        grid.appendChild(folderGrid);
-    }
 
     /**
      * Refreshes the project assets in the asset library.
@@ -372,7 +464,7 @@ class AssetManagerView extends LS.Multipane.View {
             obj.__element = LS.Create({
                 class: 'asset-library-item',
                 inner: [
-                    { tag: 'i', class: this.getIcon(obj) },
+                    { tag: 'i', class: AssetManagerView.getIcon(obj) },
                     { tag: 'span', inner: obj.name },
                     obj.helpText ? { tag: 'i', class: 'bi-info-circle', onclick() {
                         LS.Modal.buildEphemeral({
@@ -389,7 +481,7 @@ class AssetManagerView extends LS.Multipane.View {
         return obj.__element;
     }
 
-    getIcon(obj) {
+    static getIcon(obj) {
         if(obj.mimeType) {
             if (obj.mimeType.startsWith("image/")) return "bi-image";
             if (obj.mimeType.startsWith("video/")) return "bi-film";
@@ -413,7 +505,7 @@ class AssetManagerView extends LS.Multipane.View {
             "events": "bi-toggles",
             "particles": "bi-stars",
             "script": "bi-braces-asterisk"
-        }[obj.type] || "bi-file")
+        }[obj.type] || "bi-file");
     }
 
     destroy() {
@@ -423,8 +515,10 @@ class AssetManagerView extends LS.Multipane.View {
         this.previewElement.remove();
         this.previewElement = null;
         this.library = null;
+        this.fileBrowser?.destroy();
+        this.fileBrowser = null;
         super.destroy();
     }
 }
 
-export default AssetManagerView;
+export { AssetManagerView, FileBrowser };

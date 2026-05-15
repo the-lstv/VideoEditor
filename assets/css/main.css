@@ -224,6 +224,21 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
     z-index: 5000;
     pointer-events: none;
     outline: 2px solid var(--accent);
+
+    max-width: 150px;
+    overflow: hidden;
+    display: flex;
+    gap: 8px;
+}
+
+.layout-slot-drag-preview > span {
+    min-width: 0;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    white-space: nowrap;
+    flex: 1 1 auto;
+    width: 100%;
+    text-align: left;
 }
 
 .is-being-dragged {
@@ -317,7 +332,6 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
 .property-editor-container, .asset-manager-content {
     overflow: auto;
     height: 100%;
-    padding: 8px 12px;
 }
 
 .property-editor-header {
@@ -537,7 +551,17 @@ ls-box ul li {
     width: 100%;
 }
 
-.folder-list-item {
+.file-browser-header > div {
+    display: flex;
+    gap: 4px
+}
+
+.file-browser-header button {
+    --padding-control-h: 8px;
+    --padding-control-v: 4px;
+}
+
+.file-browser-item {
     padding: 4px 8px;
     cursor: pointer;
     justify-content: space-between;
@@ -547,7 +571,7 @@ ls-box ul li {
     background: var(--elevate);
 }
 
-.asset-library-item:not(.folder-list-item) *:not(.bi-info-circle) {
+.asset-library-item:not(.file-browser-item) *:not(.bi-info-circle) {
     pointer-events: none;
 }
 
@@ -561,6 +585,7 @@ ls-box ul li {
     display: flex;
     flex-direction: column;
     height: 100%;
+    padding: 8px 12px;
 }
 
 /* File Browser */
@@ -577,4 +602,29 @@ pre.log-message {
     padding: 4px 8px;
     user-select: text;
     border-radius: var(--border-radius);
+}
+
+.file-browser, .file-browser-content, .file-browser-content .ls-tree {
+    height: 100%;
+}
+
+.file-browser, .file-browser-content {
+    overflow: hidden;
+}
+
+.file-browser-content {
+    background: var(--surface-n1);
+}
+
+.file-browser-header {
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+    margin: 6px 8px;
+}
+
+.file-browser {
+    height: 100%;
+    display: flex;
+    flex-direction: column;
 }

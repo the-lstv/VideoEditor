@@ -57,9 +57,10 @@ if(typeof require !== "undefined") {
 class Resource {
     constructor(options) {
         this.id = options.id || LS.Misc.uid();
-        this.path = options.path || "Unnamed Resource" + this.id;
+        this.path = options.path || this.id;
+        this.folderName = options.folderName || null;
 
-        this.mimeType = options.mimeType || (options.name && RESOURCE_MIME_TYPES[options.name.split(".").pop()]) || RESOURCE_MIME_TYPES.default;
+        this.mimeType = options.mimeType || (options.path && RESOURCE_MIME_TYPES[options.path.split(".").pop()]) || RESOURCE_MIME_TYPES.default;
 
         this.type = options.type || ({ audio: "sound", video: "video", image: "image" }[this.mimeType.split("/")[0]] || "asset");
 
@@ -120,7 +121,8 @@ class Resource {
     export() {
         return {
             id: this.id,
-            name: this.path,
+            path: this.path,
+            folderName: this.folderName,
             type: this.type,
             mimeType: this.mimeType,
             isExternal: this.isExternal
@@ -209,8 +211,11 @@ class ResourceManager extends LS.EventEmitter {
     }
 
     async listDirectory(name, path) {
+        console.log("ResourceManager.listDirectory: listing directory", name, path);
+        
         if(isNode) {
             const folder = this.projectFolders.get(name);
+
             if(!folder) {
                 console.warn("ResourceManager.listDirectory: folder not found", name);
                 return [];
@@ -221,7 +226,10 @@ class ResourceManager extends LS.EventEmitter {
 
             return entries.map(entry => ({
                 name: entry.name,
+                path: fullPath + "/" + entry.name,
+                relativePath: fullPath.replace(folder.path, "") + "/" + entry.name,
                 isDirectory: entry.isDirectory(),
+                mimeType: entry.isDirectory() ? null : RESOURCE_MIME_TYPES[entry.name.split(".").pop()] || RESOURCE_MIME_TYPES.default
             }));
         } else {
             // Currently not implemented, later could use the some blah blah file api i really don't know
@@ -267,8 +275,29 @@ class ResourceManager extends LS.EventEmitter {
      * @param {number} row Optional if adding to timeline
      * @param {number} offset Optional if adding to timeline
      */
+    // TODO: row/offset doesn't belong here
     async addProjectResources(files, row, offset) {
         console.log("Adding project resources from files", files);
+    }
+
+    /**
+     * Add a resource to the project.
+     * @param {*} resource Resource object
+     * @param {string} resource.id Optional id
+     * @param {string} resource.path Path or name (for internal resources) of the resource.
+     * @param {string} resource.mimeType Optional mime type
+     * @param {string} resource.type Optional type (sound, video, image, etc.)
+     * @param {boolean} resource.isExternal Optional whether the resource is stored externally
+     * @returns {Resource} The added resource object
+     */
+    addResource(resource) {
+        if(!(resource instanceof Resource)) {
+            resource = new Resource(resource);
+        }
+
+        this.resources.set(resource.id, resource);
+        this.emit("resource-added", [resource]);
+        return resource;
     }
 
     disposeAll() {
@@ -328,8 +357,9 @@ class ResourceManager extends LS.EventEmitter {
                 folderName = folderName + " (" + counter + ")";
             }
 
-            this.projectFolders.set(folderName, { path: folderPath });
-            this.emit("folder-added", [{ name: folderName, path: folderPath }]);
+            const folderData = { path: folderPath, name: folderName };
+            this.projectFolders.set(folderName, folderData);
+            this.emit("folder-added", [folderData]);
             return;
         }
         

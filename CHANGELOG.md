@@ -6,6 +6,7 @@ Warning; this changelog is just rough notes and may not be comprehensive.
 - Now using a static index.html
 - Electron is now primary
 - Split Project into three parts (project, flavor, and renderer). Was that a good idea?
+..Much more
 
 ---
 Changelog started

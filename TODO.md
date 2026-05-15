@@ -48,3 +48,5 @@
 - [ ] Dynamic text objects
 
 ## Bugs
+
+The resource management is currently one big mess.
