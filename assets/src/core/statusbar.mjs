@@ -12,6 +12,10 @@ class StatusBar {
                 ]
             })
         );
+
+        LS.on("flavor-ready", (flavor) => {
+            this.container.querySelector(".statusbar-left").textContent = "Version " + (flavor.constructor.version || "");
+        });
     }
 }
 

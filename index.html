@@ -83,7 +83,7 @@
     <!-- LS -->
     <!-- <script src="https://cdn.extragon.cloud/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,gl,patcher,node,resize,tabs,timeline,toast,tooltips,multipane/ls.js"></script>
     <link rel=stylesheet href="https://cdn.extragon.cloud/ls/beta/flat,knob,timeline/ls.css"> -->
-    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,node,resize,tree,tabs,timeline,toast,tooltips,gl,multipane/ls.js"></script>
+    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,i18n,node,resize,tree,tabs,timeline,toast,tooltips,gl,multipane/ls.js"></script>
     <link rel=stylesheet href="https://cdn-origin.extragon.localhost/ls/beta/flat,knob,timeline/ls.css">
 
     <!-- CSS -->
@@ -140,10 +140,10 @@
             <!-- Navigation Items -->
             <div>
                 <img style='padding: 4px;max-width: 32px;margin-right: 4px;' class="nav-menu-item flavor-icon" draggable="false" src='assets/images/icon-flat.svg' alt='Editor Icon'>
-                <div tabindex='0' class="nav-menu-item">File</div>
-                <div tabindex='0' class="nav-menu-item">Options</div>
-                <div tabindex='0' class="nav-menu-item">Layout</div>
-                <div tabindex='0' class="nav-menu-item">Help</div>
+                <div tabindex='0' class="nav-menu-item" data-ls-i18n="nav.file" data-ls-i18n-fallback="File">File</div>
+                <div tabindex='0' class="nav-menu-item" data-ls-i18n="nav.options" data-ls-i18n-fallback="Options">Options</div>
+                <div tabindex='0' class="nav-menu-item" data-ls-i18n="nav.layout" data-ls-i18n-fallback="Layout">Layout</div>
+                <div tabindex='0' class="nav-menu-item" data-ls-i18n="nav.help" data-ls-i18n-fallback="Help">Help</div>
             </div>
 
             <!-- Undo/Redo Buttons -->

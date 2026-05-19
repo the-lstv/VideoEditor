@@ -82,6 +82,9 @@ const app = globalThis.app = {
     }
 }
 
+// Currently this is just the defaults
+LS.i18n.loadLocale({ code: "en", translations: {} });
+LS.i18n.changeLocale(app.config.get("language") || "en");
 
 // --- Workspace initialization
 
@@ -212,11 +215,11 @@ window.addEventListener('load', async () => {
             settingsModal.open();
         });
 
-        app.shortcutManager.assign("TIMELINE_TOOL_SELECT", () =>  { app.flavor.timeline.tool = "select"  });
-        app.shortcutManager.assign("TIMELINE_TOOL_SLICE", () =>   { app.flavor.timeline.tool = "slice"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { app.flavor.timeline.tool = "preview" });
-        app.shortcutManager.assign("TIMELINE_TOOL_GROUP", () =>   { app.flavor.timeline.tool = "group"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_ERASE", () =>   { app.flavor.timeline.tool = "erase"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_SELECT", () =>  { app.flavor.timelineInstance.tool = "select"  });
+        app.shortcutManager.assign("TIMELINE_TOOL_SLICE", () =>   { app.flavor.timelineInstance.tool = "slice"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { app.flavor.timelineInstance.tool = "preview" });
+        app.shortcutManager.assign("TIMELINE_TOOL_GROUP", () =>   { app.flavor.timelineInstance.tool = "group"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_ERASE", () =>   { app.flavor.timelineInstance.tool = "erase"   });
 
         undoButton.addEventListener('click', () => {
             app.currentProject.historyManager.undo();
@@ -289,6 +292,28 @@ window.addEventListener('load', async () => {
                     { text: "Teal", action() { LS.Color.setAccent('teal'); localStorage.setItem("ls-accent", "teal"); } },
                     { text: "Yellow", action() { LS.Color.setAccent('yellow'); localStorage.setItem("ls-accent", "yellow"); } },
                 ] },
+
+                { type: "separator" },
+
+                { text: "Set editor language", items: [
+                        { code: "en", text: "English" },
+                        { code: "cs", text: "Čeština (Czech)" },
+                        // { code: "de", text: "Deutsch (German) (Auto-Translated!)" },
+                        // { code: "es", text: "Español (Spanish) (Auto-Translated!)" },
+                        // { code: "fr", text: "Français (French) (Auto-Translated!)" },
+                        // { code: "zh", text: "中文 (Mandarin Chinese) (Auto-Translated!)" },
+                    ].map(lang => ({
+                        text: lang.text,
+                        type: "radio",
+                        group: "language",
+                        checked: LS.i18n.locale === lang.code,
+
+                        action() {
+                            LS.i18n.changeLocale(lang.code);
+                            app.config.set("language", lang.code);
+                        },
+                    }))
+                },
             ],
 
             layout: [
@@ -321,10 +346,10 @@ window.addEventListener('load', async () => {
 
                 { type: "separator" },
 
-                { text: "Tutorials", action() {
-                    // ! todo
-                    window.open();
-                } },
+                // { text: "Tutorials", action() {
+                //     // ! todo
+                //     window.open();
+                // } },
 
                 { type: "separator" },
 

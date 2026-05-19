@@ -9,26 +9,26 @@ class AssetManagerView extends LS.Multipane.View {
 
     libraryTemplate = {
         objects: {
-            name: "Basic objects",
+            name: "Base objects",
             icon: "bi-box",
             items: [
-                { icon: "bi-archive", label: "Container", type: "container", item: { type: "container", label: "Container", color: "white" } },
-                { icon: "bi-textarea-t", label: "Dynamic text", type: "text", helpText: "A dynamic text object.\n\nIt uses a custom text rendering engine optimized for this platform. Text can be updated at any time and can be written anywhere on the screen quickly and at any scale. Also supports realtime effects and syntax highlighting.\n\nCons:\n- Fonts need to be converted to a special format limited to a set of characters, and text shaping is not currently supported.\n- Currently only works well with monospace fonts.\n- Larger overhead per instance; it's recommended to reuse it.\n- Slightly more complex to use.\n\nPros:\n- Crisp at any scale\n- Great for dynamic content and per-character effects\n- A more versatile API.\n\nSuitable when you change text or text styles often and need high performance text rendering with advanced per-character effects.", item: { type: "text", label: "Dynamic text", data: { text: "Some text" }, color: "aquamarine" } },
-                { icon: "bi-fonts", label: "Static text", type: "static_text", helpText: "A static text object that uses the browser's native text rendering, and then applies it as a texture to a sprite.\n\nCons:\n- Updates are expensive, meaning changing text or styles often may cause performance issues.\n- Handles less textthan dynamic text (performance and memory usage worsens with more text).\n- Less flexible scripting interface and styling is limited to one block (no individual character styling).\n- Does not handle scaling automatically, so changing text size requires re-rendering, otherwise the text will be distorted/pixelated.\n\nPros:\n- Simpler to use\n- More efficient for fixed text content\n- Handles font features (ligatures, kerning) better and works with any supported language.\n\nSuitable when you have short to medium fixed text content that doesn't need frequent updates and stays more-or-less the same size.", item: { type: "static_text", label: "Static text", data: { text: "Some text" }, color: "aquamarine" } },
-                { icon: "bi-square", label: "Simple shape", type: "sprite", item: { type: "sprite", label: "Shape", data: { positionX: 100, positionY: 100, scaleX: 500, scaleY: 500, anchorX: 0, anchorY: 0 } } },
-                { icon: "bi-vector-pen", label: "Vector shape", type: "graphics", item: { type: "graphics", label: "Vector shape" } },
-                { icon: "bi-bezier2", label: "Automation clip", type: "automation", item: { type: "automation", label: "Automation clip", data: { value: 1, points: [ { value: 0, type: "linear", time: 1 } ] } } },
-                { icon: "bi-film", label: "Video", type: "video", item: { type: "video", label: "Video", color: "blue" } },
-                { icon: "bi-image", label: "Image", type: "sprite", item: { type: "sprite", label: "Image" } },
-                { icon: "bi-music-note-beamed", label: "Sound", type: "sound", item: { type: "sound", label: "Sound", color: "purple" } },
-                { icon: "bi-music-note-list", label: "Pattern", type: "notes", item: { type: "notes", label: "Pattern", color: "yellow" } },
-                { icon: "bi-box", label: "3D Mesh", type: "mesh", item: { type: "mesh", label: "3D Mesh", color: "lapis" } },
-                { icon: "bi-camera-video", label: "Camera", type: "camera", item: { type: "camera", label: "Camera", color: "orange" } },
-                { icon: "bi-lightbulb", label: "Light", type: "light", item: { type: "light", label: "Light", color: "yellow" } },
-                { icon: "bi-stars", label: "Particle emitter", type: "particles", item: { type: "particles", label: "Particle emitter", color: "pink" } },
-                { icon: "bi-toggles", label: "Events", type: "events", item: { type: "events", label: "Events" } },
-                { icon: "bi-braces-asterisk", label: "Timeline script", type: "script", item: { type: "script", label: "Timeline script" } },
-                { icon: "bi-file-earmark", label: "Empty item", type: "empty", item: { type: "empty", label: "Empty item" } },
+                { i18n: "assets.base.container", icon: "bi-archive", label: "Container", type: "container", item: { type: "container", label: "Container", color: "white" } },
+                { i18n: "assets.base.shape", icon: "bi-square", label: "Simple shape", type: "sprite", item: { type: "sprite", label: "Shape", data: { positionX: 100, positionY: 100, scaleX: 500, scaleY: 500, anchorX: 0, anchorY: 0 } } },
+                { i18n: "assets.base.vector_shape", icon: "bi-vector-pen", label: "Vector shape", type: "graphics", item: { type: "graphics", label: "Vector shape" } },
+                { i18n: "assets.base.automation_clip", icon: "bi-bezier2", label: "Automation clip", type: "automation", item: { type: "automation", label: "Automation clip" } },
+                { i18n: "assets.base.video", icon: "bi-film", label: "Video", type: "video", item: { type: "video", label: "Video", color: "blue" } },
+                { i18n: "assets.base.image", icon: "bi-image", label: "Image", type: "sprite", item: { type: "sprite", label: "Image" } },
+                { i18n: "assets.base.sound", icon: "bi-music-note-beamed", label: "Sound", type: "sound", item: { type: "sound", label: "Sound", color: "purple" } },
+                { i18n: "assets.base.dynamic_text", icon: "bi-textarea-t", label: "Dynamic text", type: "text", helpText: "A dynamic text object.\n\nIt uses a custom text rendering engine optimized for this platform. Text can be updated at any time and can be written anywhere on the screen quickly and at any scale. Also supports realtime effects and syntax highlighting.\n\nCons:\n- Fonts need to be converted to a special format limited to a set of characters, and text shaping is not currently supported.\n- Currently only works well with monospace fonts.\n- Larger overhead per instance; it's recommended to reuse it.\n- Slightly more complex to use.\n\nPros:\n- Crisp at any scale\n- Great for dynamic content and per-character effects\n- A more versatile API.\n\nSuitable when you change text or text styles often and need high performance text rendering with advanced per-character effects.", item: { type: "text", label: "Dynamic text", data: { text: "Some text" }, color: "aquamarine" } },
+                { i18n: "assets.base.static_text", icon: "bi-fonts", label: "Static text", type: "static_text", helpText: "A static text object that uses the browser's native text rendering, and then applies it as a texture to a sprite.\n\nCons:\n- Updates are expensive, meaning changing text or styles often may cause performance issues.\n- Handles less textthan dynamic text (performance and memory usage worsens with more text).\n- Less flexible scripting interface and styling is limited to one block (no individual character styling).\n- Does not handle scaling automatically, so changing text size requires re-rendering, otherwise the text will be distorted/pixelated.\n\nPros:\n- Simpler to use\n- More efficient for fixed text content\n- Handles font features (ligatures, kerning) better and works with any supported language.\n\nSuitable when you have short to medium fixed text content that doesn't need frequent updates and stays more-or-less the same size.", item: { type: "static_text", label: "Static text", data: { text: "Some text" }, color: "aquamarine" } },
+                { i18n: "assets.base.pattern", icon: "bi-music-note-list", label: "Pattern", type: "notes", item: { type: "notes", label: "Pattern", color: "yellow" } },
+                { i18n: "assets.base.3d_mesh", icon: "bi-box", label: "3D Object", type: "mesh", item: { type: "mesh", label: "3D Object", color: "lapis" } },
+                { i18n: "assets.base.camera", icon: "bi-camera-video", label: "Camera", type: "camera", item: { type: "camera", label: "Camera", color: "orange" } },
+                { i18n: "assets.base.light", icon: "bi-lightbulb", label: "Light", type: "light", item: { type: "light", label: "Light", color: "yellow" } },
+                { i18n: "assets.base.particle_emitter", icon: "bi-stars", label: "Particle emitter", type: "particles", item: { type: "particles", label: "Particle emitter", color: "pink" } },
+                { i18n: "assets.base.events", icon: "bi-toggles", label: "Events", type: "events", item: { type: "events", label: "Events" } },
+                { i18n: "assets.base.timeline_script", icon: "bi-braces-asterisk", label: "Timeline script", type: "script", item: { type: "script", label: "Timeline script" } },
+                { i18n: "assets.base.empty_item", icon: "bi-file-earmark", label: "Empty item", type: "empty", item: { type: "empty", label: "Empty item" } },
             ]
         },
 
@@ -69,7 +69,7 @@ class AssetManagerView extends LS.Multipane.View {
             class: 'empty-state',
             inner: [
                 { tag: 'i', class: 'bi-folder2-open', style: 'font-size: 3em; opacity: 0.3;' },
-                { tag: 'p', inner: 'No content added yet' }
+                { tag: 'p', i18n: "assets.empty_state", text: "No items to display" }
             ]
         });
 
@@ -232,27 +232,27 @@ class AssetManagerView extends LS.Multipane.View {
             }
         });
 
-        // this.__contentContainer.addEventListener("dragover", (e) => {
-        //     if(this.currentTab !== 'projectAssets') return;
+        this.__contentContainer.addEventListener("dragover", (e) => {
+            if(this.currentTab !== 'projectAssets') return;
 
-        //     e.preventDefault();
-        //     this.__contentContainer.classList.add("drag-over");
-        // });
+            e.preventDefault();
+            this.__contentContainer.classList.add("drag-over");
+        });
 
-        // this.__contentContainer.addEventListener("dragleave", (e) => {
-        //     if(this.currentTab !== 'projectAssets') return;
+        this.__contentContainer.addEventListener("dragleave", (e) => {
+            if(this.currentTab !== 'projectAssets') return;
 
-        //     e.preventDefault();
-        //     this.__contentContainer.classList.remove("drag-over");
-        // });
+            e.preventDefault();
+            this.__contentContainer.classList.remove("drag-over");
+        });
 
-        // this.__contentContainer.addEventListener("drop", (e) => {
-        //     if(this.currentTab !== 'projectAssets') return;
+        this.__contentContainer.addEventListener("drop", (e) => {
+            if(this.currentTab !== 'projectAssets') return;
 
-        //     e.preventDefault();
-        //     this.__contentContainer.classList.remove("drag-over");
-        //     this.parent?.resources.addProjectResources(e.dataTransfer.files);
-        // });
+            e.preventDefault();
+            this.__contentContainer.classList.remove("drag-over");
+            this.parent?.resources.addProjectResources(e.dataTransfer.files);
+        });
 
         this._boundRefreshFolders = () => this.refreshFolders();
         this._boundRefreshProjectAssets = () => this.refreshFolders(); // todo

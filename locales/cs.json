@@ -1,0 +1,100 @@
+{
+    "properties": {
+        "visible": " Viditelný:",
+        "tint": " Barva:",
+        "opacity": " Průhlednost:",
+        "castShadow": " Vrhat stíny:",
+        "receiveShadow": " Přijímat stíny:",
+        "wireframe": " Drátěný model:",
+        "blendMode": " Režim prolínání:",
+        "position": " Pozice:",
+        "rotation": " Rotace:",
+        "scale": " Měřítko:",
+        "tileColor": " Barva dlaždice:",
+        "label": " Štítek:",
+        "name": " Název:",
+        "type": " Typ:",
+        "geometry": " Geometrie:",
+        "material": " Materiál:",
+        "duration": " Délka:",
+        "start": " Začátek:",
+
+        "loop": " Smyčka:",
+        "loopStart": " Začátek smyčky:",
+        "loopEnd": " Konec smyčky:",
+
+        "volume": " Hlasitost:",
+        "audioPan": " Panoráma:",
+
+        "playbackRate": " Rychlost přehrávání:",
+        "playbackRateDirection": " Rychlost/směr přehrávání:",
+        "frameRateLimit": " Limit snímkové frekvence:",
+
+        "offset": " Posun od začátku:",
+
+        "anchor": " Kotva:",
+        "sourceUrl": " Média:",
+        "sourceFitMode": " Režim přizpůsobení:",
+        "effects": " Efekty:",
+        "skew": " Šikmý pohled:",
+
+        "general": "Obecné",
+        "transform": "Transformace",
+        "media": "Média",
+        "source": "Zdroj",
+        "appearance": "Vzhled",
+        "behavior": "Chování",
+        "animation": "Animace",
+        "rendering": "Zobrazování",
+        "other": "Ostatní",
+        "text": "Text",
+        "automation": "Automatizace",
+        "audio": "Audio",
+
+        "fontSize": " Velikost písma:",
+        "fontFamily": " Rodina písma:",
+
+        "textContent": " Obsah:",
+        "textStyleWeight": " Tloušťka písma:",
+        "automationEnabled": " Povolit:",
+        "automationBaseValue": " Počáteční hodnota:",
+        "automationFunction": " Globální mapovací funkce:",
+
+        "nothingSelected": "Nic není vybráno",
+        "selectElement": "Vyberte prvek pro úpravy",
+        
+        "audioTip": "TIP: Další audio efekty a možnosti najdete na záložce \"Pipeline\".",
+        "effectsTip": "TIP: Další efekty, pokročilé režimy prolínání a filtry najdete na záložce \"Pipeline\"."
+    },
+
+    "assets": {
+        "base": {
+            "container": "Kontejner",
+            "dynamic_text": "Dynamický text",
+            "static_text": "Statický text",
+            "shape": "Jednoduchý tvar",
+            "vector_shape": "Vektorový tvar",
+            "automation_clip": "Klip automatizace",
+            "video": "Video",
+            "image": "Obrázek",
+            "sound": "Zvuk",
+            "pattern": "Vzor",
+            "3d_mesh": "3D objekt",
+            "camera": "Kamera",
+            "light": "Světlo",
+            "particle_emitter": "Emiter částic",
+            "events": "Události",
+            "timeline_script": "Skript časové osy",
+            "empty_item": "Prázdná položka"
+        },
+
+        "empty_state": "Žádné položky k zobrazení"
+    },
+
+    "nav": {
+        "file": "Soubor",
+        "options": "Možnosti",
+        "layout": "Rozvržení",
+        "help": "Nápověda"
+    }
+}

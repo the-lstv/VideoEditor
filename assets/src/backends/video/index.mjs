@@ -2,6 +2,15 @@
 // At some point we need proper native video decoding & encoding, this is a temporary solution
 
 
+// import * as THREE from 'three';
+
+// I love this library. It covers everything and saved me a lot of work. I think the first 3rd party library that is an enjoyment to use
+const { 
+    Input, Output, UrlSource, FilePathSource,
+    Mp4OutputFormat, WebMOutputFormat, BufferTarget, 
+    VideoSampleSink, ALL_FORMATS, VideoSample, CanvasSink
+} = require("mediabunny");
+
 /**
  * Video encoder/renderer helper class
  * 
@@ -126,51 +135,174 @@ class VideoEncoder {
     }
 }
 
+if(localStorage.getItem("suppressSlowFramesWarning") === "true") {
+    globalThis.slowFramesWarningShown = true;
+}
+
 /**
  * Placeholder video decoder helper class
  */
 class VideoDecoder {
     constructor(resource) {
         this.resource = resource;
+        this.ready = false;
 
-        this.video = document.createElement('video');
+        this.canvas = document.createElement('canvas');
 
-        video.src = resource.getURI();
-        video.crossOrigin = 'anonymous';
-        video.muted = true;
-        video.playsInline = true;
+        // I don't think willReadFrequently is a good idea since it forces CPU readback
+        // this.ctx = this.canvas.getContext('2d', { willReadFrequently: true });
+        this.ctx = this.canvas.getContext('2d');
 
-        this.frameReady = false;
+        this.texture = new THREE.CanvasTexture(this.canvas);
+        this.texture.minFilter = THREE.LinearFilter;
+        this.texture.magFilter = THREE.LinearFilter;
+        this.texture.generateMipmaps = false;
+        this.texture.colorSpace = THREE.SRGBColorSpace;
+        this.texture.needsUpdate = false;
 
-        video.play();
+        this.slowFrames = 0;
+        this.sinceLastSlowFrame = 0;
 
-        this.texture = new THREE.VideoTexture(video);
-
-        texture.minFilter = THREE.LinearFilter;
-        texture.magFilter = THREE.LinearFilter;
-        texture.generateMipmaps = false;
-        texture.needsUpdate = false;
+        this._initPromise = this.init();
     }
 
-    update() {
-        // To be added to exporting
-        // this.video.requestVideoFrameCallback(() => {
-        //     this.frameReady = true;
-        // });
+    async init() {
+        try {
+            this.input = new Input({
+                // UrlSource should then be used for remote videos
+                // TODO: use blobs in local files in the browser when possible
+                source: isNode? new FilePathSource(this.resource.fullPath): new UrlSource(this.resource.getURI()),
 
-        if (this.video.readyState >= this.video.HAVE_CURRENT_DATA) {
-            this.texture.needsUpdate = true;
+                // Supports HLS, MP4, QTFF, MATROSKA, WEBM, WAVE, OGG, FLAC, MP3, ADTS, MPEG_TS!
+                formats: ALL_FORMATS
+            });
+
+            this.duration = await this.input.computeDuration();
+            this.videoTrack = await this.input.getPrimaryVideoTrack();
+
+	        const decodable = await this.videoTrack.canDecode();
+            if (!decodable) {
+                console.warn("VideoDecoder: Browser may not support decoding this video codec.");
+            }
+
+            this.sink = new VideoSampleSink(this.videoTrack);
+            this.ready = true;
+
+            await this.seek(0);
+            this._initPromise = null;
+        } catch (error) {
+            console.error("VideoDecoder: Failed to initialize", error);
         }
     }
 
-    seek(time) {
-        this.video.currentTime = time;
+    async seek(time) {
+        if (!this.ready) await this._initPromise;
+        if (!this.ready || !this.sink) return;
+
+        if(this.isSeeking) {
+            if(!globalThis.slowFramesWarningShown && performance.now() - this.sinceLastSlowFrame > 100) {
+                this.slowFrames ++;
+                this.sinceLastSlowFrame = performance.now();
+    
+                if(this.slowFrames > 30) {
+                    LS.Modal.buildEphemeral({
+                        title: "Performance Notice",
+                        content: LS.Create({ html: "<pre style='white-space:pre-wrap'>VideoDecoder seems to be struggling to keep up with one or more of your video files.\nIt is likely that the video is compressed and not optimized for editing, which causes stuttering.\n\nTo improve scrub performance while editing, the editor can attempt to create a \"proxy\" copy of the video in a more editing-friendly format.\nThis copy will be in slightly lower quality and only used during editing, exported videos will use the original and won't have issues with stuttering.\n\n<strong>Warning:</strong> this process may take a long time (seconds to minutes, depending on the video and your system) and require a lot of disk space (proxy videos are uncompressed and may take many times the original video size).</pre>" }),
+                        buttons: [
+                            { label: "Ignore", class: "elevated" },
+                            { label: "Don't show", class: "elevated", onclick: (event) => {
+                                localStorage.setItem("suppressSlowFramesWarning", "true");
+                                event.target.closest(".ls-modal").lsComponent.close();
+                            } },
+                            { label: "Optimize", onclick: async (event) => {
+                                event.target.closest(".ls-modal").lsComponent.close();
+
+                                // ! todo
+                            } }
+                        ]
+                    }, { closeable: false });
+                    globalThis.slowFramesWarningShown = true;
+                }
+            }
+            return;
+        }
+
+        // Snap to 30FPS & clamp to duration for better editing performance.
+        const newTime = Math.max(0, Math.min((time * 30 | 0) / 30, this.duration));
+        if(this.currentTime === newTime) return;
+
+        this.isSeeking = true;
+        this.currentTime = newTime;
+
+        try {
+            const sample = await this.sink.getSample(this.currentTime);
+            if (sample) this.drawSample(sample);
+        } catch (error) {
+            console.error("VideoDecoder: Error seeking to frame", error);
+        } finally {
+            this.isSeeking = false;
+        }
+    }
+
+    /**
+     * @param {VideoSample} sample
+     */
+    drawSample(sample) {
+        if (this.canvas.width !== sample.displayWidth || this.canvas.height !== sample.displayHeight) {
+            this.canvas.width = sample.displayWidth;
+            this.canvas.height = sample.displayHeight;
+            this.texture.dispose();
+        }
+
+        sample.draw(this.ctx, 0, 0);
+        this.texture.needsUpdate = true;
+        sample.close();
+    }
+
+    // ! todo; playback stream for efficient exporting.
+    // async *playbackStream() {
+    //     if (!this.ready || !this.sink) return;
+    // }
+
+    /**
+     * Generates thumbnail images at evenly spaced intervals throughout the video
+     * Useful for timeline generation
+     * 
+     * @param {*} count 
+     * @returns An array of thumbnail image data
+     */
+    async generateThumbnails(count = 5) {
+        if (!this.ready) return [];
+
+        const canvasSink = new CanvasSink(this.videoTrack, { width: 160, height: 90 });
+        const startTimestamp = await videoTrack.getFirstTimestamp();
+		const endTimestamp = await videoTrack.computeDuration();
+
+        for await (const result of canvasSink.canvasesAtTimestamps(
+            Array.from({ length: count }, (_, i) => startTimestamp + i * (endTimestamp - startTimestamp) / (count - 1))
+        )) {
+            console.log(`Got thumbnail for timestamp ${timestamp}:`, result);
+		}
+
+        return thumbnails;
     }
 
     destroy() {
+        if(this.destroyed) return;
         this.texture.dispose();
-        this.video.pause();
-        this.video.src = "";
+
+        if (this.input) {
+            this.input.dispose();
+        }
+
+        this.input = null;
+        this.sink = null;
+        this.ready = false;
+        this.texture = null;
+        this.canvas = null;
+        this.ctx = null;
+        this.resource = null;
+        this.destroyed = true;
     }
 }
 

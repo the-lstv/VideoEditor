@@ -416,6 +416,18 @@ ls-box ul li {
     align-items: center;
 }
 
+.input-with-reset {
+    display: flex;
+    align-items: center;
+    min-width: 0px;
+}
+
+.input-label-small {
+    font-size: 0.8em;
+    color: var(--surface-8);
+    margin-right: 6px;
+}
+
 .property-editor-container input[type="number"] {
     width: 80px;
 }

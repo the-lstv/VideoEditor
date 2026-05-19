@@ -30,6 +30,7 @@ import TimelineView from "../../views/timeline.mjs";
 import Project from "../../core/project.mjs";
 
 import { Variable, mappingCompiler } from "../../core/variable.mjs";
+import { ResourceManager, Resource } from "../../core/resources.mjs";
 
 // --- Video editor flavor
 class VideoEditor extends FlavorBase {
@@ -181,7 +182,7 @@ class VideoEditor extends FlavorBase {
                 case "videoPreview":
                     view.setSource(this.renderer);
                     break;
-                
+
                 case "assetManager":
                     this.addExternalEventListener(view, 'asset-dropped', (event) => {
                         const elementsFromPoint = document.elementsFromPoint(event.x, event.y);
@@ -214,17 +215,15 @@ class VideoEditor extends FlavorBase {
                             else {
                                 event.data.isExternal = true;
                                 event.data.type = null; // :shrug:
-    
-                                this.project.resources.addResource(event.data);
-    
-                                console.log(event.data, this.project.resources);
-    
+
+                                const resource = this.project.resources.addResource(event.data);
+
                                 // Now we need to make an item for the asset
                                 // TODO: this is temporary, just testing
                                 const newItem = {
-                                    type: "image",
-                                    // resourceHash: event.data.resourceHash,
-                                    resource: event.data,
+                                    type: resource.type || "image",
+                                    // resource: ResourceManager.createReference(resource),
+                                    data: { resource },
                                     label: event.data.label,
                                     start: time,
                                     row,
@@ -245,7 +244,6 @@ class VideoEditor extends FlavorBase {
                     view.timeline.reset(true);
                     this.timelineInstance.events.clear();
                     this.timelineInstance = null;
-                    this.pauseActiveMedia();
                     break;
 
                 case "videoPreview":
@@ -331,6 +329,8 @@ class VideoEditor extends FlavorBase {
         // Expose some globals for debugging
         window.timelineView = timelineView;
         window.timeline = timelineView.timeline;
+
+        LS.emit("flavor-ready", [app.flavor]);
     }
 
     #exportTo(data) {
@@ -377,7 +377,6 @@ class VideoEditor extends FlavorBase {
             this.frameScheduler.start();
         } else {
             this.frameScheduler.stop();
-            this.pauseActiveMedia();
         }
     }
 
@@ -449,6 +448,7 @@ class VideoEditor extends FlavorBase {
         const renderTargets = this.__renderTargets;
         renderTargets.length = 0;
 
+        // ! todo To be removed
         const currentMediaItems = this.__currentMediaItems;
         currentMediaItems.clear();
 
@@ -489,16 +489,21 @@ class VideoEditor extends FlavorBase {
                 this.renderer.updateNodeResource(item);
             }
 
+            // TODO: this is very temporary, optimize
+            if(item.type === "video") {
+                // Crazy chain. Anyway, videoDecoder is assumed to have been created by the above renderer.updateNodeResource call
+                const decoder = item.__videoDecoder || (item.__videoDecoder = (item.data.resource instanceof Resource? item.data.resource: (item.data.resource = this.project.resources.getResource(item.data.resource))).assets.videoDecoder);
+
+                if(decoder) {
+                    decoder.seek(time - item.start);
+                }
+            }
+
             if(item.data.animations) {
                 for(const anim of item.data.animations) {
                     if(anim.enabled === false) continue;
                     this.processAutomationItemAtTime(anim, time);
                 }
-            }
-
-            if(item.type === "video") {
-                this.syncMediaItem(item, time, true);
-                currentMediaItems.add(item);
             }
 
             renderTargets.push(item);
@@ -538,7 +543,7 @@ class VideoEditor extends FlavorBase {
             renderOrder++;
         }
 
-        this.renderer.render(this.activeCamera || this.renderer.camera);
+        this.renderer.render(this.activeCamera || this.renderer.defaultCamera);
     }
 
     processAutomationItemAtTime(item, time) {
@@ -614,8 +619,6 @@ class VideoEditor extends FlavorBase {
             if(!destroyViews) this.timelineInstance.reset(true);
             this.timelineInstance = null;
         }
-
-        this.pauseActiveMedia();
 
         for(const item of Array.from(this.mediaItems)) {
             this.releaseItemMedia(item);

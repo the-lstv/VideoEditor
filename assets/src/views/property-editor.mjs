@@ -1,5 +1,6 @@
 /**
  * Property editor view class
+ * A bit of a monolith at the moment
  */
 class PropertyEditorView extends LS.Multipane.View {
     static name = "propertyEditor";
@@ -13,9 +14,10 @@ class PropertyEditorView extends LS.Multipane.View {
             })
         });
 
+        // Shown when no element is selected
         this.emptyMessage = LS.Create({
             class: "centered-layout",
-            style: "flex-direction: column; color: var(--surface-8); text-align: center;",
+            style: "flex-direction: column; color: var(--surface-8); text-align: center",
             inner: [
                 {
                     tag: "svg",
@@ -28,650 +30,45 @@ class PropertyEditorView extends LS.Multipane.View {
                     },
                     innerHTML: `<path d="M120.85,28.42l8-16a8,8,0,0,1,14.31,7.16l-8,16a8,8,0,1,1-14.31-7.16ZM16,104h8a8,8,0,0,0,0-16H16a8,8,0,0,0,0,16ZM96,32a8,8,0,0,0,8-8V16a8,8,0,0,0-16,0v8A8,8,0,0,0,96,32ZM28.42,120.85l-16,8a8,8,0,0,0,7.16,14.31l16-8a8,8,0,1,0-7.16-14.31Zm135.65,15.9,50.34-21.88A16,16,0,0,0,213,85.07L52.92,32.8A15.95,15.95,0,0,0,32.8,52.92L85.07,213a15.82,15.82,0,0,0,14.41,11l.78,0a15.84,15.84,0,0,0,14.61-9.59l21.88-50.34L192,219.31a16,16,0,0,0,22.63,0l4.68-4.68a16,16,0,0,0,0-22.63Z"></path>`
                 },
-                { tag: "h1", inner: "Nothing selected", style: "margin: 10px 0px 5px 0" },
-                { tag: "h3", inner: "Select an element to edit it", style: "margin: 0; font-weight: normal; color: var(--surface-6);" }
+                { tag: "h1", i18n: "properties.nothingSelected", text: "Nothing selected", style: "margin: 10px 0px 5px 0" },
+                { tag: "h3", i18n: "properties.selectElement", text: "Select an element to edit it", style: "margin: 0; font-weight: normal; color: var(--surface-6);" }
             ]
         });
 
+        // Map of input elements
         this.inputs = new Map();
 
-        this.tabContainer = LS.Create("ls-tabs", { class: "property-editor-tabs editor-tabs" });
-        this.tabs = new LS.Tabs(this.tabContainer, {
+        // Property groups
+        this.propertyGroups = {};
+
+        // --- Tabs
+        this.tabs = new LS.Tabs((this.tabContainer = LS.Create("ls-tabs.property-editor-tabs.editor-tabs")), {
             list: true,
             styled: false
         });
 
-        // --- Edit aid (moving and resizing)
-        this.__editAid = LS.Create({
-            class: "editAid",
-        });
-
-        const entry = LS.Resize.set(this.__editAid, {
-            sides: true,
-            corners: true,
-            translate: true
-        });
-
-        entry.handler.on("resize", (side, width, height, leftOffset, topOffset, state) => {
-            if(!this.currentTarget) return;
-
-            const project = this.#getProject();
-            const preview = project?.connectedViews.get("videoPreview");
-            if(preview) {
-                const contained = preview.getContainedCoords();
-                // TODO:
-                const isContainer = false// this.currentTarget.node.constructor === PIXI.Container;
-                width /= contained.scale;
-                height /= contained.scale;
-
-                this.#updateProp("scaleX", width / (isContainer ? 1 : this.currentTarget.node?.bounds.width ?? 1));
-                this.#updateProp("scaleY", height / (isContainer ? 1 : this.currentTarget.node?.bounds.height ?? 1));
-
-                if(side.toLowerCase().includes("left") || side.toLowerCase().includes("top")) {
-                    this.#updateProp("positionX", (leftOffset - contained.left) / contained.scale);
-                    this.#updateProp("positionY", (topOffset - contained.top) / contained.scale);
-                }
-            }
-        });
-        
-        entry.handler.on("resize-end", () => {
-            if(!this.currentTarget) return;
-            this.updateAidPosition();
-        });
-
-        this.propertyGroups = {};
-
-        this.propertyGroups.general = LS.Create([
-            { tag: "h3", inner: "General", class: "property-editor-header" },
-            {
-                class: "property-editor-group level-n1", inner: [
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-tag" }, { tag: "label", inner: " Label:" }] }, this.__labelInput = LS.Create({
-                        tag: "input", type: "text", class: "property-editor-name-input", oninput: () => {
-                            if (this.currentTarget) {
-                                this.currentTarget.label = this.__labelInput.value;
-                                this.#updateTimeline();
-                            }
-                        }
-                    })],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette2" }, { tag: "label", inner: " Tile color:" }] }, this.#createInput("tileColor", {
-                        type: "select",
-                        animatable: false,
-                        defaultValue: "",
-                        options: [
-                            { value: "", text: "Default" },
-                            { value: "white", text: "White" },
-                            { value: "blue", text: "Blue" },
-                            { value: "pastel-indigo", text: "Pastel Indigo" },
-                            { value: "lapis", text: "Lapis" },
-                            { value: "pastel-teal", text: "Pastel Teal" },
-                            { value: "aquamarine", text: "Aquamarine" },
-                            { value: "green", text: "Green" },
-                            { value: "lime", text: "Lime" },
-                            { value: "neon", text: "Neon" },
-                            { value: "yellow", text: "Yellow" },
-                            { value: "orange", text: "Orange" },
-                            { value: "deep-orange", text: "Deep Orange" },
-                            { value: "red", text: "Red" },
-                            { value: "rusty-red", text: "Rusty Red" },
-                            { value: "pink", text: "Pink" },
-                            { value: "hotpink", text: "Hotpink" },
-                            { value: "purple", text: "Purple" },
-                            { value: "soap", text: "Soap" },
-                            { value: "burple", text: "Burple" }
-                        ]
-                    })],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-stopwatch" }, { tag: "label", inner: " Duration (s):" }] }, this.#createInput("clipDuration", {
-                        animatable: false, type: "number", attributes: { min: 0.1, step: 0.1 }, defaultValue: 5, onchange: () => {
-                            this.#updateTimeline();
-                    }})],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-align-start" }, { tag: "label", inner: " Start (s):" }] }, this.#createInput("clipStartTime", {
-                        animatable: false, type: "number", attributes: { min: 0, step: 0.1 }, defaultValue: 0, onchange: () => {
-                            this.#updateTimeline();
-                    }})],
-                ]
-            },
-        ]);
-
-        this.propertyGroups.transform = LS.Create([
-            { tag: "h3", inner: "Transform", class: "property-editor-header" },
-            {
-                class: "property-editor-group level-n1", inner: [
-                    // Position Group
-                    [
-                        { tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", inner: " Position:" }] },
-                        {
-                            class: "input-group", inner: [
-                                { tag: "label", inner: "X", class: "input-label-small" },
-                                this.#createInput("positionX", { type: "number", attributes: { step: 1 }, defaultValue: 0 }),
-                                { tag: "label", inner: "Y", class: "input-label-small" },
-                                this.#createInput("positionY", { type: "number", attributes: { step: 1 }, defaultValue: 0 }),
-                                { tag: "label", inner: "Z", class: "input-label-small" },
-                                this.#createInput("positionZ", { type: "number", attributes: { step: 1 }, defaultValue: 0 })
-                            ]
-                        }
-                    ],
-                    // Scale Group
-                    [
-                        { tag: "span", inner: [{ tag: "i", class: "bi-aspect-ratio" }, { tag: "label", inner: " Scale:" }] },
-                        {
-                            class: "input-group", inner: [
-                                { tag: "label", inner: "X", class: "input-label-small" },
-                                this.#createInput("scaleX", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 }),
-                                { tag: "label", inner: "Y", class: "input-label-small" },
-                                this.#createInput("scaleY", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 }),
-                                { tag: "label", inner: "Z", class: "input-label-small" },,
-                                this.#createInput("scaleZ", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 })
-                            ]
-                        }
-                    ],
-                    // Rotation
-                    [
-                        { tag: "span", inner: [{ tag: "i", class: "bi-arrow-clockwise" }, { tag: "label", inner: " Rotation:" }] },
-                        this.#createInput("rotationX", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
-                        this.#createInput("rotationY", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
-                        this.#createInput("rotationZ", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 })
-                    ],
-                    // Skew Group
-                    [
-                        { tag: "span", inner: [{ tag: "i", class: "bi-slash-square" }, { tag: "label", inner: " Skew:" }] },
-                        {
-                            class: "input-group", inner: [
-                                { tag: "label", inner: "X", class: "input-label-small" },
-                                this.#createInput("skewX", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
-                                { tag: "label", inner: "Y", class: "input-label-small" },
-                                this.#createInput("skewY", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 })
-                            ]
-                        }
-                    ],
-                    // Anchor Group
-                    [
-                        { tag: "span", inner: [{ tag: "i", class: "bi-pin-angle" }, { tag: "label", inner: " Anchor:" }] },
-                        {
-                            class: "input-group", inner: [
-                                { tag: "label", inner: "X", class: "input-label-small" },
-                                this.#createInput("anchorX", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0 }),
-                                { tag: "label", inner: "Y", class: "input-label-small" },
-                                this.#createInput("anchorY", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0 })
-                            ]
-                        }
-                    ],
-                ]
-            },
-        ]);
-
-        this.propertyGroups.rendering = LS.Create([
-            { tag: "h3", inner: "Rendering", class: "property-editor-header" },
-            {
-                class: "property-editor-group level-n1", inner: [
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-eye-slash" }, { tag: "label", inner: " Visible:" }] },
-                        this.#createInput("visible", { type: "checkbox", defaultValue: true })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette-fill" }, { tag: "label", inner: " Color:" }] },
-                        this.#createInput("tint", { type: "color", defaultValue: "#ffffff" })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-circle-half" }, { tag: "label", inner: " Opacity:" }] },
-                        this.#createInput("opacity", { type: "number", attributes: { min: 0, max: 1, step: 0.05 }, defaultValue: 1 })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-circle-half" }, { tag: "label", inner: " Blend mode:" }] },
-                        this.#createInput("blendMode", {
-                            type: "select",
-                            options: [
-                                { value: "normal", text: "Normal" },
-                                { value: "add", text: "Additive" },
-                                { value: "multiply", text: "Multiply" },
-                                { value: "screen", text: "Screen" },
-                                { value: "overlay", text: "Overlay" },
-                                { value: "darken", text: "Darken" },
-                                { value: "lighten", text: "Lighten" }
-                            ],
-                        })
-                    ],
-                ]
-            },
-
-            { tag: "ls-box", class: "elevated", inner: "TIP: For more effects, advanced blend modes and filters see the pipeline tab." }
-        ]);
-
-        this.propertyGroups.source = LS.Create([
-            { tag: "h3", inner: "Source", class: "property-editor-header" },
-            {
-                class: "property-editor-group level-n1", inner: [
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-link-45deg" }, { tag: "label", inner: " URL:" }] },
-                        this.#createInput("sourceUrl", { type: "text", defaultValue: "", callback: (v) => this.#updateProp({ url: v }) })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-aspect-ratio" }, { tag: "label", inner: " Fit mode:" }] },
-                        this.#createInput("sourceFitMode", {
-                            type: "select",
-                            options: [
-                                { value: "contain", text: "Contain" },
-                                { value: "cover", text: "Cover" },
-                                { value: "stretch", text: "Stretch" },
-                                { value: "none", text: "None" }
-                            ],
-                        })
-                    ],
-                ]
-            }
-        ]);
-
-        this.propertyGroups.audio = LS.Create([
-            { tag: "h3", inner: "Audio", class: "property-editor-header" },
-            {
-                class: "property-editor-group level-n1", inner: [
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-volume-up" }, { tag: "label", inner: " Volume:" }] },
-                        this.#createInput("audioVolume", { type: "number", inputType: "knob", attributes: { min: 0, max: 100, step: 0.05 }, defaultValue: 100 })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-speaker" }, { tag: "label", inner: " Pan:" }] },
-                        this.#createInput("audioPan", { type: "number", inputType: "knob", attributes: { min: -1, max: 1, step: 0.05 }, defaultValue: 0 })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-alignment-baseline" }, { tag: "label", inner: " Playback rate:" }] },
-                        this.#createInput("audioPlaybackRate", { type: "number", inputType: "knob", attributes: { min: 0.1, step: 0.1 }, defaultValue: 1 })
-                    ],
-                ]
-            },
-
-            { tag: "ls-box", class: "elevated", inner: "TIP: For more audio effects and options, see the pipeline tab." }
-        ]);
-
-        this.propertyGroups.text = LS.Create([
-            { tag: "h3", inner: "Text", class: "property-editor-header" },
-            {
-                class: "property-editor-group level-n1", inner: [
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-fonts" }, { tag: "label", inner: " Content:" }] },
-                        this.#createInput("textContent", { type: "text", defaultValue: "Some text" })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-type-bold" }, { tag: "label", inner: " Font weight:" }] },
-                        this.#createInput("textStyleWeight", {
-                            type: "select",
-                            defaultValue: "400",
-                            options: [
-                                { value: "100", text: "Thin (100)" },
-                                { value: "200", text: "Extra Light (200)" },
-                                { value: "300", text: "Light (300)" },
-                                { value: "400", text: "Normal (400)" },
-                                { value: "500", text: "Medium (500)" },
-                                { value: "600", text: "Semi Bold (600)" },
-                                { value: "700", text: "Bold (700)" },
-                                { value: "800", text: "Extra Bold (800)" },
-                                { value: "900", text: "Black (900)" }
-                            ],
-                        })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-type-italic" }, { tag: "label", inner: " Font style:" }] },
-                        this.#createInput("textStyleStyle", {
-                            type: "select",
-                            options: [
-                                { value: "normal", text: "Normal" },
-                                { value: "italic", text: "Italic" },
-                                { value: "oblique", text: "Oblique" }
-                            ],
-                        })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-paragraph" }, { tag: "label", inner: " Font size:" }] },
-                        this.#createInput("textStyleFontSize", { type: "number", attributes: { step: 1 }, defaultValue: 24 })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-fonts" }, { tag: "label", inner: " Font family:" }] },
-                        this.#createInput("textStyleFontFamily", { type: "text", defaultValue: "Arial" })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-left" }, { tag: "label", inner: " Alignment:" }] },
-                        this.#createInput("textStyleAlignment", {
-                            type: "select",
-                            options: [
-                                { value: "left", text: "Left" },
-                                { value: "center", text: "Center" },
-                                { value: "right", text: "Right" }
-                            ],
-                        })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette-fill" }, { tag: "label", inner: " Color:" }] },
-                        this.#createInput("textStyleFill", { type: "color", defaultValue: "#ffffff" })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-layout-text-sidebar-reverse" }, { tag: "label", inner: " Line height:" }] },
-                        this.#createInput("textStyleLineHeight", { type: "number", attributes: { step: 0.1, min: 0.1 }, defaultValue: 1.2 })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-wrap" }, { tag: "label", inner: " Wrap width:" }] },
-                        this.#createInput("textStyleWrapWidth", { type: "number", attributes: { step: 1, min: 0 }, defaultValue: 200 })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-paragraph" }, { tag: "label", inner: " Letter spacing:" }] },
-                        this.#createInput("textStyleLetterSpacing", { type: "number", attributes: { step: 0.1 }, defaultValue: 0 })
-                    ],
-                    
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-wrap" }, { tag: "label", inner: " Word wrap:" }] },
-                        this.#createInput("textStyleWrap", { type: "checkbox", defaultValue: true })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-border-style" }, { tag: "label", inner: " Stroke:" }] },
-                        this.#createInput("textStyleStroke", { type: "color", defaultValue: "#000000" })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-border-width" }, { tag: "label", inner: " Stroke thickness:" }] },
-                        this.#createInput("textStyleStrokeThickness", { type: "number", attributes: { step: 1, min: 0 }, defaultValue: 0 })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-paragraph" }, { tag: "label", inner: " Stroke line join:" }] },
-                        this.#createInput("textStyleStrokeLinejoin", {
-                            type: "select",
-                            options: [
-                                { value: "miter", text: "Miter" },
-                                { value: "round", text: "Round" },
-                                { value: "bevel", text: "Bevel" }
-                            ],
-                        })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-shadows" }, { tag: "label", inner: " Drop shadow:" }] },
-                        this.#createInput("textStyleDropShadow", { type: "checkbox", defaultValue: false })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette" }, { tag: "label", inner: " Shadow color:" }] },
-                        this.#createInput("textStyleDropShadowColor", { type: "color", defaultValue: "#000000" })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-circle-half" }, { tag: "label", inner: " Shadow opacity:" }] },
-                        this.#createInput("textStyleDropShadowOpacity", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0.5 })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-arrows-angle-expand" }, { tag: "label", inner: " Shadow angle:" }] },
-                        this.#createInput("textStyleDropShadowAngle", { type: "number", inputType: "angle", attributes: { step: 0.1 }, defaultValue: Math.PI / 6 })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-distribute-vertical" }, { tag: "label", inner: " Shadow distance:" }] },
-                        this.#createInput("textStyleDropShadowDistance", { type: "number", attributes: { step: 1 }, defaultValue: 5 })
-                    ],
-
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-droplet-half" }, { tag: "label", inner: " Shadow blur:" }] },
-                        this.#createInput("textStyleDropShadowBlur", { type: "number", attributes: { step: 0.1, min: 0 }, defaultValue: 0 })
-                    ],
-                ]
-            }
-        ]);
-
-        this.propertyGroups.automation = LS.Create([
-            { tag: "h3", inner: "Automation", class: "property-editor-header" },
-            { class: "property-editor-group level-n1", inner: [
-                [{ tag: "span", inner: [{ tag: "i", class: "bi-toggles" }, { tag: "label", inner: " Enabled:" }] },
-                    this.#createInput("automationEnabled", {
-                        type: "checkbox", defaultValue: false
-                    })
-                ],
-
-                [{ tag: "span", inner: [{ tag: "i", class: "bi-123" }, { tag: "label", inner: " Starting value:" }] },
-                    this.#createInput("automationBaseValue", {
-                        type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0
-                    })
-                ],
-
-                [{ tag: "span", inner: [{ tag: "i", class: "bi-braces-asterisk" }, { tag: "label", inner: " Global mapping function:" }] },
-                    this.#createInput("automationFunction", {
-                        type: "text", defaultValue: "x",
-                        animatable: false,
-                        helpModal: this.__automationHelpModal = LS.Modal.build({
-                            title: "Mapping functions",
-                            content: [
-                                { tag: "p", style: "margin-top: 0", inner: "Mapping functions allow you to transform the automation value before applying it to the target property. You can use 'x' or 'input' to represent the input value (from the automation curve), and return a new value." },
-                                { tag: "ls-box", accent: "orange", class: "elevated", innerHTML: "Tip: Mapping functions are largely compatible with the <a href=\"https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_form.htm\" target=\"_blank\">FL Studio Mapping Formula</a>." },
-                                { tag: "p", inner: "Examples:" },
-                                { tag: "ul", style: "padding-left: 20px", inner: [
-                                    { tag: "li", inner: [{ tag: "code", inner: "x" }, " - Identity function (1:1)"] },
-                                    { tag: "li", inner: [{ tag: "code", inner: "x + 10" }, " - Adds 10 to the value (offset)"] },
-                                    { tag: "li", inner: [{ tag: "code", inner: "x * 2" }, " - Doubles the value (multiplier)"] },
-                                    { tag: "li", inner: [{ tag: "code", inner: "x * 2 + 10" }, " - Offset & multiplier"] },
-                                    { tag: "li", inner: [{ tag: "code", inner: "x / 2" }, " - Halves the value"] },
-                                    { tag: "li", inner: [{ tag: "code", inner: "sin(x)" }, " - Applies sine function to the value"] },
-                                    { tag: "li", inner: [{ tag: "code", inner: "sin(x * pi)" }, " - sin(x * pi)"] },
-                                    { tag: "li", inner: [{ tag: "code", inner: "1-x" }, " - Inverts the value"] },
-                                    { tag: "li", inner: [{ tag: "code", inner: "-x * 0.5" }, " - Negates and halves the value"] },
-                                    { tag: "li", inner: [{ tag: "code", inner: "!x" }, " - Flips a boolean value"] },
-                                    { tag: "li", inner: [{ tag: "code", inner: "case(ifl(x, 0.5), 0, 1)" }, " - If x is below 0.5, returns 0; otherwise, returns 1"] },
-                                ] },
-
-                                { tag: "p", inner: "Available operators:" },
-                                { tag: "div", style: "display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 4px; margin-top: 5px;", inner: [
-                                    "+", "-", "*", "/", "%", "^"
-                                ].map(f => ({ tag: "code", class: "example-chip", inner: f })) },
-
-                                { tag: "p", inner: "Available functions (hover for an example):" },
-                                { tag: "div", style: "display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 4px; margin-top: 5px;", inner: [
-                                    { name: "x", example: "x - Input from the automation curve" },
-                                    { name: "time", example: "time - Current project time in seconds" },
-                                    { name: "sin", example: "sin(x)" },
-                                    { name: "cos", example: "cos(x)" },
-                                    { name: "tan", example: "tan(x)" },
-                                    { name: "tg", example: "tg(x)" },
-                                    { name: "ctg", example: "ctg(x)" },
-                                    { name: "sec", example: "sec(x)" },
-                                    { name: "cosec", example: "cosec(x)" },
-                                    { name: "arcsin", example: "arcsin(x)" },
-                                    { name: "arccos", example: "arccos(x)" },
-                                    { name: "arctan", example: "arctan(x)" },
-                                    { name: "arctg", example: "arctg(x)" },
-                                    { name: "exp", example: "exp(x)" },
-                                    { name: "sqrt", example: "sqrt(x)" },
-                                    { name: "ln", example: "ln(x)" },
-                                    { name: "log10", example: "log10(x)" },
-                                    { name: "log2", example: "log2(x)" },
-                                    { name: "abs", example: "abs(x)" },
-                                    { name: "neg", example: "neg(x)" },
-                                    { name: "round", example: "round(x)" },
-                                    { name: "int", example: "int(x)" },
-                                    { name: "frac", example: "frac(x)" },
-                                    { name: "min", example: "min(x, 10)" },
-                                    { name: "max", example: "max(x, 10)" },
-                                    { name: "clamp", example: "clamp(x, 0, 1)" },
-                                    { name: "sum", example: "sum(x, 10, 5)" },
-                                    { name: "ife", example: "ife(a, b) - If equal" },
-                                    { name: "ifl", example: "ifl(a, b) - If less" },
-                                    { name: "ifg", example: "ifg(a, b) - If greater" },
-                                    { name: "ifle", example: "ifle(a, b) - If less or equal" },
-                                    { name: "ifge", example: "ifge(a, b) - If greater or equal" },
-                                    { name: "case", example: "case(a, b, c) - Case statement (returns b if a=1, else returns c)" },
-                                    { name: "pi", example: "pi - " + Math.PI },
-                                    { name: "e", example: "e - " + Math.E },
-                                    { name: "rand", example: "rand - Random number between 0 and 1" }
-                                ].map(f => ({ tag: "code", class: "example-chip", inner: f.name, tooltip: `Example: ${f.example}` })) }
-                            ],
-                            buttons: [{ label: "Close" }]
-                        })
-                    })
-                ],
-            ] },
-
-            { tag: "h3", inner: "Targets", class: "property-editor-header" },
-            {
-                class: "ls-table-wrap property-editor-table",
-                inner: [
-                    {
-                        tag: "table",
-                        inner: [
-                            { tag: "thead", inner: { tag: "tr", inner: [
-                                { tag: "th", inner: "Node" },
-                                { tag: "th", inner: "Property" },
-                                { tag: "th", inner: "Mapping Function" },
-                                { tag: "th", inner: "Is Relative" },
-                                { tag: "th", inner: "Action" }
-                            ] } },
-                            this.__automationTargetsBody = LS.Create({ tag: "tbody" })
-                        ]
-                    },
-                    {
-                        class: "ls-tfoot",
-                        role: "caption",
-                        inner: [
-                            { tag: "button", class: "add-button pill elevated", inner: [{ tag: "i", class: "bi-plus-lg" }, { tag: "span", inner: "Add target" }], onclick: () => this.linkingAutomationTarget() },
-                        ]
-                    }
-                ]
-            },
-
-            ... localStorage.getItem("show-automation-help") !== "false" ? [{ tag: "ls-box", class: "elevated margin-top-xlarge", inner: [
-                { tag: "h2", inner: "Getting started with automation clips" },
-                { tag: "p", style: "white-space: pre-wrap", innerHTML: "Automation clips allow you to animate one or more of any properties in any way you want.\n\nAutomation base value (x) ranges from 0 to 1, so you may want to use a mapping function to transform it. For booleans, 0 is <code>false</code>, anything above is <code>true</code>." },
-                { tag: "ul", style: "padding-left: 20px; margin-top: 5px", inner: [
-                    { tag: "li", inner: "First, connect the automation to a target (whatever you want to animate)" },
-                    { tag: "li", inner: "Then, draw the automation curve in your timeline (right-click to create a point, right click a point to see options)" },
-                    { tag: "li", inner: "Finally, you can add a mapping function to each target to modify how the value affects it" },
-                ] },
-                { tag: "p", inner: "You can also quickly make one by right-clicking the property you want to automate when editing any object." },
-                { tag: "button", inner: "What is a mapping function?", class: "pill elevated", style: "margin-top: 10px", onclick: () => { this.__automationHelpModal.open(); } },
-                { tag: "button", inner: "Don't show again", class: "pill elevated margin-left-small", style: "margin-top: 10px", onclick() {
-                    this.parentElement.remove();
-                    localStorage.setItem("show-automation-help", "false");
-                } }
-            ] }] : [],
-
-            { tag: "ls-box", class: "elevated margin-top-large", innerHTML: "Relative: value gets added on top of the original value.<br>Absolute: value replaces (sets) the value." }
-        ]);
-
-        // --- Handles
-
-        let startValue, min, max, input, step, precision;
-        this.__valueHandle = new LS.Util.TouchHandle(this.editorContainer, {
-            cursor: 'ew-resize',
-            pointerLock: true,
-
-            onStart(event) {
-                if (event.domEvent.target.tagName !== "INPUT" || event.domEvent.target.type !== "number" || (event.domEvent.type === "mousedown" && event.domEvent.button !== 0) || this.__addingTarget) return event.cancel();
-                input = event.domEvent.target;
-
-                startValue = Number(input.value);
-                input.focus();
-                input.select();
-                min = input.min !== "" ? Number(input.min) : -Infinity;
-                max = input.max !== "" ? Number(input.max) : Infinity;
-                step = input.step && input.step !== "any" ? Number(input.step) : 1;
-
-                // Calculate precision based on step
-                if (Math.floor(step) === step) precision = 0;
-                else {
-                    const str = step.toString();
-                    if (str.indexOf("e-") > -1) precision = parseInt(str.split("e-")[1]);
-                    else precision = str.split(".")[1]?.length || 0;
-                }
-            },
-
-            onMove(event) {
-                let modifier = 1;
-                if (event.domEvent) {
-                    if (event.domEvent.shiftKey) modifier = 10;
-                    if (event.domEvent.altKey) modifier = 0.1;
-                }
-
-                const delta = event.offsetX * step * modifier;
-                let newValue = startValue + delta;
-
-                newValue = Math.max(min, Math.min(max, newValue));
-
-                input.value = newValue.toFixed(precision);
-                input.dispatchEvent(new Event('input'));
-            },
-
-            onEnd() {
-                input = null;
-            }
-        });
-
-        // --- Context menu for inputs
-        this.__valueContextMenu = new LS.Menu({
-            items: [
-                { text: "Reset", icon: "bi-arrow-counterclockwise", action: () => {
-                    if(this.focusedInput) {
-                        this.focusedInput.input.value = this.focusedInput.defaultValue;
-                        this.focusedInput.input.dispatchEvent(new Event('input'));
-                    }
-                } },
-
-                { type: "separator" },
-
-                { text: "Copy value", icon: "bi-clipboard", action: () => {
-                    if(this.focusedInput) {
-                        navigator.clipboard.writeText(this.focusedInput.input.value);
-                    }
-                } },
-
-                { text: "Paste value", icon: "bi-clipboard-check", action: () => {
-                    if(this.focusedInput) {
-                        navigator.clipboard.readText().then(text => {
-                            this.focusedInput.input.value = text;
-                            this.focusedInput.input.dispatchEvent(new Event('input'));
-                        });
-                    }
-                } },
-
-                { type: "separator" },
-
-                this.__valueContextMenu_createAutomationButton = { text: "Create automation clip", icon: "bi-bezier2", action: () => {
-                    if(this.currentTarget && this.focusedInput) {
-                        if(!this.focusedInput.animatable) return;
-
-                        const propertyName = this.focusedInput.id;
-                        if(!propertyName) return;
-
-                        const timeline = this.#getAttachment()?.timeline;
-                        if(!timeline) return;
-
-                        const clip = {
-                            type: "automation",
-                            start: this.currentTarget.start || 0,
-                            duration: this.currentTarget.duration || 1,
-                            row: (this.currentTarget.row || 0) + 1,
-                            label: `${this.currentTarget.label || this.currentTarget.type || "Target"} - ${propertyName}`,
-                            color: "neon",
-                            data: {
-                                targets: [
-                                    { nodeId: this.currentTarget.id, property: propertyName }
-                                ],
-
-                                value: 0,
-                                points: []
-                            }
-                        }
-
-                        timeline.add(clip);
-                    }
-                } }
-            ]
-        });
-
-        // --- Tabs
-        this.editorContainer = LS.Create("ls-tab", { class: "property-editor-container" });
-
-        this.tabs.add("Editor", this.editorContainer);
+        this.tabs.add("Editor", this.editorContainer = LS.Create("ls-tab.property-editor-container"));
         this.tabs.add("Pipeline", LS.Create());
         this.tabs.add("Animation", LS.Create());
         this.tabs.add("Behavior", LS.Create());
         this.tabs.set(0);
 
+        // Setup (i separated it because the constructor became way too big)
+        this.#setupContextMenu();
+        this.#setupValueHandle();
+        this.#setupPropertyGroups();
+        this.#setupEditAid();
+
         this.container.appendChild(this.emptyMessage);
 
-        window.addEventListener("resize", this.__resizeListener = () => {
+        this.__resizeObserver = new ResizeObserver(() => {
             this.updateAidPosition();
         });
-
-        this.__resizeObserver = new ResizeObserver(this.__resizeListener);
         this.__resizeObserver.observe(this.container);
 
-        this.frameScheduler = new LS.Util.FrameScheduler(() => {
-            this.#render();
-        });
+        this.frameScheduler = new LS.Util.FrameScheduler(() => this.#render());
     }
+
 
     /**
      * Set the current target to edit
@@ -680,14 +77,14 @@ class PropertyEditorView extends LS.Multipane.View {
     setTarget(target) {
         if(!target) {
             this.tabContainer.remove();
-            this.container.innerHTML = "";
+            this.container.replaceChildren();
             this.container.appendChild(this.emptyMessage);
             this.currentTarget = null;
             this.__editAid.remove();
             return;
         }
 
-        this.editorContainer.innerHTML = "";
+        this.editorContainer.replaceChildren();
         this.editorContainer.appendChild(this.propertyGroups.general);
 
         this.currentTarget = target;
@@ -700,12 +97,7 @@ class PropertyEditorView extends LS.Multipane.View {
 
         this.targetNodeIsVisual = false;
         switch(target.type) {
-            case "sprite":
-            case "text":
-            case "graphics":
-            case "container":
-            case "graphics":
-            case "video":
+            case "sprite": case "text": case "graphics": case "container": case "graphics": case "video":
                 this.targetNodeIsVisual = true;
 
                 for(const prop of ["positionX", "positionY", "scaleX", "scaleY", "scaleZ", "rotationX", "rotationY", "rotationZ", "anchorX", "anchorY", "opacity", "visible", "blendMode", "tint", "skewX", "skewY"]) {
@@ -724,6 +116,10 @@ class PropertyEditorView extends LS.Multipane.View {
 
                 if(target.type === "sprite" || target.type === "video") {
                     this.editorContainer.appendChild(this.propertyGroups.source);
+                }
+
+                if(target.type === "video") {
+                    this.editorContainer.appendChild(this.propertyGroups.video);
                 }
 
                 this.editorContainer.appendChild(this.propertyGroups.rendering);
@@ -822,6 +218,7 @@ class PropertyEditorView extends LS.Multipane.View {
                 if(!this.__editAidHandle) this.__editAidHandle = new LS.Util.TouchHandle(previewContainer, {
                     cursor: 'move',
                     exclude: ".ls-resize-handle",
+                    pointerlock: true,
 
                     onStart: (event) => {
                         if (!this.currentTarget || !this.currentTarget.node) return event.cancel();
@@ -931,7 +328,6 @@ class PropertyEditorView extends LS.Multipane.View {
         if(hasDefault || inputObject.helpModal) {            
             inputObject.container = LS.Create({
                 class: "input-with-reset",
-                style: "display: flex; align-items: center; min-width: 0;",
                 inner: [ inputObject.container || inputObject.input ]
             });
 
@@ -1126,7 +522,679 @@ class PropertyEditorView extends LS.Multipane.View {
         this.frameScheduler.schedule();
     }
 
+    // --- Setup methods
+
+    // -- Context menu for all inputs
+    #setupContextMenu() {
+        this.__valueContextMenu = new LS.Menu({
+            items: [
+                { text: "Reset", icon: "bi-arrow-counterclockwise", action: () => {
+                    if(this.focusedInput) {
+                        this.focusedInput.input.value = this.focusedInput.defaultValue;
+                        this.focusedInput.input.dispatchEvent(new Event('input'));
+                    }
+                } },
+
+                { type: "separator" },
+
+                { text: "Copy value", icon: "bi-clipboard", action: () => {
+                    if(this.focusedInput) {
+                        navigator.clipboard.writeText(this.focusedInput.input.value);
+                    }
+                } },
+
+                { text: "Paste value", icon: "bi-clipboard-check", action: () => {
+                    if(this.focusedInput) {
+                        navigator.clipboard.readText().then(text => {
+                            this.focusedInput.input.value = text;
+                            this.focusedInput.input.dispatchEvent(new Event('input'));
+                        });
+                    }
+                } },
+
+                { type: "separator" },
+
+                this.__valueContextMenu_createAutomationButton = { text: "Create automation clip", icon: "bi-bezier2", action: () => {
+                    if(this.currentTarget && this.focusedInput) {
+                        if(!this.focusedInput.animatable) return;
+
+                        const propertyName = this.focusedInput.id;
+                        if(!propertyName) return;
+
+                        const timeline = this.#getAttachment()?.timeline;
+                        if(!timeline) return;
+
+                        const clip = {
+                            type: "automation",
+                            start: this.currentTarget.start || 0,
+                            duration: this.currentTarget.duration || 1,
+                            row: (this.currentTarget.row || 0) + 1,
+                            label: `${this.currentTarget.label || this.currentTarget.type || "Target"} - ${propertyName}`,
+                            color: "neon",
+                            data: {
+                                targets: [
+                                    { nodeId: this.currentTarget.id, property: propertyName }
+                                ],
+
+                                value: 0,
+                                points: []
+                            }
+                        }
+
+                        timeline.add(clip);
+                    }
+                } }
+            ]
+        });
+    }
+
+    // -- Handle for dragging on number inputs
+    #setupValueHandle() {
+        let startValue, min, max, input, step, precision;
+        console.log("Setting up value handle", this.editorContainer);
+        
+        this.__valueHandle = new LS.Util.TouchHandle(this.editorContainer, {
+            cursor: 'ew-resize',
+            pointerLock: true,
+            buttons: [0],
+
+            onStart(event) {
+                console.log(event.domEvent.target);
+                
+                if (event.domEvent.target.tagName !== "INPUT" || event.domEvent.target.type !== "number" || (event.domEvent.type === "mousedown" && event.domEvent.button !== 0) || this.__addingTarget) return event.cancel();
+                input = event.domEvent.target;
+
+                startValue = Number(input.value);
+                input.focus();
+                input.select();
+                min = input.min !== "" ? Number(input.min) : -Infinity;
+                max = input.max !== "" ? Number(input.max) :  Infinity;
+                step = input.step && input.step !== "any" ? Number(input.step) : 1;
+
+                // Calculate precision based on step
+                if (Math.floor(step) === step) precision = 0;
+                else {
+                    const str = step.toString();
+                    if (str.indexOf("e-") > -1) precision = parseInt(str.split("e-")[1]);
+                    else precision = str.split(".")[1]?.length || 0;
+                }
+            },
+
+            onMove(event) {
+                let modifier = 1;
+                if (event.domEvent) {
+                    if (event.domEvent.shiftKey) modifier = 10;
+                    if (event.domEvent.altKey) modifier = 0.1;
+                }
+
+                const delta = event.offsetX * step * modifier;
+                let newValue = startValue + delta;
+
+                newValue = Math.max(min, Math.min(max, newValue));
+
+                input.value = newValue.toFixed(precision);
+                input.dispatchEvent(new Event('input'));
+            },
+
+            onEnd() {
+                input = null;
+            }
+        });
+    }
+
+    // -- Property groups & inputs
+    #setupPropertyGroups() {
+        this.propertyGroups.general = LS.Create([
+            { tag: "h3", i18n: "properties.general", text: "General", class: "property-editor-header" },
+            {
+                class: "property-editor-group level-n1", inner: [
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-tag" }, { tag: "label", i18n: "properties.label", text: " Label:" }] }, this.__labelInput = LS.Create({
+                        tag: "input", type: "text", class: "property-editor-name-input", oninput: () => {
+                            if (this.currentTarget) {
+                                this.currentTarget.label = this.__labelInput.value;
+                                this.#updateTimeline();
+                            }
+                        }
+                    })],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette2" }, { tag: "label", i18n: "properties.tileColor", text: " Tile color:" }] }, this.#createInput("tileColor", {
+                        type: "select",
+                        animatable: false,
+                        defaultValue: "",
+                        options: [
+                            { value: "", text: "Default" },
+                            { value: "white", text: "White" },
+                            { value: "blue", text: "Blue" },
+                            { value: "pastel-indigo", text: "Pastel Indigo" },
+                            { value: "lapis", text: "Lapis" },
+                            { value: "pastel-teal", text: "Pastel Teal" },
+                            { value: "aquamarine", text: "Aquamarine" },
+                            { value: "green", text: "Green" },
+                            { value: "lime", text: "Lime" },
+                            { value: "neon", text: "Neon" },
+                            { value: "yellow", text: "Yellow" },
+                            { value: "orange", text: "Orange" },
+                            { value: "deep-orange", text: "Deep Orange" },
+                            { value: "red", text: "Red" },
+                            { value: "rusty-red", text: "Rusty Red" },
+                            { value: "pink", text: "Pink" },
+                            { value: "hotpink", text: "Hotpink" },
+                            { value: "purple", text: "Purple" },
+                            { value: "soap", text: "Soap" },
+                            { value: "burple", text: "Burple" }
+                        ]
+                    })],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-stopwatch" }, { tag: "label", i18n: "properties.duration", text: " Duration (s):" }] }, this.#createInput("clipDuration", {
+                        animatable: false, type: "number", attributes: { min: 0.1, step: 0.1 }, defaultValue: 5, onchange: () => {
+                            this.#updateTimeline();
+                    }})],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-align-start" }, { tag: "label", i18n: "properties.start", text: " Start (s):" }] }, this.#createInput("clipStartTime", {
+                        animatable: false, type: "number", attributes: { min: 0, step: 0.1 }, defaultValue: 0, onchange: () => {
+                            this.#updateTimeline();
+                    }})],
+                ]
+            },
+        ]);
+
+        this.propertyGroups.transform = LS.Create([
+            { tag: "h3", i18n: "properties.transform", text: "Transform", class: "property-editor-header" },
+            {
+                class: "property-editor-group level-n1", inner: [
+                    // Position Group
+                    [
+                        { tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", i18n: "properties.position", text: " Position:" }] },
+                        {
+                            class: "input-group", inner: [
+                                { tag: "label", inner: "X", class: "input-label-small" },
+                                this.#createInput("positionX", { type: "number", attributes: { step: 1 }, defaultValue: 0 }),
+                                { tag: "label", inner: "Y", class: "input-label-small" },
+                                this.#createInput("positionY", { type: "number", attributes: { step: 1 }, defaultValue: 0 }),
+                                { tag: "label", inner: "Z", class: "input-label-small" },
+                                this.#createInput("positionZ", { type: "number", attributes: { step: 1 }, defaultValue: 0 })
+                            ]
+                        }
+                    ],
+                    // Scale Group
+                    [
+                        { tag: "span", inner: [{ tag: "i", class: "bi-aspect-ratio" }, { tag: "label", i18n: "properties.scale", text: " Scale:" }] },
+                        {
+                            class: "input-group", inner: [
+                                { tag: "label", inner: "X", class: "input-label-small" },
+                                this.#createInput("scaleX", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 }),
+                                { tag: "label", inner: "Y", class: "input-label-small" },
+                                this.#createInput("scaleY", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 }),
+                                { tag: "label", inner: "Z", class: "input-label-small" },,
+                                this.#createInput("scaleZ", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 })
+                            ]
+                        }
+                    ],
+                    // Rotation
+                    [
+                        { tag: "span", inner: [{ tag: "i", class: "bi-arrow-clockwise" }, { tag: "label", i18n: "properties.rotation", text: " Rotation:" }] },
+                        {
+                            class: "input-group", inner: [
+                                { tag: "label", inner: "X", class: "input-label-small" },
+                                this.#createInput("rotationX", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
+                                { tag: "label", inner: "Y", class: "input-label-small" },
+                                this.#createInput("rotationY", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
+                                { tag: "label", inner: "Z", class: "input-label-small" },
+                                this.#createInput("rotationZ", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 })
+                            ]
+                        }
+                    ],
+                    // Skew Group
+                    [
+                        { tag: "span", inner: [{ tag: "i", class: "bi-slash-square" }, { tag: "label", i18n: "properties.skew", text: " Skew:" }] },
+                        {
+                            class: "input-group", inner: [
+                                { tag: "label", inner: "X", class: "input-label-small" },
+                                this.#createInput("skewX", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
+                                { tag: "label", inner: "Y", class: "input-label-small" },
+                                this.#createInput("skewY", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 })
+                            ]
+                        }
+                    ],
+                    // Anchor Group
+                    [
+                        { tag: "span", inner: [{ tag: "i", class: "bi-pin-angle" }, { tag: "label", i18n: "properties.anchor", text: " Anchor:" }] },
+                        {
+                            class: "input-group", inner: [
+                                { tag: "label", inner: "X", class: "input-label-small" },
+                                this.#createInput("anchorX", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0 }),
+                                { tag: "label", inner: "Y", class: "input-label-small" },
+                                this.#createInput("anchorY", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0 })
+                            ]
+                        }
+                    ],
+                ]
+            },
+        ]);
+
+        this.propertyGroups.rendering = LS.Create([
+            { tag: "h3", i18n: "properties.rendering", text: "Rendering", class: "property-editor-header" },
+            {
+                class: "property-editor-group level-n1", inner: [
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-eye-slash" }, { tag: "label", i18n: "properties.visible", text: " Visible:" }] },
+                        this.#createInput("visible", { type: "checkbox", defaultValue: true })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette-fill" }, { tag: "label", i18n: "properties.tint", text: " Color:" }] },
+                        this.#createInput("tint", { type: "color", defaultValue: "#ffffff" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-circle-half" }, { tag: "label", i18n: "properties.opacity", text: " Opacity:" }] },
+                        this.#createInput("opacity", { type: "number", attributes: { min: 0, max: 1, step: 0.05 }, defaultValue: 1 })
+                    ],
+                    
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-shadows" }, { tag: "label", i18n: "properties.castShadow", text: " Cast shadows:" }] },
+                        this.#createInput("castShadow", { type: "checkbox", defaultValue: false })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-shadows" }, { tag: "label", i18n: "properties.receiveShadow", text: " Receive shadows:" }] },
+                        this.#createInput("receiveShadow", { type: "checkbox", defaultValue: false })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-bounding-box-circles" }, { tag: "label", i18n: "properties.wireframe", text: " Wireframe:" }] },
+                        this.#createInput("wireframe", { type: "checkbox", defaultValue: false })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-circle-half" }, { tag: "label", i18n: "properties.blendMode", text: " Blend mode:" }] },
+                        this.#createInput("blendMode", {
+                            type: "select",
+                            options: [
+                                { value: "normal", text: "Normal" },
+                                { value: "add", text: "Additive" },
+                                { value: "multiply", text: "Multiply" },
+                                { value: "screen", text: "Screen" },
+                                { value: "overlay", text: "Overlay" },
+                                { value: "darken", text: "Darken" },
+                                { value: "lighten", text: "Lighten" }
+                            ],
+                        })
+                    ],
+                ]
+            },
+
+            { tag: "ls-box", class: "elevated", i18n: "properties.effectsTip", text: "TIP: For more effects, advanced blend modes and filters see the pipeline tab." }
+        ]);
+
+        this.propertyGroups.source = LS.Create([
+            { tag: "h3", i18n: "properties.source", text: "Source / Media / Material", class: "property-editor-header" },
+            {
+                class: "property-editor-group level-n1", inner: [
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-highlights" }, { tag: "label", i18n: "properties.material", text: " Material:" }] },
+                        this.#createInput("material", { type: "resource", defaultValue: "", callback: (v) => this.#updateProp({ url: v }) })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-link-45deg" }, { tag: "label", i18n: "properties.sourceUrl", text: " Media:" }] },
+                        this.#createInput("sourceUrl", { type: "resource", defaultValue: "", callback: (v) => this.#updateProp({ url: v }) })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-aspect-ratio" }, { tag: "label", i18n: "properties.sourceFitMode", text: " Fit mode:" }] },
+                        this.#createInput("sourceFitMode", {
+                            type: "select",
+                            options: [
+                                { value: "contain", text: "Contain" },
+                                { value: "cover",   text: "Cover"   },
+                                { value: "stretch", text: "Stretch" },
+                                { value: "none",    text: "None"    }
+                            ],
+                        })
+                    ],
+                ]
+            }
+        ]);
+
+        this.propertyGroups.audio = LS.Create([
+            { tag: "h3", i18n: "properties.audio", text: "Audio", class: "property-editor-header" },
+            {
+                class: "property-editor-group level-n1", inner: [
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-volume-up" }, { tag: "label", i18n: "properties.volume", text: " Volume:" }] },
+                        this.#createInput("audioVolume", { type: "number", inputType: "knob", attributes: { min: 0, max: 100, step: 0.05 }, defaultValue: 100 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-speaker" }, { tag: "label", i18n: "properties.audioPan", text: " Pan:" }] },
+                        this.#createInput("audioPan", { type: "number", inputType: "knob", attributes: { min: -1, max: 1, step: 0.05 }, defaultValue: 0 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-alignment-baseline" }, { tag: "label", i18n: "properties.playbackRate", text: " Playback rate:" }] },
+                        this.#createInput("audioPlaybackRate", { type: "number", inputType: "knob", attributes: { min: 0.1, step: 0.1 }, defaultValue: 1 })
+                    ],
+                ]
+            },
+
+            { tag: "ls-box", class: "elevated", i18n: "properties.audioTip", text: "TIP: For more audio effects and options, see the pipeline tab." }
+        ]);
+
+        this.propertyGroups.video = LS.Create([
+            { tag: "h3", i18n: "properties.video", text: "Video", class: "property-editor-header" },
+            {
+                class: "property-editor-group level-n1", inner: [
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-film" }, { tag: "label", i18n: "properties.playbackRateDirection", text: " Playback rate/direction:" }] },
+                        this.#createInput("videoPlaybackRate", { type: "number", inputType: "number", attributes: { min: -10, max: 10, step: 0.1 }, defaultValue: 1 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-display" }, { tag: "label", i18n: "properties.frameRateLimit", text: " Frame rate limit:" }] },
+                        this.#createInput("videoFrameRate", { type: "number", inputType: "number", attributes: { min: -1, max: 960, step: 0.1 }, defaultValue: -1 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-stopwatch" }, { tag: "label", i18n: "properties.offset", text: " Start offset:" }] },
+                        this.#createInput("videoOffset", { type: "number", inputType: "number", attributes: { min: 0, step: 0.1 }, defaultValue: 0 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-repeat-1" }, { tag: "label", i18n: "properties.loop", text: " Loop:" }] },
+                        this.#createInput("videoLoop", { type: "checkbox", defaultValue: false })
+                    ],
+                ]
+            }
+        ]);
+
+        this.propertyGroups.text = LS.Create([
+            { tag: "h3", i18n: "properties.text", text: "Text", class: "property-editor-header" },
+            {
+                class: "property-editor-group level-n1", inner: [
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-fonts" }, { tag: "label", i18n: "properties.textContent", text: " Content:" }] },
+                        this.#createInput("textContent", { type: "text", defaultValue: "Some text" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-type-bold" }, { tag: "label", i18n: "properties.textStyleWeight", text: " Font weight:" }] },
+                        this.#createInput("textStyleWeight", {
+                            type: "select",
+                            defaultValue: "400",
+                            options: [
+                                { value: "100", text: "Thin (100)" },
+                                { value: "200", text: "Extra Light (200)" },
+                                { value: "300", text: "Light (300)" },
+                                { value: "400", text: "Normal (400)" },
+                                { value: "500", text: "Medium (500)" },
+                                { value: "600", text: "Semi Bold (600)" },
+                                { value: "700", text: "Bold (700)" },
+                                { value: "800", text: "Extra Bold (800)" },
+                                { value: "900", text: "Black (900)" }
+                            ],
+                        })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-type-italic" }, { tag: "label", inner: " Font style:" }] },
+                        this.#createInput("textStyleStyle", {
+                            type: "select",
+                            options: [
+                                { value: "normal", text: "Normal" },
+                                { value: "italic", text: "Italic" },
+                                { value: "oblique", text: "Oblique" }
+                            ],
+                        })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-paragraph" }, { tag: "label", inner: " Font size:" }] },
+                        this.#createInput("textStyleFontSize", { type: "number", attributes: { step: 1 }, defaultValue: 24 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-fonts" }, { tag: "label", inner: " Font family:" }] },
+                        this.#createInput("textStyleFontFamily", { type: "text", defaultValue: "Arial" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-left" }, { tag: "label", inner: " Alignment:" }] },
+                        this.#createInput("textStyleAlignment", {
+                            type: "select",
+                            options: [
+                                { value: "left", text: "Left" },
+                                { value: "center", text: "Center" },
+                                { value: "right", text: "Right" }
+                            ],
+                        })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette-fill" }, { tag: "label", inner: " Color:" }] },
+                        this.#createInput("textStyleFill", { type: "color", defaultValue: "#ffffff" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-layout-text-sidebar-reverse" }, { tag: "label", inner: " Line height:" }] },
+                        this.#createInput("textStyleLineHeight", { type: "number", attributes: { step: 0.1, min: 0.1 }, defaultValue: 1.2 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-wrap" }, { tag: "label", inner: " Wrap width:" }] },
+                        this.#createInput("textStyleWrapWidth", { type: "number", attributes: { step: 1, min: 0 }, defaultValue: 200 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-paragraph" }, { tag: "label", inner: " Letter spacing:" }] },
+                        this.#createInput("textStyleLetterSpacing", { type: "number", attributes: { step: 0.1 }, defaultValue: 0 })
+                    ],
+                    
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-wrap" }, { tag: "label", inner: " Word wrap:" }] },
+                        this.#createInput("textStyleWrap", { type: "checkbox", defaultValue: true })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-border-style" }, { tag: "label", inner: " Stroke:" }] },
+                        this.#createInput("textStyleStroke", { type: "color", defaultValue: "#000000" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-border-width" }, { tag: "label", inner: " Stroke thickness:" }] },
+                        this.#createInput("textStyleStrokeThickness", { type: "number", attributes: { step: 1, min: 0 }, defaultValue: 0 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-paragraph" }, { tag: "label", inner: " Stroke line join:" }] },
+                        this.#createInput("textStyleStrokeLinejoin", {
+                            type: "select",
+                            options: [
+                                { value: "miter", text: "Miter" },
+                                { value: "round", text: "Round" },
+                                { value: "bevel", text: "Bevel" }
+                            ],
+                        })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-shadows" }, { tag: "label", inner: " Drop shadow:" }] },
+                        this.#createInput("textStyleDropShadow", { type: "checkbox", defaultValue: false })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette" }, { tag: "label", inner: " Shadow color:" }] },
+                        this.#createInput("textStyleDropShadowColor", { type: "color", defaultValue: "#000000" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-circle-half" }, { tag: "label", inner: " Shadow opacity:" }] },
+                        this.#createInput("textStyleDropShadowOpacity", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0.5 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-arrows-angle-expand" }, { tag: "label", inner: " Shadow angle:" }] },
+                        this.#createInput("textStyleDropShadowAngle", { type: "number", inputType: "angle", attributes: { step: 0.1 }, defaultValue: Math.PI / 6 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-distribute-vertical" }, { tag: "label", inner: " Shadow distance:" }] },
+                        this.#createInput("textStyleDropShadowDistance", { type: "number", attributes: { step: 1 }, defaultValue: 5 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-droplet-half" }, { tag: "label", inner: " Shadow blur:" }] },
+                        this.#createInput("textStyleDropShadowBlur", { type: "number", attributes: { step: 0.1, min: 0 }, defaultValue: 0 })
+                    ],
+                ]
+            }
+        ]);
+
+        this.propertyGroups.automation = LS.Create([
+            { tag: "h3", i18n: "properties.automation", text: "Automation", class: "property-editor-header" },
+            { class: "property-editor-group level-n1", inner: [
+                [{ tag: "span", inner: [{ tag: "i", class: "bi-toggles" }, { tag: "label", i18n: "properties.automationEnabled", text: " Enabled:" }] },
+                    this.#createInput("automationEnabled", {
+                        type: "checkbox", defaultValue: false
+                    })
+                ],
+
+                [{ tag: "span", inner: [{ tag: "i", class: "bi-123" }, { tag: "label", i18n: "properties.automationBaseValue", text: " Starting value:" }] },
+                    this.#createInput("automationBaseValue", {
+                        type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0
+                    })
+                ],
+
+                [{ tag: "span", inner: [{ tag: "i", class: "bi-braces-asterisk" }, { tag: "label", i18n: "properties.automationFunction", text: " Global mapping function:" }] },
+                    this.#createInput("automationFunction", {
+                        type: "text", defaultValue: "x",
+                        animatable: false,
+                        helpModal: this.__automationHelpModal = LS.Modal.build({
+                            title: "Mapping functions",
+                            content: [
+                                { tag: "p", style: "margin-top: 0", inner: "Mapping functions allow you to transform the automation value before applying it to the target property. You can use 'x' or 'input' to represent the input value (from the automation curve), and return a new value." },
+                                { tag: "ls-box", accent: "orange", class: "elevated", innerHTML: "Tip: Mapping functions are largely compatible with the <a href=\"https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_form.htm\" target=\"_blank\">FL Studio Mapping Formula</a>." },
+                                { tag: "p", inner: "Examples:" },
+                                { tag: "ul", style: "padding-left: 20px", inner: [
+                                    { tag: "li", inner: [{ tag: "code", inner: "x" }, " - Identity function (1:1)"] },
+                                    { tag: "li", inner: [{ tag: "code", inner: "x + 10" }, " - Adds 10 to the value (offset)"] },
+                                    { tag: "li", inner: [{ tag: "code", inner: "x * 2" }, " - Doubles the value (multiplier)"] },
+                                    { tag: "li", inner: [{ tag: "code", inner: "x * 2 + 10" }, " - Offset & multiplier"] },
+                                    { tag: "li", inner: [{ tag: "code", inner: "x / 2" }, " - Halves the value"] },
+                                    { tag: "li", inner: [{ tag: "code", inner: "sin(x)" }, " - Applies sine function to the value"] },
+                                    { tag: "li", inner: [{ tag: "code", inner: "sin(x * pi)" }, " - sin(x * pi)"] },
+                                    { tag: "li", inner: [{ tag: "code", inner: "1-x" }, " - Inverts the value"] },
+                                    { tag: "li", inner: [{ tag: "code", inner: "-x * 0.5" }, " - Negates and halves the value"] },
+                                    { tag: "li", inner: [{ tag: "code", inner: "!x" }, " - Flips a boolean value"] },
+                                    { tag: "li", inner: [{ tag: "code", inner: "case(ifl(x, 0.5), 0, 1)" }, " - If x is below 0.5, returns 0; otherwise, returns 1"] },
+                                ] },
+
+                                { tag: "p", inner: "Available operators:" },
+                                { tag: "div", style: "display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 4px; margin-top: 5px;", inner: [
+                                    "+", "-", "*", "/", "%", "^"
+                                ].map(f => ({ tag: "code", class: "example-chip", inner: f })) },
+
+                                { tag: "p", inner: "Available functions (hover for an example):" },
+                                { tag: "div", style: "display: grid; grid-template-columns: repeat(auto-fill, minmax(60px, 1fr)); gap: 4px; margin-top: 5px;", inner: [
+                                    { name: "x", example: "x - Input from the automation curve" },
+                                    { name: "time", example: "time - Current project time in seconds" },
+                                    { name: "sin", example: "sin(x)" },
+                                    { name: "cos", example: "cos(x)" },
+                                    { name: "tan", example: "tan(x)" },
+                                    { name: "tg", example: "tg(x)" },
+                                    { name: "ctg", example: "ctg(x)" },
+                                    { name: "sec", example: "sec(x)" },
+                                    { name: "cosec", example: "cosec(x)" },
+                                    { name: "arcsin", example: "arcsin(x)" },
+                                    { name: "arccos", example: "arccos(x)" },
+                                    { name: "arctan", example: "arctan(x)" },
+                                    { name: "arctg", example: "arctg(x)" },
+                                    { name: "exp", example: "exp(x)" },
+                                    { name: "sqrt", example: "sqrt(x)" },
+                                    { name: "ln", example: "ln(x)" },
+                                    { name: "log10", example: "log10(x)" },
+                                    { name: "log2", example: "log2(x)" },
+                                    { name: "abs", example: "abs(x)" },
+                                    { name: "neg", example: "neg(x)" },
+                                    { name: "round", example: "round(x)" },
+                                    { name: "int", example: "int(x)" },
+                                    { name: "frac", example: "frac(x)" },
+                                    { name: "min", example: "min(x, 10)" },
+                                    { name: "max", example: "max(x, 10)" },
+                                    { name: "clamp", example: "clamp(x, 0, 1)" },
+                                    { name: "sum", example: "sum(x, 10, 5)" },
+                                    { name: "ife", example: "ife(a, b) - If equal" },
+                                    { name: "ifl", example: "ifl(a, b) - If less" },
+                                    { name: "ifg", example: "ifg(a, b) - If greater" },
+                                    { name: "ifle", example: "ifle(a, b) - If less or equal" },
+                                    { name: "ifge", example: "ifge(a, b) - If greater or equal" },
+                                    { name: "case", example: "case(a, b, c) - Case statement (returns b if a=1, else returns c)" },
+                                    { name: "pi", example: "pi - " + Math.PI },
+                                    { name: "e", example: "e - " + Math.E },
+                                    { name: "rand", example: "rand - Random number between 0 and 1" }
+                                ].map(f => ({ tag: "code", class: "example-chip", inner: f.name, tooltip: `Example: ${f.example}` })) }
+                            ],
+                            buttons: [{ label: "Close" }]
+                        })
+                    })
+                ],
+            ] },
+
+            { tag: "h3", inner: "Targets", class: "property-editor-header" },
+            {
+                class: "ls-table-wrap property-editor-table",
+                inner: [
+                    {
+                        tag: "table",
+                        inner: [
+                            { tag: "thead", inner: { tag: "tr", inner: [
+                                { tag: "th", inner: "Node" },
+                                { tag: "th", inner: "Property" },
+                                { tag: "th", inner: "Mapping Function" },
+                                { tag: "th", inner: "Is Relative" },
+                                { tag: "th", inner: "Action" }
+                            ] } },
+                            this.__automationTargetsBody = LS.Create({ tag: "tbody" })
+                        ]
+                    },
+                    {
+                        class: "ls-tfoot",
+                        role: "caption",
+                        inner: [
+                            { tag: "button", class: "add-button pill elevated", inner: [{ tag: "i", class: "bi-plus-lg" }, { tag: "span", inner: "Add target" }], onclick: () => this.linkingAutomationTarget() },
+                        ]
+                    }
+                ]
+            },
+
+            ... localStorage.getItem("show-automation-help") !== "false" ? [{ tag: "ls-box", class: "elevated margin-top-xlarge", inner: [
+                { tag: "h2", inner: "Getting started with automation clips" },
+                { tag: "p", style: "white-space: pre-wrap", innerHTML: "Automation clips allow you to animate one or more of any properties in any way you want.\n\nAutomation base value (x) ranges from 0 to 1, so you may want to use a mapping function to transform it. For booleans, 0 is <code>false</code>, anything above is <code>true</code>." },
+                { tag: "ul", style: "padding-left: 20px; margin-top: 5px", inner: [
+                    { tag: "li", inner: "First, connect the automation to a target (whatever you want to animate)" },
+                    { tag: "li", inner: "Then, draw the automation curve in your timeline (right-click to create a point, right click a point to see options)" },
+                    { tag: "li", inner: "Finally, you can add a mapping function to each target to modify how the value affects it" },
+                ] },
+                { tag: "p", inner: "You can also quickly make one by right-clicking the property you want to automate when editing any object." },
+                { tag: "button", inner: "What is a mapping function?", class: "pill elevated", style: "margin-top: 10px", onclick: () => { this.__automationHelpModal.open(); } },
+                { tag: "button", inner: "Don't show again", class: "pill elevated margin-left-small", style: "margin-top: 10px", onclick() {
+                    this.parentElement.remove();
+                    localStorage.setItem("show-automation-help", "false");
+                } }
+            ] }] : [],
+
+            { tag: "ls-box", class: "elevated margin-top-large", innerHTML: "Relative: value gets added on top of the original value.<br>Absolute: value replaces (sets) the value." }
+        ]);
+    }
+
+    // -- Edit aid (moving and resizing objects in preview)
+    #setupEditAid() {
+        this.__editAid = LS.Create({
+            class: "editAid",
+        });
+
+        // Edit aid resize handles
+        const aidResizerEntry = LS.Resize.set(this.__editAid, {
+            sides: true,
+            corners: true,
+            translate: true
+        });
+
+        aidResizerEntry.handler.on("resize", (side, width, height, leftOffset, topOffset, state) => {
+            if(!this.currentTarget) return;
+
+            const project = this.#getProject();
+            const preview = project?.connectedViews.get("videoPreview");
+            if(preview) {
+                const contained = preview.getContainedCoords();
+                // TODO:
+                const isContainer = false// this.currentTarget.node.constructor === PIXI.Container;
+                width /= contained.scale;
+                height /= contained.scale;
+
+                // TODO: w/h system for THREE (well, all) objects
+                this.#updateProp("scaleX", width / (isContainer ? 1 : this.currentTarget.node?.bounds?.width ?? 1));
+                this.#updateProp("scaleY", height / (isContainer ? 1 : this.currentTarget.node?.bounds?.height ?? 1));
+
+                if(side.toLowerCase().includes("left") || side.toLowerCase().includes("top")) {
+                    this.#updateProp("positionX", (leftOffset - contained.left) / contained.scale);
+                    this.#updateProp("positionY", (topOffset - contained.top) / contained.scale);
+                }
+            }
+        });
+        
+        aidResizerEntry.handler.on("resize-end", () => {
+            if(!this.currentTarget) return;
+            this.updateAidPosition();
+        });
+    }
+
     destroy() {
+        if(this.destroyed) return;
+
         if(this.__valueHandle) {
             this.__valueHandle.destroy();
             this.__valueHandle = null;
@@ -1166,9 +1234,6 @@ class PropertyEditorView extends LS.Multipane.View {
 
         this.__automationHelpModal?.destroy();
         this.__automationHelpModal = null;
-
-        window.removeEventListener("resize", this.__resizeListener);
-        this.__resizeListener = null;
 
         if(this.__editAidZoomHandler) {
             const connectedPreview = this.#getProject()?.connectedViews.get("videoPreview");

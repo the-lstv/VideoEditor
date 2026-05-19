@@ -55,7 +55,11 @@ if(typeof require !== "undefined") {
 }
 
 class Resource {
-    constructor(options) {
+    constructor(options, resourceManager) {
+        if(!(resourceManager instanceof ResourceManager)) {
+            throw new Error("Resource.constructor: resourceManager must be an instance of ResourceManager");
+        }
+
         this.id = options.id || LS.Misc.uid();
         this.path = options.path || this.id;
         this.folderName = options.folderName || null;
@@ -69,15 +73,33 @@ class Resource {
 
         // Cache for related loaded assets (textures, audio buffers, etc.)
         this.assets = {};
+
+        this.resourceManager = resourceManager;
     }
 
     getURI() {
         if(this.isExternal) {
-            return "file://" + this.path;
+            return "file://" + this.fullPath;
         }
 
         // For embedded resources, we need to get an object URL
         // ! todo
+    }
+
+    get fullPath() {
+        if(this.destroyed) throw new Error("Resource.fullPath: resource is destroyed");
+
+        if(this.folderName) {
+            const folder = this.resourceManager.projectFolders.get(this.folderName);
+            if(folder) {
+                return path.join(folder.path, this.path);
+            } else {
+                console.warn("Resource.fullPath: folder not found for resource", this);
+                return this.path;
+            }
+        }
+
+        return this.path;
     }
 
     async getTexture() {
@@ -96,12 +118,12 @@ class Resource {
     }
 
     getVideoDecoder() {
-        if(this.type !== "video") {
-            throw new Error("Resource.getVideoDecoder: resource is not a video");
-        }
-
         if(this.assets.videoDecoder) {
             return this.assets.videoDecoder;
+        }
+
+        if(this.type !== "video") {
+            throw new Error("Resource.getVideoDecoder: resource is not a video");
         }
 
         // Create a new video decoder for this resource
@@ -118,6 +140,24 @@ class Resource {
         // ...
     }
 
+    async readAsArrayBuffer() {
+        if(this.isExternal) {
+            return await fs.promises.readFile(this.fullPath);
+        }
+
+        // For embedded resources
+        // ! todo
+    }
+
+    async readAsText() {
+        if(this.isExternal) {
+            return await fs.promises.readFile(this.fullPath, "utf-8");
+        }
+
+        // For embedded resources
+        // ! todo
+    }
+
     export() {
         return {
             id: this.id,
@@ -130,13 +170,17 @@ class Resource {
     }
 
     destroy() {
+        if(this.destroyed) return;
+
         // Dispose cached assets
         for(const asset of Object.values(this.assets)) {
-            if(asset.dispose) asset.dispose();
-            if(asset.destroy) asset.destroy();
+            if(typeof asset.dispose === "function") asset.dispose();
+            if(typeof asset.destroy === "function") asset.destroy();
         }
 
         this.assets = null;
+        this.resourceManager = null;
+        this.destroyed = true;
     }
 }
 
@@ -264,7 +308,7 @@ class ResourceManager extends LS.EventEmitter {
         }
 
         for(const resData of data) {
-            const resource = new Resource(resData);
+            const resource = new Resource(resData, this);
             this.resources.set(resource.id, resource);
         }
     }
@@ -292,7 +336,7 @@ class ResourceManager extends LS.EventEmitter {
      */
     addResource(resource) {
         if(!(resource instanceof Resource)) {
-            resource = new Resource(resource);
+            resource = new Resource(resource, this);
         }
 
         this.resources.set(resource.id, resource);
@@ -403,6 +447,23 @@ class ResourceManager extends LS.EventEmitter {
             this.projectFolders.set(newName, folderData);
             this.emit("folder-renamed", [{ oldName, newName }]);
         }
+    }
+
+    /**
+     * Creates a unique reference object for a resource
+     * @param {Object} resource Resource object
+     * @returns {Object} Reference object
+     */
+    static createReference(resource) {
+        if(!resource) return null;
+        
+        const ref = { id: resource.id };
+
+        if(resource.path) {
+            ref.path = resource.path;
+        }
+
+        return ref;
     }
 
     destroy() {

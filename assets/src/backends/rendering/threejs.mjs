@@ -15,7 +15,7 @@ import AcceleratedTextRenderer from "./text.mjs";
  * But what does this mean?
  * - For now, there are some rendering limitations and performance concerns imposed by the limits of WebGL.
  * - On the other hand, proper optimizations are still important either way. WebGPU is not a silver bullet.
- * - Transition should not be too difficult once WebGPU is ready.
+ * - Transition should not be too difficult once WebGPU is ready (i want to make it agnostic anyway).
  * 
  * Why don't we use a native rendering backend?
  * - bro idk
@@ -78,9 +78,9 @@ class ThreeRendererAdapter extends RendererAdapter {
         this.root.name = "EditorRenderRoot";
         this.scene.add(this.root);
 
-        this.camera = new THREE.OrthographicCamera(0, this.width, 0, this.height, -10000, 10000);
-        this.camera.position.set(0, 0, 1000);
-        this.camera.lookAt(0, 0, 0);
+        this.defaultCamera = new THREE.OrthographicCamera(0, this.width, 0, this.height, -10000, 10000);
+        this.defaultCamera.position.set(0, 0, 1000);
+        this.defaultCamera.lookAt(0, 0, 0);
 
         this.ambientLight = new THREE.AmbientLight(0xffffff, options.ambientLightIntensity ?? 0.75);
         this.scene.add(this.ambientLight);
@@ -96,11 +96,11 @@ class ThreeRendererAdapter extends RendererAdapter {
         this.width = width || this.width;
         this.height = height || this.height;
 
-        this.camera.left = 0;
-        this.camera.right = this.width;
-        this.camera.top = 0;
-        this.camera.bottom = this.height;
-        this.camera.updateProjectionMatrix();
+        this.defaultCamera.left = 0;
+        this.defaultCamera.right = this.width;
+        this.defaultCamera.top = 0;
+        this.defaultCamera.bottom = this.height;
+        this.defaultCamera.updateProjectionMatrix();
 
         const pixelRatio = Math.min((typeof window !== "undefined"? window.devicePixelRatio: 1) || 1, 2);
         this.renderer.setPixelRatio(pixelRatio);
@@ -238,6 +238,15 @@ class ThreeRendererAdapter extends RendererAdapter {
                 item.node.userData.material.map = texture;
                 item.node.userData.material.needsUpdate = true;
             }
+
+            if(resource.type === "video") {
+                const videoDecoder = resource.getVideoDecoder();
+                if(videoDecoder) {
+                    const texture = videoDecoder.texture;
+                    item.node.userData.material.map = texture;
+                    item.node.userData.material.needsUpdate = true;
+                }
+            }
         }
     }
 
@@ -363,13 +372,26 @@ class ThreeRendererAdapter extends RendererAdapter {
         }
     }
 
+    static setMaterialOpacity(item, value) {
+        if(!item.node) return;
+        // this.forEachMaterial(item.node, (material) => {
+        // });
+
+        const material = item.node.userData.material;
+        if(material) {
+            material.opacity = value;
+            material.transparent = value < 1 || !!material.map;
+            material.needsUpdate = true;
+        }
+    }
+
     clear() {
         this.renderer.setRenderTarget(null);
         this.renderer.clear(true, true, true);
     }
 
     render(camera = null) {
-        this.renderer.render(this.scene, camera || this.camera);
+        this.renderer.render(this.scene, camera || this.defaultCamera);
     }
 
     /**
@@ -504,7 +526,13 @@ class ThreeRendererAdapter extends RendererAdapter {
         },
 
         "wireframe": (item, v) => {
-            if(item.node) this.forEachMaterial(item.node, (material) => material.wireframe = !!v);
+            if(item.node) {
+                const material = item.node.userData.material;
+                if(material) {
+                    material.wireframe = !!v;
+                    material.needsUpdate = true;
+                }
+            }
         },
 
         "castShadow": (item, v) => {
