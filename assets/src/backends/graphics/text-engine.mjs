@@ -1,3 +1,12 @@
+/**
+ * Fast WebGL hardware-accelerated dynamic MSDF text renderer.
+ * @copyright 2026 lstv.space
+ * @license GPL-3.0
+ */
+
+// This is set later and guarantees THREE is available. Or not if not used. Do not blindly replace this with imports, this is correct.
+let THREE = window.THREE || null;
+
 /*
 TODO:
 - Antialiasing
@@ -30,8 +39,11 @@ float median(float r, float g, float b) {
 void main() {
     vec3 msd = texture(u_texture, v_texCoord).rgb;
     float sd = median(msd.r, msd.g, msd.b);
-    float screenPxDistance = u_pxRange * (sd - 0.5);
-    float alpha = clamp(screenPxDistance + 0.5, 0.0, 1.0);
+    vec2 texSize = vec2(textureSize(u_texture, 0));
+    vec2 unitRange = vec2(u_pxRange) / texSize;
+    vec2 screenTexSize = vec2(1.0) / fwidth(v_texCoord);
+    float screenPxRange = max(0.5 * dot(unitRange, screenTexSize), 1.0);
+    float alpha = clamp(screenPxRange * (sd - 0.5) + 0.5, 0.0, 1.0);
     outColor = vec4(v_color.rgb, v_color.a * alpha);
 }
 `;
@@ -71,6 +83,14 @@ void main() {
     v_color = i_color;
 }
 `;
+
+function stripShaderVersion(source) {
+    const trimmed = source.trimStart();
+    if (!trimmed.startsWith("#version")) return source;
+    const firstNewline = source.indexOf("\n");
+    if (firstNewline === -1) return "";
+    return source.slice(firstNewline + 1);
+}
 
 function createShader(gl, type, source) {
     const shader = gl.createShader(type);
@@ -166,9 +186,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
     constructor(options = {}) {
         super();
 
-        this.container = LS.Create({ class: "ls-textgrid-container" });
-
-        this.frameScheduler = new LS.Util.FrameScheduler(this.#tick.bind(this));
+        this.frameScheduler = new LS.Util.FrameScheduler(this.tick.bind(this));
 
         this.font = null;
         this.instanceCount = 0;
@@ -176,6 +194,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
 
         this.fontSize = 16;
         this.scale = 1;
+        this.pxRange = 4.0;
         this.cellWidth = 0;
         this.cellHeight = 0;
 
@@ -193,9 +212,8 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
 
         this.projMatrix = new Float32Array(16);
 
-        this.useThree = false;
-        this.THREE = null;
-        this.threeRenderer = null;
+        this.usingThree = !!options.threeRenderer;
+        this.threeRenderer = options.threeRenderer || null;
         this.threeMesh = null;
         this.threeGeometry = null;
         this.threeMaterial = null;
@@ -276,15 +294,18 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
             this.cellHeight = this.font.baseCellHeight * this.scale;
             this._rebuildGlyphScale();
 
-            if (this.useThree && this.threeMaterial?.uniforms?.u_pxRange) {
-                this.threeMaterial.uniforms.u_pxRange.value = 4.0 * this.scale;
+            if (this.usingThree && this.threeMaterial?.uniforms?.u_pxRange) {
+                this.threeMaterial.uniforms.u_pxRange.value = this.pxRange;
             }
 
             // Rebuild all vertices with the new scale
             if (this.gridBuffer) {
                 for (let row = 0; row < this.rows; row++) {
                     for (let col = 0; col < this.cols; col++) {
-                        this._updateVertex(col, row);
+                        const cellIdx = row * this.cols + col;
+                        const charCode = this.gridBuffer[cellIdx];
+                        if (!charCode) continue;
+                        this._updateVertex(col, row, charCode, undefined, undefined, undefined, undefined, true);
                     }
                 }
             }
@@ -300,7 +321,8 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         // Backing buffers to remember grid state for resizing & skipping updates
         this.gridBuffer = new Uint16Array(numCells);
 
-        if (this.useThree) {
+        if (this.usingThree) {
+            // y the fuck is this split? (i did not do that)
             this.instancePos = new Float32Array(numCells * 2);
             this.instanceSize = new Float32Array(numCells * 2);
             this.instanceUvRect = new Float32Array(numCells * 4);
@@ -318,7 +340,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         }
 
         this.instanceCount = numCells;
-        if (this.useThree && this.threeGeometry) {
+        if (this.usingThree && this.threeGeometry) {
             this.threeGeometry.instanceCount = this.instanceCount;
         }
         this.gridDirty = false;
@@ -351,7 +373,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
     clearGrid() {
         if (!this.gridBuffer) return;
         this.gridBuffer.fill(0);
-        if (this.useThree) {
+        if (this.usingThree) {
             if (this.instancePos) this.instancePos.fill(0);
             if (this.instanceSize) this.instanceSize.fill(0);
             if (this.instanceUvRect) this.instanceUvRect.fill(0);
@@ -381,7 +403,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
     clear() {
         if (!this.gridBuffer) return;
         this.gridBuffer.fill(0);
-        if (this.useThree) {
+        if (this.usingThree) {
             if (this.instancePos) this.instancePos.fill(0);
             if (this.instanceSize) this.instanceSize.fill(0);
             if (this.instanceUvRect) this.instanceUvRect.fill(0);
@@ -424,7 +446,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
      * @param {number} b - Optional new blue color component (0-255). If undefined, the blue component will not be changed.
      * @param {number} a - Optional new alpha component (0-255). If undefined, the alpha component will not be changed.
      */
-    _updateVertex(col, row, charCode, r, g, b, a) {
+    _updateVertex(col, row, charCode, r, g, b, a, forceGlyph = false) {
         const cellIdx = (row * this.cols + col);
 
         // Dirty glyph (for now we only care to render if glyph changes through this function)
@@ -448,7 +470,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         // It would be more readable to use inline enums but JS doesn't have that
         // Maybe one day I'll rewrite this in Glitter 🤔
 
-        if (this.useThree) {
+        if (this.usingThree) {
             const colorIdx = cellIdx * 4;
             if (this.instanceColor) {
                 if (r !== undefined) this.instanceColor[colorIdx] = r;
@@ -466,7 +488,12 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         }
         this.gridDirty = true;
 
+        if (forceGlyph) updateChar = true;
         if (!updateChar) return;
+
+        if (charCode === undefined) {
+            charCode = this.gridBuffer[cellIdx];
+        }
 
         // Debug updating chars
         // if(updateChar) charCode = 9608; else charCode = 9617;
@@ -496,7 +523,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         const halfWidth = map[glyphIdx + 13];
         const halfHeight = map[glyphIdx + 14];
 
-        if (this.useThree) {
+        if (this.usingThree) {
             const posIdx = cellIdx * 2;
             const sizeIdx = cellIdx * 2;
             const uvIdx = cellIdx * 4;
@@ -527,9 +554,9 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         }
     }
 
-    #tick() {
+    tick() {
         if (this.pendingResize[0]) {
-            if (!this.useThree) {
+            if (!this.usingThree) {
                 this.#resize(this.pendingResize[1], this.pendingResize[2]);
                 this.quickEmit("resize", this.canvas.width, this.canvas.height);
             }
@@ -542,7 +569,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
 
         if (!this.font || this.instanceCount === 0) return;
 
-        if (this.useThree) {
+        if (this.usingThree) {
             this.updateBuffers();
             return;
         }
@@ -553,6 +580,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         const gl = this.gl;
         gl.viewport(0, 0, cw, ch);
         gl.clear(gl.COLOR_BUFFER_BIT);
+        gl.disable(gl.CULL_FACE);
 
         this.updateBuffers();
 
@@ -566,13 +594,12 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         const locations = this.locations;
 
         // -- Render text grid
-        // Scale the MSDF pixel range to keep edges crisp at different font sizes
         gl.useProgram(this.program);
         if (updatedDimensions) {
             gl.uniformMatrix4fv(locations.projection, false, this.projMatrix);
         }
         gl.uniform2f(locations.offset, this.gridOffsetX, this.gridOffsetY);
-        gl.uniform1f(locations.pxRange, 4.0 * this.scale);
+        gl.uniform1f(locations.pxRange, this.pxRange || 4.0);
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
         gl.uniform1i(locations.texture, 0);
@@ -583,7 +610,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
 
     updateBuffers() {
         if (!this.gridDirty) return;
-        if (this.useThree) {
+        if (this.usingThree) {
             if (this.threeAttributes) {
                 this.threeAttributes.i_pos.needsUpdate = true;
                 this.threeAttributes.i_size.needsUpdate = true;
@@ -624,23 +651,21 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
             })
         ]);
 
-        if (this.useThree) {
-            const THREE = this.THREE;
+        if (this.usingThree) {
             const texture = new THREE.Texture(image);
             texture.minFilter = THREE.LinearFilter;
             texture.magFilter = THREE.LinearFilter;
             texture.wrapS = THREE.ClampToEdgeWrapping;
             texture.wrapT = THREE.ClampToEdgeWrapping;
             texture.flipY = false;
-            if ("colorSpace" in texture && THREE.NoColorSpace) {
-                texture.colorSpace = THREE.NoColorSpace;
-            }
+
+            // if ("colorSpace" in texture && THREE.NoColorSpace) {
+            //     texture.colorSpace = THREE.NoColorSpace;
+            // }
+
             texture.needsUpdate = true;
             this.texture = texture;
-
-            if (this.threeMaterial?.uniforms?.u_texture) {
-                this.threeMaterial.uniforms.u_texture.value = texture;
-            }
+            this.threeMaterial.uniforms.u_texture.value = texture;
         } else {
             const gl = this.gl;
             this.texture = gl.createTexture();
@@ -657,6 +682,15 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
 
         const baseFontSize = fontData.atlas.size || 24;
         const metrics = fontData.metrics || {};
+
+        const atlasRange = fontData.atlas?.range;
+        if (typeof atlasRange === "number" && Number.isFinite(atlasRange)) {
+            this.pxRange = atlasRange;
+        }
+
+        if (this.usingThree && this.threeMaterial?.uniforms?.u_pxRange) {
+            this.threeMaterial.uniforms.u_pxRange.value = this.pxRange;
+        }
 
         const lowestCharCode = Math.min(...fontData.glyphs.map(c => c.code || Infinity));
         const highestCharCode = Math.max(...fontData.glyphs.map(c => c.code || 0));
@@ -757,8 +791,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         if (this.initialized) return;
         this.initialized = true;
 
-        const useThree = !!(options.threeRenderer && (options.THREE || options.three));
-        if (useThree) {
+        if (this.usingThree) {
             await this.#initThree(options);
             return;
         }
@@ -766,6 +799,8 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         this.canvas = document.createElement('canvas');
         this.canvas.width = 800;
         this.canvas.height = 600;
+
+        this.container = LS.Create({ class: "ls-textgrid-container" });
         this.container.appendChild(this.canvas);
 
         this.gl = this.canvas.getContext('webgl2', { antialias: true });
@@ -774,6 +809,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         gl.clearColor(...this.backgroundColor.floatPixel);
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.disable(gl.CULL_FACE);
 
         this.canvas.addEventListener("wheel", (e) => {
             if (!this.virtualScrolling) return;
@@ -847,7 +883,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
     setOffset(x, y) {
         this.gridOffsetX = Number.isNaN(x) ? 0 : x;
         this.gridOffsetY = Number.isNaN(y) ? 0 : y;
-        if (this.useThree && this.threeMaterial?.uniforms?.uOffset) {
+        if (this.usingThree && this.threeMaterial?.uniforms?.uOffset) {
             this.threeMaterial.uniforms.uOffset.value.set(this.gridOffsetX, this.gridOffsetY);
         }
         this.render();
@@ -862,7 +898,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
 
     resize(width, height) {
         if (!this.initialized) return;
-        if (this.useThree) {
+        if (this.usingThree) {
             if (width !== undefined && height !== undefined) {
                 this.fitGridToSize(width, height);
             }
@@ -1102,7 +1138,7 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
 
     destroy() {
         if (this.destroyed) return;
-        if (this.useThree) {
+        if (this.usingThree) {
             if (this.threeGeometry) this.threeGeometry.dispose();
             if (this.threeMaterial) this.threeMaterial.dispose();
             if (this.texture?.dispose) this.texture.dispose();
@@ -1152,13 +1188,8 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         this.destroyed = true;
     }
 
-    #initThree(options) {
-        this.useThree = true;
-        this.THREE = options.THREE || options.three;
+    async #initThree(options) {
         this.threeRenderer = options.threeRenderer;
-
-        const THREE = this.THREE;
-
         this.threeGeometry = new THREE.InstancedBufferGeometry();
 
         const quadData = new Float32Array([
@@ -1167,48 +1198,51 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
             -1, 1,
             1, 1
         ]);
+
         this.threeGeometry.setAttribute("a_quad", new THREE.BufferAttribute(quadData, 2));
 
+        this.threeGeometry.setIndex([0, 1, 2, 2, 1, 3]);
+        this.threeGeometry.setDrawRange(0, 6);
+
         this.threeMaterial = new THREE.RawShaderMaterial({
-            vertexShader: msdfVertex,
-            fragmentShader: msdfFragment,
+            vertexShader: stripShaderVersion(msdfVertex),
+            fragmentShader: stripShaderVersion(msdfFragment),
             uniforms: {
                 uProjection: { value: new THREE.Matrix4() },
                 uOffset: { value: new THREE.Vector2(0, 0) },
-                u_pxRange: { value: 4.0 * this.scale },
+                u_pxRange: { value: this.pxRange },
                 u_texture: { value: null }
             },
             transparent: true,
             depthTest: options.depthTest !== undefined ? options.depthTest : true,
             depthWrite: options.depthWrite !== undefined ? options.depthWrite : false,
             glslVersion: THREE.GLSL3,
-            defines: {
-                USE_THREE_MATRICES: 1
-            }
+            defines: { USE_THREE_MATRICES: 1 },
+            side: THREE.DoubleSide
         });
 
         this.threeMesh = new THREE.Mesh(this.threeGeometry, this.threeMaterial);
-        // this.threeMesh.frustumCulled = false;
+        this.threeMesh.frustumCulled = false;
+
+        this.threeMesh.onBeforeRender = () => this.updateBuffers();
 
         const fontSrc = options.fontSrc || ("assets/fonts/" + (options.fontName || "JetBrainsMono"));
-        return this.loadFont(fontSrc).then(() => {
-            if (!this.lineHeight) this.lineHeight = options.lineHeight || this.font.metrics.lineHeight || 1.2;
-            this.setFontSize(this.fontSize);
+        await this.loadFont(fontSrc);
 
-            if (options.cols && options.rows) {
-                this.setupGrid(options.cols, options.rows);
-            } else if (options.width && options.height) {
-                this.fitGridToSize(options.width, options.height);
-            } else {
-                this.setupGrid(80, 25);
-            }
-        });
+        if (!this.lineHeight) this.lineHeight = options.lineHeight || this.font.metrics.lineHeight || 1.2;
+
+        this.setFontSize(this.fontSize);
+        if (options.cols && options.rows) {
+            this.setupGrid(options.cols, options.rows);
+        } else if (options.width && options.height) {
+            this.fitGridToSize(options.width, options.height);
+        } else {
+            this.setupGrid(80, 25);
+        }
     }
 
     _setupThreeAttributes() {
-        if (!this.useThree || !this.threeGeometry) return;
-        const THREE = this.THREE;
-
+        if (!this.usingThree || !this.threeGeometry) return;
         const iPos = new THREE.InstancedBufferAttribute(this.instancePos, 2);
         iPos.setUsage(THREE.DynamicDrawUsage);
         const iSize = new THREE.InstancedBufferAttribute(this.instanceSize, 2);
@@ -1233,6 +1267,10 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
 
     getObject3D() {
         return this.threeMesh || null;
+    }
+
+    static provideThreeJS(Three) {
+        if (!THREE) THREE = Three;
     }
 }
 

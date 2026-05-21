@@ -1,4 +1,10 @@
 /**
+ * ConfigStore class.
+ * @copyright 2026 lstv.space
+ * @license GPL-3.0
+ */
+
+/**
  * Rough polyfill implementation of ConfigStore class
  * Temporarily using localStorage; in the future, this could be swapped
  */

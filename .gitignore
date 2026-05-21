@@ -20,3 +20,5 @@ node_modules
 # The generator binary
 msdf-atlas-gen
 *.exe
+
+video_proxies

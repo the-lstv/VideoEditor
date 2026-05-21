@@ -19,7 +19,7 @@
         "duration": " Délka:",
         "start": " Začátek:",
 
-        "loop": " Smyčka:",
+        "loopMode": " Smyčka:",
         "loopStart": " Začátek smyčky:",
         "loopEnd": " Konec smyčky:",
 
@@ -30,10 +30,19 @@
         "playbackRateDirection": " Rychlost/směr přehrávání:",
         "frameRateLimit": " Limit snímkové frekvence:",
 
-        "offset": " Posun od začátku:",
+        "proxy": " Proxy:",
+        "generateProxy": "Generovat proxy",
+        "deleteProxy": "Smazat proxy",
+
+        "proxySettings": "Nastavení proxy",
+        "proxyDescription": "Pokud máte potíže s plynulostí videa při úpravách, toto s tím může pomoci. Stiskněte tlačítko \"Generovat proxy\" pro vytvoření verze videa optimalizované pro úpravy.",
+
+        "enabled": "Povolit",
+
+        "offset": " Posun:",
 
         "anchor": " Kotva:",
-        "sourceUrl": " Média:",
+        "resource": " Média:",
         "sourceFitMode": " Režim přizpůsobení:",
         "effects": " Efekty:",
         "skew": " Šikmý pohled:",
@@ -80,7 +89,8 @@
             "sound": "Zvuk",
             "pattern": "Vzor",
             "3d_mesh": "3D objekt",
-            "camera": "Kamera",
+            "perspectiveCamera": "Perspektivní kamera",
+            "orthographicCamera": "Ortografická kamera",
             "light": "Světlo",
             "particle_emitter": "Emiter částic",
             "events": "Události",
@@ -88,7 +98,26 @@
             "empty_item": "Prázdná položka"
         },
 
-        "empty_state": "Žádné položky k zobrazení"
+        "empty_state": "Žádné položky k zobrazení",
+
+        "linked_project_folders": "Propojené složky projektu",
+        "global_linked_folders": "Globální propojené složky",
+        "project_data": "Složka projektu",
+
+        "tabname": {
+            "objects": "Základní objekty",
+            "folders": "Prohlížeč souborů",
+            "projectAssets": "Soubory použité v projektu",
+            "saved": "Uložené položky"
+        },
+
+        "add_project_folder": "Přidat projektovou složku",
+        "add_global_folder": "Přidat globální složku",
+        "project_folder": "Projektová",
+        "global_folder": "Globální",
+        "collapse_folders": "Sbalit vše",
+        "refresh": "Obnovit",
+        "click_for_more_info": "Klikněte pro více informací"
     },
 
     "nav": {

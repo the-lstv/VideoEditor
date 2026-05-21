@@ -1,4 +1,10 @@
 /**
+ * Dynamic variable mapping.
+ * @copyright 2026 lstv.space
+ * @license GPL-3.0
+ */
+
+/**
  * This class represents a variable in the editor that can be tweaked, automated, etc.
  */
 class Variable {
@@ -18,6 +24,7 @@ class Variable {
 const mappingCompiler = new class {
     NOOP_FUNCTION = (x) => x;
 
+    cache = new Map();
     functionMap = {
         'sin': 'Math.sin', 'cos': 'Math.cos', 'tg': 'Math.tan', 'tan': 'Math.tan',
         'ctg': '(1/Math.tan', 'sec': '(1/Math.cos', 'cosec': '(1/Math.sin',
@@ -32,8 +39,86 @@ const mappingCompiler = new class {
         'clamp': '((v,min,max)=>Math.min(Math.max(v,min),max))',
         'lerp': '((a,b,t)=>a+(b-a)*t)',
         'smoothstep': '((edge0,edge1,x)=>{let t=Math.min(Math.max((x - edge0)/(edge1 - edge0),0),1);return t*t*(3 - 2*t);})',
-        'y': 'y', 'time': 'y'
+        'y': 'y', 'time': 'y',
+
+        'global': 'global'
     };
+
+    /**
+     * Process a timeline-based automation item, applying its computed value to its targets at the given time.
+     * Not sure if this is the right place for this.
+     * 
+     * @param {*} automationItem The automation item to process
+     * @param {*} time The current time to evaluate the automation at
+     * @param {*} timelineInstance The timeline instance the automation item belongs to (used for resolving target nodes)
+     * @param {*} adapter The renderer adapter (used for applying values to targets)
+     */
+    processTimelinedAutomation(automationItem, time, timelineInstance, adapter) {
+        if(!automationItem.__automationClip || !automationItem.data || !automationItem.data.targets || automationItem.data.enabled === false || automationItem.data.targets.length === 0) return;
+
+        if (automationItem.data.automationFunction && (automationItem.__dirtyMapping || !automationItem.mappingFn)) {
+            try {
+                automationItem.mappingFn = mappingCompiler.compile(automationItem.data.automationFunction);
+            } catch (e) {
+                console.error("Failed to compile automation mapping function:", e);
+                automationItem.mappingFn = mappingCompiler.NOOP_FUNCTION;
+            }
+
+            automationItem.__dirtyMapping = false;
+        } else if(!automationItem.data.automationFunction) {
+            automationItem.mappingFn = mappingCompiler.NOOP_FUNCTION;
+        }
+
+        const automationValue = automationItem.mappingFn(automationItem.__automationClip.getValueAtTime(time - automationItem.start), time);
+
+        // Use cached targets
+        if(automationItem.__cTargets && !automationItem.__dirty) {
+            for (const cTarget of automationItem.__cTargets) {
+                const baseValue = cTarget.isRelative? cTarget.target.data[cTarget.property] || 0: 0;
+                cTarget.setter(cTarget.target, baseValue + cTarget.mappingFn(automationValue, time));
+            }
+            return;
+        }
+
+        const setters = adapter?.constructor?.nodePropertySetters;
+        if(!setters) {
+            console.warn("Renderer adapter does not have node property setters, cannot apply automation");
+            return;
+        }
+
+        // Compile targets
+        const compiled = [];
+        for (let i = 0; i < automationItem.data.targets.length; i++) {
+            const target = automationItem.data.targets[i];
+
+            const targetNode = target.nodeId? timelineInstance.getItemById(target.nodeId): null;
+            if(!targetNode) continue;
+            if(!targetNode.node) adapter.createObject(targetNode); // ? Should this be here?
+            if(!targetNode.node && targetNode.type !== "audio") continue;
+
+            const setter = setters[target.property];
+            if(typeof setter !== "function") continue;
+            
+            const mappingFn = target.__mappingCache || (target.mapping && target.mapping !== "x"? mappingCompiler.compile(target.mapping): mappingCompiler.NOOP_FUNCTION);
+            target.__mappingCache = mappingFn;
+
+            const isRelative = target.isRelative;
+            const finalValue = isRelative? (targetNode.data[target.property] || 0) + (mappingFn(automationValue, time)): mappingFn(automationValue, time);
+
+            setter(targetNode, finalValue);
+
+            compiled.push({
+                setter,
+                target: targetNode,
+                property: target.property,
+                mappingFn,
+                isRelative
+            });
+        }
+
+        automationItem.__cTargets = compiled;
+        automationItem.__dirty = false;
+    }
 
     /**
      * Compiles a mapping function from a code string
@@ -50,6 +135,11 @@ const mappingCompiler = new class {
         if(!code || code.length === 0) {
             return this.NOOP_FUNCTION;
         }
+
+        // todo: this is not a reliable way to keep cache + causes memory leaks.
+        // if(this.cache.has(code)) {
+        //     return this.cache.get(code);
+        // }
 
         let i = -1, cs = null, state = 0, operations = [];
         while(i++ < code.length -1) {
@@ -179,7 +269,9 @@ const mappingCompiler = new class {
         }
 
         const generatedCode = "return (" + (operations.join('') || "0") + ") || 0;";
-        return new Function('x', 'y', generatedCode);
+        const func = new Function('x', 'y', generatedCode);
+        // this.cache.set(code, func);
+        return func;
     }
 }
 

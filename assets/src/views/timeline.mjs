@@ -32,6 +32,14 @@ class TimelineView extends LS.Multipane.View {
                                     this.timeline.tool = "slice";
                                 } },
 
+                                { tag: "button", class: "control-button tool-button tool-slide square clear", inner: { tag: "i", class: "bi-arrows" }, tooltip: "Slide tool <kbd>S</kbd>", onclick: () => {
+                                    this.timeline.tool = "slide";
+                                } },
+
+                                { tag: "button", class: "control-button tool-button tool-paint square clear", inner: { tag: "i", class: "bi-pencil" }, tooltip: "Paint tool <kbd>B</kbd>", onclick: () => {
+                                    this.timeline.tool = "paint";
+                                } },
+
                                 { tag: "button", class: "control-button tool-button tool-preview square clear", inner: { tag: "i", class: "bi-eye-fill" }, tooltip: "Preview tool <kbd>P</kbd><br>Or <kbd>Alt</kbd> + right-click", onclick: () => {
                                     this.timeline.tool = "preview";
                                 } },
@@ -86,7 +94,7 @@ class TimelineView extends LS.Multipane.View {
 
                                         buttons: [{ label: "Don't show again", class: "elevated", onclick: (event) => {
                                             localStorage.setItem("hideTimelineHelp", "true");
-                                            event.target.closest(".ls-modal").lsComponent.close();
+                                            LS.Modal.closeFromElement(event.target);
                                             btnEvent.target.remove();
                                         }}, { label: "Close" }]
                                     });

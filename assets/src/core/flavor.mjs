@@ -1,5 +1,7 @@
 /**
- * Flavor base class
+ * Flavor base class.
+ * @copyright 2026 lstv.space
+ * @license GPL-3.0
  */
 
 export default class Flavor extends LS.Context {

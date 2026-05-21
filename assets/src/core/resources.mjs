@@ -5,6 +5,9 @@
  * It used to always store files by hash though that is no longer the case, only for embedded resources.
  * 
  * Provides various utility functions for working with resources and loading in various ways.
+ * 
+ * @copyright 2026 lstv.space
+ * @license GPL-3.0
  */
 
 import Project from "./project.mjs";
@@ -15,7 +18,7 @@ import { VideoDecoder } from "../backends/video/index.mjs";
 const MAX_EMBED_RESOURCE_SIZE = 50 * 1024 * 1024; // 50 MB
 
 const RESOURCE_DEFAULT_COLORS = {
-    sound: "purple",
+    audio: "purple",
     video: "blue",
     sprite: "green",
     image: "green"
@@ -60,13 +63,14 @@ class Resource {
             throw new Error("Resource.constructor: resourceManager must be an instance of ResourceManager");
         }
 
-        this.id = options.id || LS.Misc.uid();
+        this.id = options.id || window?.crypto?.randomUUID?.() || LS.Misc.uid();
         this.path = options.path || this.id;
         this.folderName = options.folderName || null;
+        this.label = options.name || this.path.split("/").pop();
 
         this.mimeType = options.mimeType || (options.path && RESOURCE_MIME_TYPES[options.path.split(".").pop()]) || RESOURCE_MIME_TYPES.default;
 
-        this.type = options.type || ({ audio: "sound", video: "video", image: "image" }[this.mimeType.split("/")[0]] || "asset");
+        this.type = options.type || ({ audio: "audio", video: "video", image: "image" }[this.mimeType.split("/")[0]] || "asset");
 
         // Whether the resource is stored externally (not embedded)
         this.isExternal = options.isExternal || false;
@@ -102,11 +106,24 @@ class Resource {
         return this.path;
     }
 
-    async getTexture() {
-        if(this.type !== "image") {
-            throw new Error("Resource.getTexture: resource is not an image/sprite");
+    /**
+     * A bit of a silly helper method for when we want to create a node out of a resource without making it manually.
+     * Technically this is not standard as nodes can be whatever they want and are not locked into a specific resource type, they only reference other resources.
+     * @returns 
+     */
+    guessNodeType() {
+        switch(this.type) {
+            case "audio": return "audio";
+            default: return "sprite";
+            // case "video": case "image": return "sprite";
         }
-        
+    }
+
+    async getImageTexture() {
+        if(this.type !== "image") {
+            throw new Error("Resource.getImageTexture: resource is not an image/sprite");
+        }
+
         if(this.assets.texture) {
             return this.assets.texture;
         }
@@ -114,6 +131,12 @@ class Resource {
         // Create a new texture for this resource
         const texture = await textureLoader.loadAsync(this.getURI());
         this.assets.texture = texture;
+
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+        texture.generateMipmaps = false;
+        texture.colorSpace = THREE.SRGBColorSpace;
+
         return texture;
     }
 
@@ -132,9 +155,34 @@ class Resource {
         return videoDecoder;
     }
 
+    async getVideoMetadata(estimateFPS = false, extractTags = false, extractAudioInfo = false) {
+        const decoder = this.getVideoDecoder();
+        return await decoder.getMetadata(estimateFPS, extractTags, extractAudioInfo);
+    }
+
+    async getImageDimensions() {
+        if(this.type !== "image") {
+            throw new Error("Resource.getImageDimensions: resource is not an image/sprite");
+        }
+
+        if(this.assets.dimensions) {
+            return this.assets.dimensions;
+        }
+
+        if(isNode && this.isExternal && !this.assets.texture) {
+            // We can simply read only the dimensions, which could be faster when we don't need the texture yet
+            const { imageSizeFromFile } = require('image-size/fromFile');
+            return (this.assets.dimensions = await imageSizeFromFile(this.fullPath));
+        }
+
+        // Fallback to reading the image and getting dimensions from the texture
+        const texture = await this.getImageTexture();
+        return (this.assets.dimensions = { width: texture.image.width, height: texture.image.height });
+    }
+
     getAudioBuffer() {
-        if(this.type !== "sound") {
-            throw new Error("Resource.getAudioBuffer: resource is not a sound");
+        if(this.type !== "audio") {
+            throw new Error("Resource.getAudioBuffer: resource is not an audio file");
         }
 
         // ...
@@ -158,15 +206,24 @@ class Resource {
         // ! todo
     }
 
-    export() {
-        return {
-            id: this.id,
-            path: this.path,
-            folderName: this.folderName,
-            type: this.type,
-            mimeType: this.mimeType,
-            isExternal: this.isExternal
-        };
+    /**
+     * Reference value for nodes or the resource itself in the project file.
+     * @returns {string|object} Reference value or exportable object for this resource
+     */
+    export(full = false) {
+        if(full) {
+            return {
+                id: this.id,
+                path: this.path,
+                folderName: this.folderName,
+                type: this.type,
+                mimeType: this.mimeType,
+                label: this.label,
+                isExternal: this.isExternal
+            };
+        }
+
+        return this.id;
     }
 
     destroy() {
@@ -330,7 +387,7 @@ class ResourceManager extends LS.EventEmitter {
      * @param {string} resource.id Optional id
      * @param {string} resource.path Path or name (for internal resources) of the resource.
      * @param {string} resource.mimeType Optional mime type
-     * @param {string} resource.type Optional type (sound, video, image, etc.)
+     * @param {string} resource.type Optional type (audio, video, image, etc.)
      * @param {boolean} resource.isExternal Optional whether the resource is stored externally
      * @returns {Resource} The added resource object
      */
@@ -369,9 +426,18 @@ class ResourceManager extends LS.EventEmitter {
     export() {
         const exportedResources = [];
         for(const resource of this.resources.values()) {
-            exportedResources.push(resource.export());
+            exportedResources.push(resource.export(true));
         }
-        return exportedResources;
+
+        const exportedFolders = {};
+        for(const [name, folderData] of this.projectFolders.entries()) {
+            exportedFolders[name] = folderData;
+        }
+
+        return {
+            resources: exportedResources,
+            folders: exportedFolders
+        };
     }
 
     /**
@@ -426,6 +492,12 @@ class ResourceManager extends LS.EventEmitter {
             this.projectFolders.delete(folderName);
             this.emit("folder-removed", [{ name: folderName }]);
         }
+    }
+
+    static addFolder(folderPath) {
+    }
+
+    static removeFolder(folderName) {
     }
 
     /**

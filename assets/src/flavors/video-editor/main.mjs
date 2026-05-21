@@ -19,7 +19,7 @@
  */
 
 import FlavorBase from "../../core/flavor.mjs";
-import ThreeRendererAdapter from "../../backends/rendering/threejs.mjs";
+import ThreeRendererAdapter from "../../backends/graphics/ThreeJS/index.mjs";
 
 // --- Views
 import { AssetManagerView } from "../../views/asset-manager.mjs";
@@ -45,11 +45,48 @@ class VideoEditor extends FlavorBase {
 
     static version = "0.2.0-alpha";
 
+    async #init() {
+        this.renderingCanvas = this.addDestroyable(document.createElement('canvas'));
+
+        const rendererOptions = this.flavorConfig.rendererOptions || {};
+
+        try {
+            this.renderer = new ThreeRendererAdapter({
+                canvas: this.renderingCanvas,
+                width: rendererOptions.width || 1280,
+                height: rendererOptions.height || 720,
+                backgroundColor: rendererOptions.backgroundColor ?? 0x000000,
+                backgroundAlpha: rendererOptions.backgroundAlpha ?? 1,
+                antialias: rendererOptions.antialias !== false,
+                alpha: rendererOptions.alpha !== false,
+                powerPreference: rendererOptions.powerPreference || "high-performance",
+                preserveDrawingBuffer: !!rendererOptions.preserveDrawingBuffer,
+                ambientLightIntensity: rendererOptions.ambientLightIntensity,
+                directionalLightIntensity: rendererOptions.directionalLightIntensity,
+                toneMapping: rendererOptions.toneMapping,
+                toneMappingExposure: rendererOptions.toneMappingExposure
+            }, this.project);
+        } catch (e) {
+            LS.Modal.buildEphemeral({
+                title: "Renderer Initialization Failed",
+                content: { html: "Failed to initialize the video renderer. This may be due to an unsupported or outdated graphics card or driver. Video editing features will be unavailable.<br><br>Error details: <pre class=\"log-message\">" + e.message + "</pre>" },
+                buttons: [
+                    { label: "OK" }
+                ]
+            }).show();
+            throw new Error(e);
+        }
+
+        console.log("Video editor initialized with renderer options:", rendererOptions);
+        
+    }
+
     constructor(project) {
         super(project);
 
         // LS.Timeline instance
         this.timelineInstance = null;
+        this.firstFrameRendered = false;
 
         // Current timeline data
         this.currentTimeline = null;
@@ -59,11 +96,10 @@ class VideoEditor extends FlavorBase {
 
         this.__renderTargets = [];
 
-        // TODO
-        this.__currentMediaItems = new Set();
-        this.activeMediaItems = new Set();
-
         this.editingItem = null;
+
+        this.frameRerender = false;
+        this.__maybeRerenderCallback = this.#maybeRerender.bind(this);
 
         // Cache event references that are emitted frequently (small benefit but skips event lookup)
         // In general this doesn't do much BUT in high-perf scenarios any detail matters so why not do it
@@ -86,11 +122,6 @@ class VideoEditor extends FlavorBase {
 
         // --- Project hooks
 
-        // When the projects starts initializing
-        this.project.once("initializing", async () => {
-            await this.#init();
-        });
-
         // When the project data has loaded
         this.project.on("project-data-loaded", (data) => {
             // Here we can initialize some flavor-specific project data
@@ -109,8 +140,13 @@ class VideoEditor extends FlavorBase {
             this.setTimeline(this.project.config.timeline || "main");
         });
 
+        // When the projects starts initializing
+        this.project.once("initializing", async () => {
+            await this.#init();
+        });
+
         // When a view connects to the project
-        this.project.on("view-connected", (view) => {
+        this.project.on("view-connected", async (view) => {
             if(view.attachedTo == null) {
                 view.attachedTo = this;
             }
@@ -175,6 +211,11 @@ class VideoEditor extends FlavorBase {
                         }
                     });
 
+                    if(!this.firstFrameRendered) {
+                        this.renderAtTime(0);
+                        this.firstFrameRendered = true;
+                    }
+
                     this.quickEmit(this.__seekEventRef, this.timelineInstance.seek);
                     this.emit('duration-changed', [this.timelineInstance.duration]);
                     break;
@@ -184,7 +225,7 @@ class VideoEditor extends FlavorBase {
                     break;
 
                 case "assetManager":
-                    this.addExternalEventListener(view, 'asset-dropped', (event) => {
+                    this.addExternalEventListener(view, 'asset-dropped', async (event) => {
                         const elementsFromPoint = document.elementsFromPoint(event.x, event.y);
 
                         // Dropped on a timeline
@@ -213,23 +254,49 @@ class VideoEditor extends FlavorBase {
                             // External file dropped, so we need to ensure it is saved as a resource,
                             // and then create a new timeline item.
                             else {
-                                event.data.isExternal = true;
-                                event.data.type = null; // :shrug:
+                                const isResource = event.data instanceof Resource;
 
-                                const resource = this.project.resources.addResource(event.data);
+                                if(!isResource) {
+                                    event.data.isExternal = true;
+                                    event.data.type = null; // :shrug:
+                                    event.data.id = null; // :shrug:
+                                }
+
+                                const resource = isResource? event.data: this.project.resources.addResource(event.data);
 
                                 // Now we need to make an item for the asset
                                 // TODO: this is temporary, just testing
                                 const newItem = {
-                                    type: resource.type || "image",
+                                    type: resource.guessNodeType(),
                                     // resource: ResourceManager.createReference(resource),
                                     data: { resource },
-                                    label: event.data.label,
+                                    label: event.data.label || resource.name,
                                     start: time,
                                     row,
                                     duration: 1
                                 };
-    
+
+                                if(resource.type === "video") {
+                                    // Compute length & size
+                                    const meta = await resource.getVideoMetadata();
+                                    newItem.duration = meta.duration;
+
+                                    // todo: use w/h
+                                    newItem.data.scaleX = meta.width;
+                                    newItem.data.scaleY = meta.height;
+                                    // newItem.data.loopMode = "loop"; // default to enabled looping for videos
+                                }
+
+                                if(resource.type === "image") {
+                                    const dimensions = await resource.getImageDimensions();
+                                    newItem.data.scaleX = dimensions.width;
+                                    newItem.data.scaleY = dimensions.height;
+                                }
+
+                                if(resource.type === "audio") {
+                                    // todo: handle audio resource
+                                }
+
                                 timeline.add(newItem);
                             }
                         }
@@ -265,39 +332,6 @@ class VideoEditor extends FlavorBase {
         this.project.on("export", (data) => {
             this.#exportTo(data);
         });
-    }
-
-    async #init() {
-        this.renderingCanvas = this.addDestroyable(document.createElement('canvas'));
-
-        const rendererOptions = this.flavorConfig.rendererOptions || {};
-
-        try {
-            this.renderer = new ThreeRendererAdapter({
-                canvas: this.renderingCanvas,
-                width: rendererOptions.width || 1280,
-                height: rendererOptions.height || 720,
-                backgroundColor: rendererOptions.backgroundColor ?? 0x000000,
-                backgroundAlpha: rendererOptions.backgroundAlpha ?? 1,
-                antialias: rendererOptions.antialias !== false,
-                alpha: rendererOptions.alpha !== false,
-                powerPreference: rendererOptions.powerPreference || "high-performance",
-                preserveDrawingBuffer: !!rendererOptions.preserveDrawingBuffer,
-                ambientLightIntensity: rendererOptions.ambientLightIntensity,
-                directionalLightIntensity: rendererOptions.directionalLightIntensity,
-                toneMapping: rendererOptions.toneMapping,
-                toneMappingExposure: rendererOptions.toneMappingExposure
-            }, this.project);
-        } catch (e) {
-            LS.Modal.buildEphemeral({
-                title: "Renderer Initialization Failed",
-                content: { html: "Failed to initialize the video renderer. This may be due to an unsupported or outdated graphics card or driver. Video editing features will be unavailable.<br><br>Error details: <pre class=\"log-message\">" + e.message + "</pre>" },
-                buttons: [
-                    { label: "OK" }
-                ]
-            }).show();
-            throw new Error(e);
-        }
     }
 
     /**
@@ -339,7 +373,7 @@ class VideoEditor extends FlavorBase {
         const exportedTimelines = {};
         for(const [id, timeline] of this.timelines) {
             exportedTimelines[id] = timeline.map(item => {
-                return this.timelineInstance.cloneItem(item, true);
+                return this.timelineInstance.cloneItem(item, true, true);
             });
         }
 
@@ -425,12 +459,12 @@ class VideoEditor extends FlavorBase {
 
 
     /**
-     * THE MAIN VIDEO FRAME RENDERING LOGIC; must be kept well optimized
-     * In the future calling WebGL directly could be better, the node based rendering isn't great for videos
+     * * THE MAIN VIDEO FRAME RENDERING LOGIC
+     * Must be kept well optimized
      * 
      * Also, the whole setup here is quite temporary and has a lot to be worked on
      * 
-     * @param {Number} time Time in seconds
+     * @param {Number} time Time in seconds of the frame to render. If not provided, it will render the current time of the timeline.
      */
     renderAtTime(time) {
         if(!this.timelineInstance || !this.renderer) return;
@@ -448,80 +482,69 @@ class VideoEditor extends FlavorBase {
         const renderTargets = this.__renderTargets;
         renderTargets.length = 0;
 
-        // ! todo To be removed
-        const currentMediaItems = this.__currentMediaItems;
-        currentMediaItems.clear();
-
         // First loop to process automation items and values
         // We find intersecting items at the current time via a binary search
         const items = this.timelineInstance.getIntersectingAt(time);
 
-        if(this.editingItem) {
+        if(this.editingItem && !items.includes(this.editingItem)) {
             items.push(this.editingItem);
         }
 
+        let activeCamera = this.renderer.defaultCamera;
+
         for(const item of items) {
             if(item.type === "automation") {
-                // Process automation items
-                this.processAutomationItemAtTime(item, time);
+                // Process automation & event & timeline data input items
+                mappingCompiler.processTimelinedAutomation(item, time, this.timelineInstance, this.renderer);
                 continue;
             }
 
-            if(item.data?.enabled === false) {
-                if(item.__mediaElement) this.syncMediaItem(item, time, false);
+            if(item.type === "audio") {
+                console.log("TODO: implement audio rendering");
                 continue;
             }
 
-            if(item.type === "sound") {
-                console.log("TODO: implement sound rendering");
-                continue;
-            }
-
-            if(item.data?.visible === false) {
-                if(item.__mediaElement) this.syncMediaItem(item, time, false);
-                continue;
-            }
-
+            // Ensure we have a visual node/rendering object
             if(!item.node) this.renderer.createObject(item);
             if(!item.node) continue;
 
+            if(item.type === "camera") {
+                activeCamera = item.node;
+                continue;
+            }
+
+            // Check for material resource updates
             if(item.resourceUpdated !== false) {
                 this.renderer.updateNodeResource(item);
             }
 
-            // TODO: this is very temporary, optimize
-            if(item.type === "video") {
-                // Crazy chain. Anyway, videoDecoder is assumed to have been created by the above renderer.updateNodeResource call
-                const decoder = item.__videoDecoder || (item.__videoDecoder = (item.data.resource instanceof Resource? item.data.resource: (item.data.resource = this.project.resources.getResource(item.data.resource))).assets.videoDecoder);
-
-                if(decoder) {
-                    decoder.seek(time - item.start);
+            // This should be more well optimized rather than check resources every time;
+            const resource = this.project.resources.getResource(item.data.resource);
+            if(resource) {
+                if(resource.type === "video") {
+                    // Seek and update the video texture using the video decoder, which is assumed to have been created by the above renderer.updateNodeResource call
+                    const decoder = item.__videoDecoder || (item.__videoDecoder = resource.assets.videoDecoder);
+                    if(decoder) {
+                        // ! todo: rerender callback doesnt seem to work
+                        decoder.seek(time - item.start, item.data, item.node?.userData.canvasTexture).then(this.__maybeRerenderCallback);
+                    }
                 }
             }
 
             if(item.data.animations) {
                 for(const anim of item.data.animations) {
                     if(anim.enabled === false) continue;
-                    this.processAutomationItemAtTime(anim, time);
+                    mappingCompiler.processTimelinedAutomation(anim, time, this.timelineInstance, this.renderer);
                 }
             }
 
             renderTargets.push(item);
         }
 
-        for(const item of this.activeMediaItems) {
-            if(!currentMediaItems.has(item)) {
-                this.syncMediaItem(item, time, false);
-            }
-        }
-
-        this.activeMediaItems.clear();
-        for(const item of currentMediaItems) {
-            this.activeMediaItems.add(item);
-        }
-
         // TODO: Optimize
         renderTargets.sort((a, b) => (a.data.zIndex || a.row || 0) - (b.data.zIndex || b.row || 0));
+
+        console.log(renderTargets);
 
         // Render all items to the main renderer
         // TODO: whotf built this
@@ -543,68 +566,20 @@ class VideoEditor extends FlavorBase {
             renderOrder++;
         }
 
-        this.renderer.render(this.activeCamera || this.renderer.defaultCamera);
+        this.renderer.render(activeCamera);
     }
 
-    processAutomationItemAtTime(item, time) {
-        if(!item.__automationClip || !item.data || !item.data.targets || item.data.enabled === false || item.data.targets.length === 0) return;
+    #maybeRerender(needsToRerender) {
 
-        if (item.data.automationFunction && (item.__dirtyMapping || !item.mappingFn)) {
-            try {
-                item.mappingFn = mappingCompiler.compile(item.data.automationFunction);
-            } catch (e) {
-                console.error("Failed to compile automation mapping function:", e);
-                item.mappingFn = mappingCompiler.NOOP_FUNCTION;
-            }
-
-            item.__dirtyMapping = false;
-        } else if(!item.data.automationFunction) {
-            item.mappingFn = mappingCompiler.NOOP_FUNCTION;
+        // Render again if a video frame took longer than the render frame to decode
+        // Eg. if a frame at a certain time wasn't ready by the time everything else was rendered, we let the decoder do it's thing and render again once the frame is ready so the user sees an accurate preview without nerfing the smoothness of everything else.
+        // This must NOT happen while exporting, only while editing
+        if(needsToRerender) {
+            console.log("Video frame arrived late, re-rendering frame");
+            this.frameRerender = true;
+            this.render();
+            this.frameRerender = false;
         }
-
-        const automationValue = item.mappingFn(item.__automationClip.getValueAtTime(time - item.start), time);
-
-        // Use cached targets
-        if(item.__cTargets && !item.__dirty) {
-            for (const cTarget of item.__cTargets) {
-                const baseValue = cTarget.isRelative? cTarget.target.data[cTarget.property] || 0: 0;
-                cTarget.setter(cTarget.target, baseValue + cTarget.mappingFn(automationValue, time));
-            }
-            return;
-        }
-
-        // Compile targets
-        const compiled = [];
-        for (let i = 0; i < item.data.targets.length; i++) {
-            const target = item.data.targets[i];
-
-            const targetNode = target.nodeId? this.timelineInstance.getItemById(target.nodeId): null;
-            if(!targetNode) continue;
-            if(!targetNode.node) ThreeRendererAdapter.createObject(targetNode);
-            if(!targetNode.node && targetNode.type !== "sound") continue;
-
-            const setter = this.constructor.nodePropertySetters[target.property];
-            if(typeof setter !== "function") continue;
-            
-            const mappingFn = target.__mappingCache || (target.mapping && target.mapping !== "x"? mappingCompiler.compile(target.mapping): mappingCompiler.NOOP_FUNCTION);
-            target.__mappingCache = mappingFn;
-
-            const isRelative = target.isRelative;
-            const finalValue = isRelative? (targetNode.data[target.property] || 0) + (mappingFn(automationValue, time)): mappingFn(automationValue, time);
-
-            setter(targetNode, finalValue);
-
-            compiled.push({
-                setter,
-                target: targetNode,
-                property: target.property,
-                mappingFn,
-                isRelative
-            });
-        }
-
-        item.__cTargets = compiled;
-        item.__dirty = false;
     }
 
     /**
@@ -618,10 +593,6 @@ class VideoEditor extends FlavorBase {
             // If destroyViews is true, the timeline has been destroyed already, so we don't need to reset it
             if(!destroyViews) this.timelineInstance.reset(true);
             this.timelineInstance = null;
-        }
-
-        for(const item of Array.from(this.mediaItems)) {
-            this.releaseItemMedia(item);
         }
 
         if(this.renderer) this.renderer.destroy();

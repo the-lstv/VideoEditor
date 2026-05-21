@@ -1,4 +1,10 @@
 /**
+ * Basic helper classes.
+ * @copyright 2026 lstv.space
+ * @license GPL-3.0
+ */
+
+/**
  * Command interface
  * Represents a command that can be executed, undone, and redone
  */

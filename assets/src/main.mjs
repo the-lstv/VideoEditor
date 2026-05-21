@@ -123,6 +123,9 @@ window.addEventListener('load', async () => {
             TIMELINE_TOOL_PREVIEW: 'p',
             TIMELINE_TOOL_GROUP: 'g',
             TIMELINE_TOOL_ERASE: 'e',
+            TIMELINE_TOOL_PAINT: 'b',
+            TIMELINE_TOOL_SLIDE: 's',
+            TIMELINE_TOOL_RIPPLE: 'r',
 
             ...app.config.get('shortcuts') || {} // Custom shortcuts
         });
@@ -220,6 +223,8 @@ window.addEventListener('load', async () => {
         app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { app.flavor.timelineInstance.tool = "preview" });
         app.shortcutManager.assign("TIMELINE_TOOL_GROUP", () =>   { app.flavor.timelineInstance.tool = "group"   });
         app.shortcutManager.assign("TIMELINE_TOOL_ERASE", () =>   { app.flavor.timelineInstance.tool = "erase"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_PAINT", () =>   { app.flavor.timelineInstance.tool = "paint"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_SLIDE", () =>   { app.flavor.timelineInstance.tool = "slide"   });
 
         undoButton.addEventListener('click', () => {
             app.currentProject.historyManager.undo();

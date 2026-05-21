@@ -1,3 +1,9 @@
+/**
+ * Base project class.
+ * @copyright 2026 lstv.space
+ * @license GPL-3.0
+ */
+
 import { HistoryManager } from "./base.mjs";
 import { ResourceManager } from "./resources.mjs";
 
@@ -157,7 +163,7 @@ class Project extends LS.Context {
         // ! Todo
         const data = {
             config: this.config,
-            resources: this.resources.export()
+            resources: this.resources.export(),
         };
 
         // Let other parts of the application add something to the exported data

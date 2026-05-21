@@ -47,7 +47,7 @@ class PropertyEditorView extends LS.Multipane.View {
             styled: false
         });
 
-        this.tabs.add("Editor", this.editorContainer = LS.Create("ls-tab.property-editor-container"));
+        this.tabs.add("Properties", this.editorContainer = LS.Create("ls-tab.property-editor-container"));
         this.tabs.add("Pipeline", LS.Create());
         this.tabs.add("Animation", LS.Create());
         this.tabs.add("Behavior", LS.Create());
@@ -89,52 +89,47 @@ class PropertyEditorView extends LS.Multipane.View {
 
         this.currentTarget = target;
 
-        for(const prop of ["id", "type", "clipDuration", "clipStartTime", "tileColor"]) {
-            this.updateInputValue(prop);
-        }
-
         this.__labelInput.value = target.label || "";
 
         this.targetNodeIsVisual = false;
         switch(target.type) {
-            case "sprite": case "text": case "graphics": case "container": case "graphics": case "video":
+            case "sprite": case "text": case "static_text": case "graphics": case "container": case "graphics":
                 this.targetNodeIsVisual = true;
-
-                for(const prop of ["positionX", "positionY", "scaleX", "scaleY", "scaleZ", "rotationX", "rotationY", "rotationZ", "anchorX", "anchorY", "opacity", "visible", "blendMode", "tint", "skewX", "skewY"]) {
-                    this.updateInputValue(prop);
-                }
 
                 this.editorContainer.appendChild(this.propertyGroups.transform);
 
                 if(target.type === "text") {
-                    for(const prop of ["textContent", "textStyleWeight", "textStyleStyle", "textStyleFontSize", "textStyleFontFamily", "textStyleAlignment", "textStyleFill", "textStyleLineHeight", "textStyleWrapWidth", "textStyleLetterSpacing", "textStyleWrap", "textStyleStroke", "textStyleStrokeThickness", "textStyleStrokeLinejoin", "textStyleDropShadow", "textStyleDropShadowColor", "textStyleDropShadowOpacity", "textStyleDropShadowAngle", "textStyleDropShadowDistance", "textStyleDropShadowBlur"]) {
-                        this.updateInputValue(prop);
-                    }
-
-                    this.editorContainer.appendChild(this.propertyGroups.text);
+                    this.editorContainer.appendChild(this.propertyGroups.dynamicText);
+                } else if(target.type === "static_text") {
+                    this.editorContainer.appendChild(this.propertyGroups.staticText);
                 }
 
-                if(target.type === "sprite" || target.type === "video") {
+                const resourceType = this.parent && this.parent.resources.getResource(target.data.resource)?.type;
+
+                if(resourceType || target.type === "sprite" || target.type === "audio") {
                     this.editorContainer.appendChild(this.propertyGroups.source);
                 }
 
-                if(target.type === "video") {
+                if(resourceType === "video") {
                     this.editorContainer.appendChild(this.propertyGroups.video);
                 }
 
                 this.editorContainer.appendChild(this.propertyGroups.rendering);
                 break;
 
-            case "automation":
-                for(const prop of ["automationBaseValue", "automationEnabled", "automationFunction"]) {
-                    this.updateInputValue(prop);
-                }
+            case "camera":
+                this.targetNodeIsVisual = true;
 
+                this.editorContainer.appendChild(this.propertyGroups.transform);
+                this.editorContainer.appendChild(this.propertyGroups.camera);
+                break;
+
+            case "automation":
                 this.__automationTargetsBody.innerHTML = "";
 
-                const attachment = this.#getAttachment();
-                if (attachment?.timeline) for (const [i, t] of (target.data.targets || []).entries()) {
-                    const targetNode = attachment.timeline.getItemById(t.nodeId);
+                const timelineInstance = this.#getAttachment()?.timelineInstance;
+                if (timelineInstance) for (const [i, t] of (target.data.targets || []).entries()) {
+                    const targetNode = timelineInstance.getItemById(t.nodeId);
                     const targetLabel = targetNode ? (targetNode.label || targetNode.type || targetNode.id) : "Unknown Node";
 
                     const mappingFormulaInput = this.#createInput(`automationTargetMapping${i}`, {
@@ -191,15 +186,20 @@ class PropertyEditorView extends LS.Multipane.View {
                 this.editorContainer.appendChild(this.propertyGroups.automation);
                 break;
 
-            case "sound":
+            case "audio":
                 this.editorContainer.appendChild(this.propertyGroups.source);
                 this.editorContainer.appendChild(this.propertyGroups.audio);
                 break;
 
-            default:
-                break;
+            default: break;
         }
 
+        for(const prop of this.editorContainer.querySelectorAll(".property-editor-input")) {
+            const id = prop.dataset.inputId;
+            this.updateInputValue(id);
+        }
+
+        // Edit aid for visual nodes
         if(this.targetNodeIsVisual) {
             const attachment = this.#getAttachment();
             if(!target.node) {
@@ -315,6 +315,8 @@ class PropertyEditorView extends LS.Multipane.View {
             }
         }});
 
+        inputObject.input.dataset.inputId = id;
+
         if(type === "checkbox" || type === "radio") {
             inputObject.container = LS.Create("label", { class: "ls-" + type, inner: [ inputObject.input, { tag: "span" } ] });
             inputObject.input.checked = !!defaultValue;
@@ -395,7 +397,7 @@ class PropertyEditorView extends LS.Multipane.View {
     }
 
     linkingAutomationTarget() {
-        if (!this.currentTarget || this.currentTarget.type !== "automation" || !this.#getAttachment()?.timeline) return;
+        if (!this.currentTarget || this.currentTarget.type !== "automation" || !this.#getAttachment()?.timelineInstance) return;
 
         this.__addingTarget = this.currentTarget;
         LS._topLayer.appendChild(this.__addingTargetElement || (this.__addingTargetElement = LS.Create({
@@ -413,7 +415,7 @@ class PropertyEditorView extends LS.Multipane.View {
         if(localStorage.getItem("show-automation-target-hint") !== "false") {
             LS.Modal.buildEphemeral({
                 title: "Hint",
-                content: "Simply tweak any animatable property on any object after this message. This will automatically link it as a target in the automation clip.",
+                content: "After closing this message, tweak any animatable property on any object that you wish to automate. This will link it as a target in the automation clip.",
                 buttons: [{ label: "Got it!" }]
             }).open();
 
@@ -462,9 +464,9 @@ class PropertyEditorView extends LS.Multipane.View {
     }
 
     #updateTimeline() {
-        const attachment = this.#getAttachment();
-        if(this.currentTarget && attachment?.timeline) {
-            attachment.timeline.render(true);
+        const timelineInstance = this.#getAttachment()?.timelineInstance;
+        if(this.currentTarget && timelineInstance) {
+            timelineInstance.render(true);
         }
     }
 
@@ -561,8 +563,8 @@ class PropertyEditorView extends LS.Multipane.View {
                         const propertyName = this.focusedInput.id;
                         if(!propertyName) return;
 
-                        const timeline = this.#getAttachment()?.timeline;
-                        if(!timeline) return;
+                        const timelineInstance = this.#getAttachment()?.timelineInstance;
+                        if(!timelineInstance) return;
 
                         const clip = {
                             type: "automation",
@@ -570,7 +572,7 @@ class PropertyEditorView extends LS.Multipane.View {
                             duration: this.currentTarget.duration || 1,
                             row: (this.currentTarget.row || 0) + 1,
                             label: `${this.currentTarget.label || this.currentTarget.type || "Target"} - ${propertyName}`,
-                            color: "neon",
+                            tileColor: "neon",
                             data: {
                                 targets: [
                                     { nodeId: this.currentTarget.id, property: propertyName }
@@ -581,7 +583,7 @@ class PropertyEditorView extends LS.Multipane.View {
                             }
                         }
 
-                        timeline.add(clip);
+                        timelineInstance.add(clip);
                     }
                 } }
             ]
@@ -647,7 +649,7 @@ class PropertyEditorView extends LS.Multipane.View {
         this.propertyGroups.general = LS.Create([
             { tag: "h3", i18n: "properties.general", text: "General", class: "property-editor-header" },
             {
-                class: "property-editor-group level-n1", inner: [
+                class: "property-editor-group level-1", inner: [
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-tag" }, { tag: "label", i18n: "properties.label", text: " Label:" }] }, this.__labelInput = LS.Create({
                         tag: "input", type: "text", class: "property-editor-name-input", oninput: () => {
                             if (this.currentTarget) {
@@ -701,7 +703,7 @@ class PropertyEditorView extends LS.Multipane.View {
         this.propertyGroups.transform = LS.Create([
             { tag: "h3", i18n: "properties.transform", text: "Transform", class: "property-editor-header" },
             {
-                class: "property-editor-group level-n1", inner: [
+                class: "property-editor-group level-1", inner: [
                     // Position Group
                     [
                         { tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", i18n: "properties.position", text: " Position:" }] },
@@ -775,17 +777,43 @@ class PropertyEditorView extends LS.Multipane.View {
         this.propertyGroups.rendering = LS.Create([
             { tag: "h3", i18n: "properties.rendering", text: "Rendering", class: "property-editor-header" },
             {
-                class: "property-editor-group level-n1", inner: [
+                class: "property-editor-group level-1", inner: [
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-eye-slash" }, { tag: "label", i18n: "properties.visible", text: " Visible:" }] },
                         this.#createInput("visible", { type: "checkbox", defaultValue: true })
                     ],
 
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-palette-fill" }, { tag: "label", i18n: "properties.tint", text: " Color:" }] },
-                        this.#createInput("tint", { type: "color", defaultValue: "#ffffff" })
+                        this.#createInput("materialColor", { type: "color", defaultValue: "#ffffff" })
                     ],
 
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-circle-half" }, { tag: "label", i18n: "properties.opacity", text: " Opacity:" }] },
                         this.#createInput("opacity", { type: "number", attributes: { min: 0, max: 1, step: 0.05 }, defaultValue: 1 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-circle-half" }, { tag: "label", i18n: "properties.blendMode", text: " Blend mode:" }] },
+                        this.#createInput("blendMode", {
+                            type: "select",
+                            options: [
+                                { value: "normal", text: "Normal" },
+                                { value: "add", text: "Additive" },
+                                { value: "subtract", text: "Subtractive" },
+                                { value: "multiply", text: "Multiply" },
+                                { value: "screen", text: "Screen" },
+                                // { value: "overlay", text: "Overlay" },
+                                { value: "darken", text: "Darken" },
+                                { value: "lighten", text: "Lighten" },
+                                // { value: "color-dodge", text: "Color Dodge" },
+                                // { value: "color-burn", text: "Color Burn" },
+                                // { value: "hard-light", text: "Hard Light" },
+                                // { value: "soft-light", text: "Soft Light" },
+                                // { value: "difference", text: "Difference" },
+                                // { value: "exclusion", text: "Exclusion" },
+                                // { value: "hue", text: "Hue" },
+                                // { value: "saturation", text: "Saturation" },
+                                // { value: "color", text: "Color" },
+                                // { value: "luminosity", text: "Luminosity" }
+                            ],
+                        })
                     ],
                     
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-shadows" }, { tag: "label", i18n: "properties.castShadow", text: " Cast shadows:" }] },
@@ -800,19 +828,8 @@ class PropertyEditorView extends LS.Multipane.View {
                         this.#createInput("wireframe", { type: "checkbox", defaultValue: false })
                     ],
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-circle-half" }, { tag: "label", i18n: "properties.blendMode", text: " Blend mode:" }] },
-                        this.#createInput("blendMode", {
-                            type: "select",
-                            options: [
-                                { value: "normal", text: "Normal" },
-                                { value: "add", text: "Additive" },
-                                { value: "multiply", text: "Multiply" },
-                                { value: "screen", text: "Screen" },
-                                { value: "overlay", text: "Overlay" },
-                                { value: "darken", text: "Darken" },
-                                { value: "lighten", text: "Lighten" }
-                            ],
-                        })
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-funnel" }, { tag: "label", i18n: "properties.dithering", text: " Dithering:" }] },
+                        this.#createInput("dithering", { type: "checkbox", defaultValue: false })
                     ],
                 ]
             },
@@ -823,13 +840,13 @@ class PropertyEditorView extends LS.Multipane.View {
         this.propertyGroups.source = LS.Create([
             { tag: "h3", i18n: "properties.source", text: "Source / Media / Material", class: "property-editor-header" },
             {
-                class: "property-editor-group level-n1", inner: [
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-highlights" }, { tag: "label", i18n: "properties.material", text: " Material:" }] },
-                        this.#createInput("material", { type: "resource", defaultValue: "", callback: (v) => this.#updateProp({ url: v }) })
+                class: "property-editor-group level-1", inner: [
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-link-45deg" }, { tag: "label", i18n: "properties.resource", text: " Media:" }] },
+                        this.#createInput("resource", { type: "resource", resourceType: "media" })
                     ],
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-link-45deg" }, { tag: "label", i18n: "properties.sourceUrl", text: " Media:" }] },
-                        this.#createInput("sourceUrl", { type: "resource", defaultValue: "", callback: (v) => this.#updateProp({ url: v }) })
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-highlights" }, { tag: "label", i18n: "properties.material", text: " Material:" }] },
+                        this.#createInput("material", { type: "resource", resourceType: "material" })
                     ],
 
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-aspect-ratio" }, { tag: "label", i18n: "properties.sourceFitMode", text: " Fit mode:" }] },
@@ -850,7 +867,7 @@ class PropertyEditorView extends LS.Multipane.View {
         this.propertyGroups.audio = LS.Create([
             { tag: "h3", i18n: "properties.audio", text: "Audio", class: "property-editor-header" },
             {
-                class: "property-editor-group level-n1", inner: [
+                class: "property-editor-group level-1", inner: [
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-volume-up" }, { tag: "label", i18n: "properties.volume", text: " Volume:" }] },
                         this.#createInput("audioVolume", { type: "number", inputType: "knob", attributes: { min: 0, max: 100, step: 0.05 }, defaultValue: 100 })
                     ],
@@ -871,30 +888,195 @@ class PropertyEditorView extends LS.Multipane.View {
         this.propertyGroups.video = LS.Create([
             { tag: "h3", i18n: "properties.video", text: "Video", class: "property-editor-header" },
             {
-                class: "property-editor-group level-n1", inner: [
+                class: "property-editor-group level-1", inner: [
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-film" }, { tag: "label", i18n: "properties.playbackRateDirection", text: " Playback rate/direction:" }] },
-                        this.#createInput("videoPlaybackRate", { type: "number", inputType: "number", attributes: { min: -10, max: 10, step: 0.1 }, defaultValue: 1 })
+                        this.#createInput("playbackRate", { type: "number", inputType: "number", attributes: { min: -30, max: 30, step: 0.1 }, defaultValue: 1 })
                     ],
 
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-display" }, { tag: "label", i18n: "properties.frameRateLimit", text: " Frame rate limit:" }] },
-                        this.#createInput("videoFrameRate", { type: "number", inputType: "number", attributes: { min: -1, max: 960, step: 0.1 }, defaultValue: -1 })
+                        this.#createInput("videoFrameRate", { type: "number", inputType: "number", attributes: { min: -1, max: 460, step: 1 }, defaultValue: -1 })
                     ],
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-stopwatch" }, { tag: "label", i18n: "properties.offset", text: " Start offset:" }] },
-                        this.#createInput("videoOffset", { type: "number", inputType: "number", attributes: { min: 0, step: 0.1 }, defaultValue: 0 })
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-stopwatch" }, { tag: "label", i18n: "properties.offset", text: " Offset:" }] },
+                        this.#createInput("mediaOffset", { type: "number", inputType: "number", attributes: { step: 0.1 }, defaultValue: 0 })
                     ],
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-repeat-1" }, { tag: "label", i18n: "properties.loop", text: " Loop:" }] },
-                        this.#createInput("videoLoop", { type: "checkbox", defaultValue: false })
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-repeat-1" }, { tag: "label", i18n: "properties.loopMode", text: " Loop mode:" }] },
+                        this.#createInput("loopMode", {
+                            type: "select",
+                            defaultValue: "loop",
+                            options: [
+                                { value: "none", text: "None" },
+                                { value: "loop", text: "Loop" },
+                                { value: "pingpong", text: "Ping Pong" }
+                            ],
+                        })
+                    ],
+
+                    { tag: "hr" },
+
+                    { tag: "h3", i18n: "properties.proxySettings", text: "Proxy settings", style: "margin: 0" },
+                    { tag: "p", i18n: "properties.proxyDescription", text: "If the video is not playing or scrubbing smoothly during editing, this can help. Press generate proxy to create a version of the video optimized for editing." },
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-speedometer" }, { tag: "label", i18n: "properties.proxy", text: " Proxy:" }] },
+                        { tag: "label", class: "ls-switch",
+                            inner: [
+                                { tag: "fixme-span", i18n: "properties.enabled", text: "Enabled" },
+                                { tag: "input", type: "checkbox", onchange: (e) => {
+                                    // ! todo
+                                }},
+                                { tag: "span" }, // This NEEDS to be fixed
+                            ]
+                        },
+
+                        { tag: "button", i18n: "properties.generateProxy", text: "Generate Proxy", class: "elevated", onclick: () => {
+                            if(this.currentTarget) {
+                                const resource = this.currentTarget.data.resource;
+                                if(resource && resource.assets?.videoDecoder) {
+                                    resource.assets.videoDecoder.generateProxyWithModal();
+                                }
+                            }
+                        }},
+
+                        { tag: "button", i18n: "properties.deleteProxy", text: "Delete Proxy", class: "elevated", onclick: () => {
+                            if(this.currentTarget) {
+                                const resource = this.currentTarget.data.resource;
+                                if(resource && resource.assets?.videoDecoder) {
+                                    resource.assets.videoDecoder.clearProxy();
+                                }
+                            }
+                        }}
                     ],
                 ]
             }
         ]);
 
-        this.propertyGroups.text = LS.Create([
+        this.propertyGroups.staticText = LS.Create([
             { tag: "h3", i18n: "properties.text", text: "Text", class: "property-editor-header" },
             {
-                class: "property-editor-group level-n1", inner: [
+                class: "property-editor-group level-1", inner: [
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-fonts" }, { tag: "label", i18n: "properties.textContent", text: " Content:" }] },
+                        this.#createInput("textContent", { type: "text", defaultValue: "Some text" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-type-bold" }, { tag: "label", i18n: "properties.textStyleWeight", text: " Font weight:" }] },
+                        this.#createInput("textStyleWeight", {
+                            type: "select",
+                            defaultValue: "400",
+                            options: [
+                                { value: "100", text: "Thin (100)" },
+                                { value: "200", text: "Extra Light (200)" },
+                                { value: "300", text: "Light (300)" },
+                                { value: "400", text: "Normal (400)" },
+                                { value: "500", text: "Medium (500)" },
+                                { value: "600", text: "Semi Bold (600)" },
+                                { value: "700", text: "Bold (700)" },
+                                { value: "800", text: "Extra Bold (800)" },
+                                { value: "900", text: "Black (900)" }
+                            ],
+                        })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-type-italic" }, { tag: "label", inner: " Font style:" }] },
+                        this.#createInput("textStyleStyle", {
+                            type: "select",
+                            options: [
+                                { value: "normal", text: "Normal" },
+                                { value: "italic", text: "Italic" },
+                                { value: "oblique", text: "Oblique" }
+                            ],
+                        })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-paragraph" }, { tag: "label", inner: " Font size:" }] },
+                        this.#createInput("textStyleFontSize", { type: "number", attributes: { step: 1 }, defaultValue: 24 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-fonts" }, { tag: "label", inner: " Font family:" }] },
+                        this.#createInput("textStyleFontFamily", { type: "text", defaultValue: "Arial" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-left" }, { tag: "label", inner: " Alignment:" }] },
+                        this.#createInput("textStyleAlignment", {
+                            type: "select",
+                            options: [
+                                { value: "left", text: "Left" },
+                                { value: "center", text: "Center" },
+                                { value: "right", text: "Right" }
+                            ],
+                        })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette-fill" }, { tag: "label", inner: " Color:" }] },
+                        this.#createInput("textStyleFill", { type: "color", defaultValue: "#ffffff" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-layout-text-sidebar-reverse" }, { tag: "label", inner: " Line height:" }] },
+                        this.#createInput("textStyleLineHeight", { type: "number", attributes: { step: 0.1, min: 0.1 }, defaultValue: 1.2 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-wrap" }, { tag: "label", inner: " Wrap width:" }] },
+                        this.#createInput("textStyleWrapWidth", { type: "number", attributes: { step: 1, min: 0 }, defaultValue: 200 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-paragraph" }, { tag: "label", inner: " Letter spacing:" }] },
+                        this.#createInput("textStyleLetterSpacing", { type: "number", attributes: { step: 0.1 }, defaultValue: 0 })
+                    ],
+                    
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-wrap" }, { tag: "label", inner: " Word wrap:" }] },
+                        this.#createInput("textStyleWrap", { type: "checkbox", defaultValue: true })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-border-style" }, { tag: "label", inner: " Stroke:" }] },
+                        this.#createInput("textStyleStroke", { type: "color", defaultValue: "#000000" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-border-width" }, { tag: "label", inner: " Stroke thickness:" }] },
+                        this.#createInput("textStyleStrokeThickness", { type: "number", attributes: { step: 1, min: 0 }, defaultValue: 0 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-text-paragraph" }, { tag: "label", inner: " Stroke line join:" }] },
+                        this.#createInput("textStyleStrokeLinejoin", {
+                            type: "select",
+                            options: [
+                                { value: "miter", text: "Miter" },
+                                { value: "round", text: "Round" },
+                                { value: "bevel", text: "Bevel" }
+                            ],
+                        })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-shadows" }, { tag: "label", inner: " Drop shadow:" }] },
+                        this.#createInput("textStyleDropShadow", { type: "checkbox", defaultValue: false })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-palette" }, { tag: "label", inner: " Shadow color:" }] },
+                        this.#createInput("textStyleDropShadowColor", { type: "color", defaultValue: "#000000" })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-circle-half" }, { tag: "label", inner: " Shadow opacity:" }] },
+                        this.#createInput("textStyleDropShadowOpacity", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0.5 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-arrows-angle-expand" }, { tag: "label", inner: " Shadow angle:" }] },
+                        this.#createInput("textStyleDropShadowAngle", { type: "number", inputType: "angle", attributes: { step: 0.1 }, defaultValue: Math.PI / 6 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-distribute-vertical" }, { tag: "label", inner: " Shadow distance:" }] },
+                        this.#createInput("textStyleDropShadowDistance", { type: "number", attributes: { step: 1 }, defaultValue: 5 })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-droplet-half" }, { tag: "label", inner: " Shadow blur:" }] },
+                        this.#createInput("textStyleDropShadowBlur", { type: "number", attributes: { step: 0.1, min: 0 }, defaultValue: 0 })
+                    ],
+                ]
+            }
+        ]);
+
+        this.propertyGroups.dynamicText = LS.Create([
+            { tag: "h3", i18n: "properties.text", text: "Text", class: "property-editor-header" },
+            {
+                class: "property-editor-group level-1", inner: [
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-fonts" }, { tag: "label", i18n: "properties.textContent", text: " Content:" }] },
                         this.#createInput("textContent", { type: "text", defaultValue: "Some text" })
                     ],
@@ -1015,7 +1197,7 @@ class PropertyEditorView extends LS.Multipane.View {
 
         this.propertyGroups.automation = LS.Create([
             { tag: "h3", i18n: "properties.automation", text: "Automation", class: "property-editor-header" },
-            { class: "property-editor-group level-n1", inner: [
+            { class: "property-editor-group level-1", inner: [
                 [{ tag: "span", inner: [{ tag: "i", class: "bi-toggles" }, { tag: "label", i18n: "properties.automationEnabled", text: " Enabled:" }] },
                     this.#createInput("automationEnabled", {
                         type: "checkbox", defaultValue: false
@@ -1036,7 +1218,7 @@ class PropertyEditorView extends LS.Multipane.View {
                             title: "Mapping functions",
                             content: [
                                 { tag: "p", style: "margin-top: 0", inner: "Mapping functions allow you to transform the automation value before applying it to the target property. You can use 'x' or 'input' to represent the input value (from the automation curve), and return a new value." },
-                                { tag: "ls-box", accent: "orange", class: "elevated", innerHTML: "Tip: Mapping functions are largely compatible with the <a href=\"https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_form.htm\" target=\"_blank\">FL Studio Mapping Formula</a>." },
+                                { tag: "ls-box", accent: "orange", class: "elevated", innerHTML: "Tip: Mapping functions are backwards compatible with the <a href=\"https://www.image-line.com/fl-studio-learning/fl-studio-online-manual/html/automation_form.htm\" target=\"_blank\">FL Studio Mapping Formula</a>." },
                                 { tag: "p", inner: "Examples:" },
                                 { tag: "ul", style: "padding-left: 20px", inner: [
                                     { tag: "li", inner: [{ tag: "code", inner: "x" }, " - Identity function (1:1)"] },
@@ -1139,7 +1321,7 @@ class PropertyEditorView extends LS.Multipane.View {
                     { tag: "li", inner: "Finally, you can add a mapping function to each target to modify how the value affects it" },
                 ] },
                 { tag: "p", inner: "You can also quickly make one by right-clicking the property you want to automate when editing any object." },
-                { tag: "button", inner: "What is a mapping function?", class: "pill elevated", style: "margin-top: 10px", onclick: () => { this.__automationHelpModal.open(); } },
+                { tag: "button", inner: "How do mapping functions work?", class: "pill elevated", style: "margin-top: 10px", onclick: () => { this.__automationHelpModal.open(); } },
                 { tag: "button", inner: "Don't show again", class: "pill elevated margin-left-small", style: "margin-top: 10px", onclick() {
                     this.parentElement.remove();
                     localStorage.setItem("show-automation-help", "false");
@@ -1147,6 +1329,25 @@ class PropertyEditorView extends LS.Multipane.View {
             ] }] : [],
 
             { tag: "ls-box", class: "elevated margin-top-large", innerHTML: "Relative: value gets added on top of the original value.<br>Absolute: value replaces (sets) the value." }
+        ]);
+
+        this.propertyGroups.camera = LS.Create([
+            { tag: "h3", i18n: "properties.camera", text: "Camera", class: "property-editor-header" },
+            {
+                class: "property-editor-group level-1", inner: [
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", i18n: "properties.cameraFov", text: " Field of view:" }] },
+                        this.#createInput("cameraFov", { type: "number", defaultValue: 75, callback: (v) => this.#updateProp({ fov: v }) })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", i18n: "properties.cameraNear", text: " Near clip:" }] },
+                        this.#createInput("cameraNear", { type: "number", defaultValue: 0.1, callback: (v) => this.#updateProp({ near: v }) })
+                    ],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", i18n: "properties.cameraFar", text: " Far clip:" }] },
+                        this.#createInput("cameraFar", { type: "number", defaultValue: 1000, callback: (v) => this.#updateProp({ far: v }) })
+                    ]
+                ]
+            }
         ]);
     }
 

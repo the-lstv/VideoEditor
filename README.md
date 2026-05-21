@@ -38,5 +38,5 @@ This old version sadly cannot be easily run anymore since it relied on an extrem
 
 <img src=https://cdn.extragon.cloud/file/a771e02dfb37f618.svg> <br>
 This software is made by a human, not by AI.<br>
-This project is almost 99% programmed solely by Lukas @ lstv.space; including all UI libraries, components, etc. with nearly no external dependencies. Please consider supporting me if you find the software useful! Many, many hours of work have gone into this project.<br>
+This project is almost 99% programmed solely by Lukas @ lstv.space; including all UI libraries, components, etc. with only a very few external dependencies. Please consider supporting me if you find the software useful! Many, many hours of work have gone into this project.<br>
 Licensed under the GPL-3.0 License.

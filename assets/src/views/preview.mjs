@@ -1,4 +1,4 @@
-import RendererAdapter from "../backends/rendering/adapter-base.mjs";
+import RendererAdapter from "../backends/graphics/adapter-base.mjs";
 
 /**
  * Visual preview view class

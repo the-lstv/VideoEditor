@@ -1,8 +1,12 @@
 {
     "dependencies": {
+        "@mediabunny/flac-encoder": "^1.45.2",
+        "@mediabunny/mp3-encoder": "^1.45.2",
         "electron-remote": "^1.3.0",
+        "image-size": "^2.0.2",
         "mediabunny": "^1.45.2",
-        "three": "^0.184.0"
+        "three": "^0.184.0",
+        "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.67.0"
     },
     "devDependencies": {
         "electron": "v41.1.1",

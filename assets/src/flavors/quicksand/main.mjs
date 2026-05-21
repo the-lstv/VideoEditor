@@ -3,7 +3,7 @@
  */
 
 import FlavorBase from "../../core/flavor.mjs";
-import ThreeRendererAdapter from "../../backends/rendering/threejs.mjs";
+import ThreeRendererAdapter from "../../backends/graphics/ThreeJS/index.mjs";
 
 // --- Views
 import { AssetManagerView } from "../../views/asset-manager.mjs";

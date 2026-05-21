@@ -1,5 +1,11 @@
-import RendererAdapter from "./adapter-base.mjs";
-import AcceleratedTextRenderer from "./text.mjs";
+/**
+ * Three.js rendering backend adapter.
+ * @copyright 2026 lstv.space
+ * @license GPL-3.0
+ */
+
+import RendererAdapter from "../adapter-base.mjs";
+import AcceleratedTextRenderer from "../text-engine.mjs";
 
 // import * as THREE from "three";
 
@@ -55,9 +61,7 @@ class ThreeRendererAdapter extends RendererAdapter {
         this.renderer.width = this.width;
         this.renderer.height = this.height;
 
-        if(THREE.SRGBColorSpace) {
-            this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-        }
+        this.renderer.outputColorSpace = THREE.SRGBColorSpace;
 
         if(options.toneMapping) {
             this.renderer.toneMapping = options.toneMapping;
@@ -78,7 +82,7 @@ class ThreeRendererAdapter extends RendererAdapter {
         this.root.name = "EditorRenderRoot";
         this.scene.add(this.root);
 
-        this.defaultCamera = new THREE.OrthographicCamera(0, this.width, 0, this.height, -10000, 10000);
+        this.defaultCamera = new THREE.OrthographicCamera(0, this.width, 0, this.height, 0.1, 10000);
         this.defaultCamera.position.set(0, 0, 1000);
         this.defaultCamera.lookAt(0, 0, 0);
 
@@ -153,21 +157,21 @@ class ThreeRendererAdapter extends RendererAdapter {
 
             /* Sprite/image/video (2D surface) node */
             case "sprite":
-            case "image":
-            case "video":
-                if(item.type === "image") item.type = "sprite"; // Normalize
+            case "image":  // technically, this type is identical to sprite
+                if(item.type === "image") item.type = "sprite"; // Normalize to prefer sprite
                 item.node = this.constructor.createSurfaceNode(item.type, item.data, this.parent);
                 break;
 
             /* Using the native dynamic text renderer (good for dynamic text) */
             case "text":
+                AcceleratedTextRenderer.provideThreeJS(THREE);
+
                 const renderer = new AcceleratedTextRenderer({
-                    THREE,
                     threeRenderer: this.renderer,
-                    cols: 120,
-                    rows: 40,
-                    fontSrc: "assets/fonts/JetBrainsMono",
-                    init: true
+                    fontSrc: item.data.fontSrc || "assets/fonts/JetBrainsMono",
+                    cols: item.data.cols || 120,
+                    rows: item.data.rows || 40,
+                    fontSize: item.data.textStyleFontSize || 24,
                 });
 
                 item.textRenderer = renderer; // Here options could get uploaded, & these could be shared
@@ -186,13 +190,13 @@ class ThreeRendererAdapter extends RendererAdapter {
 
             /* Camera node */
             case "camera":
-                item.node = this.constructor.createCameraNode(item);
+                item.node = this.constructor.createCameraNode(item, this.width, this.height);
                 break;
 
             /* Audio related */
-            case "sound":
+            case "audio":
             case "notes":
-                // No visual node, but sound items should carry an audio stream with a connectable output
+                // No visual node, but audio items should carry an audio stream with a connectable output
                 return null;
 
             default:
@@ -211,6 +215,18 @@ class ThreeRendererAdapter extends RendererAdapter {
 
         this.applyInitialNodeProperties(item);
         return item.node;
+    }
+
+    static createCameraNode(item, width = 1280, height = 720) {
+        const data = item.data || {};
+
+        // HELP i don't really understand this and what the defaults shouls be :'(
+        const camera = data.cameraType === "orthographic"?
+            new THREE.OrthographicCamera(data.cameraLeft ?? 0, data.cameraRight ?? width, data.cameraTop ?? 0, data.cameraBottom ?? height, data.cameraNear ?? 0.1, data.cameraFar ?? 1000):
+            new THREE.PerspectiveCamera (data.cameraFov ?? 50, data.cameraAspect ?? width / height, data.cameraNear ?? 0.1, data.cameraFar ?? 1000);
+
+        camera.lookAt(0, 0, 0);
+        return camera;
     }
 
     async applyInitialNodeProperties(item) {
@@ -234,16 +250,27 @@ class ThreeRendererAdapter extends RendererAdapter {
 
         if(item.node) {
             if(resource.type === "image") {
-                const texture = await resource.getTexture();
+                const texture = await resource.getImageTexture();
                 item.node.userData.material.map = texture;
                 item.node.userData.material.needsUpdate = true;
             }
 
             if(resource.type === "video") {
                 const videoDecoder = resource.getVideoDecoder();
+
+                if(!item.node.userData.canvasTexture) {
+                    const texture = new THREE.CanvasTexture(videoDecoder.canvas);
+                    texture.minFilter = THREE.LinearFilter;
+                    texture.magFilter = THREE.LinearFilter;
+                    texture.generateMipmaps = false;
+                    texture.colorSpace = THREE.SRGBColorSpace;
+                    texture.needsUpdate = false;
+
+                    item.node.userData.canvasTexture = texture;
+                }
+
                 if(videoDecoder) {
-                    const texture = videoDecoder.texture;
-                    item.node.userData.material.map = texture;
+                    item.node.userData.material.map = item.node.userData.canvasTexture;
                     item.node.userData.material.needsUpdate = true;
                 }
             }
@@ -345,6 +372,7 @@ class ThreeRendererAdapter extends RendererAdapter {
             1, 1, 0,
             0, 1, 0
         ], 3));
+
         geometry.setAttribute('uv', new THREE.Float32BufferAttribute([
             0, 1,
             1, 1,
@@ -399,7 +427,7 @@ class ThreeRendererAdapter extends RendererAdapter {
      */
     static nodePropertySetters = {
         "tileColor": (item, v) => {
-            item.color = v;
+            item.tileColor = v;
         },
 
         "clipDuration": (item, v) => {
@@ -497,20 +525,15 @@ class ThreeRendererAdapter extends RendererAdapter {
             if (item.node) item.node.visible = v;
         },
 
-        "tint": (item, v) => {
-            this.setMaterialColor(item, v);
-        },
-
-        "color": (item, v) => {
-            this.setMaterialColor(item, v);
-        },
-
-        "fill": (item, v) => {
-            this.setMaterialColor(item, v);
-        },
-
         "materialColor": (item, v) => {
             this.setMaterialColor(item, v);
+        },
+
+        "sourceFitMode": (item, v) => {
+            if (item.node?.userData) {
+                item.node.userData.sourceFitMode = v;
+                ThreeRendererAdapter.updateNodeLocalShape(item.node);
+            }
         },
 
         "opacity": (item, v) => {
@@ -521,8 +544,65 @@ class ThreeRendererAdapter extends RendererAdapter {
             this.setMaterialOpacity(item, v);
         },
 
+        // todo: handle other blending modes
         "blendMode": (item, v) => {
-            this.setBlendMode(item, v);
+            if(item.node) {
+                const material = item.node.userData.material;
+                if(material) {
+                    // Reset blending settings
+                    material.blendEquation = null;
+                    material.blendSrc = null;
+                    material.blendDst = null;
+
+                    switch(v) {
+                        case "normal":
+                            material.blending = THREE.NormalBlending;
+                            break;
+
+                        case "additive":
+                            material.blending = THREE.AdditiveBlending;
+                            break;
+
+                        case "subtractive":
+                            material.blending = THREE.CustomBlending;
+                            material.blendEquation = THREE.ReverseSubtractEquation;
+                            material.blendSrc = THREE.OneFactor;
+                            material.blendDst = THREE.OneFactor;
+                            break;
+
+                        case "multiply":
+                            material.premultipliedAlpha = true;
+                            material.blending = THREE.MultiplyBlending;
+                            break;
+
+                        case "screen":
+                            material.blending = THREE.CustomBlending;
+                            material.blendEquation = THREE.AddEquation;
+                            material.blendSrc = THREE.OneMinusDstColorFactor;
+                            material.blendDst = THREE.OneFactor;
+                            break;
+
+                        case "lighten":
+                            material.blending = THREE.CustomBlending;
+                            material.blendEquation = THREE.MaxEquation;
+                            break;
+
+                        case "darken":
+                            material.blending = THREE.CustomBlending;
+                            material.blendEquation = THREE.MinEquation;
+                            break;
+                            
+                        case "custom":
+                            // todo: Handle custom blending settings
+                            material.blending = THREE.CustomBlending;
+                            break;
+
+                        default:
+                            material.blending = THREE.NormalBlending;
+                    }
+                    material.needsUpdate = true;
+                }
+            }
         },
 
         "wireframe": (item, v) => {
@@ -530,6 +610,16 @@ class ThreeRendererAdapter extends RendererAdapter {
                 const material = item.node.userData.material;
                 if(material) {
                     material.wireframe = !!v;
+                    material.needsUpdate = true;
+                }
+            }
+        },
+
+        "dithering": (item, v) => {
+            if(item.node) {
+                const material = item.node.userData.material;
+                if(material) {
+                    material.dithering = !!v;
                     material.needsUpdate = true;
                 }
             }
@@ -543,195 +633,55 @@ class ThreeRendererAdapter extends RendererAdapter {
             if(item.node) item.node.receiveShadow = !!v;
         },
 
-        "textContent": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                item.node.userData.textState.text = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyle": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                item.node.userData.textState.style = v || {};
-                item.data.textStyle = v || {};
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleWeight": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.fontWeight = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleStyle": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.fontStyle = v;
-                this.updateTextNode(item);
-            }
-        },
-
+        "textContent": (item, v) => {},
+        "textStyle": (item, v) => {},
+        "textStyleWeight": (item, v) => {},
+        "textStyleStyle": (item, v) => {},
         "textStyleFontSize": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.fontSize = v;
-                this.updateTextNode(item);
+            if(item.textRenderer) {
+                item.textRenderer.setFontSize(v);
+                item.data.textStyleFontSize = v;
             }
         },
+        "textStyleFontFamily": (item, v) => {},
+        "textStyleFill": (item, v) => {},
+        "textStyleAlignment": (item, v) => {},
+        "textStyleLineHeight": (item, v) => {},
+        "textStyleWrapWidth": (item, v) => {},
+        "textStyleWrap": (item, v) => {},
+        "textStyleLetterSpacing": (item, v) => {},
+        "textStyleStroke": (item, v) => {},
+        "textStyleStrokeThickness": (item, v) => {},
+        "textStyleStrokeLinejoin": (item, v) => {},
+        "textStyleDropShadow": (item, v) => {},
+        "textStyleDropShadowColor": (item, v) => {},
+        "textStyleDropShadowDistance": (item, v) => {},
+        "textStyleDropShadowAngle": (item, v) => {},
+        "textStyleDropShadowBlur": (item, v) => {},
+        "textStyleDropShadowOpacity": (item, v) => {},
 
-        "textStyleFontFamily": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.fontFamily = v;
-                this.updateTextNode(item);
-            }
+        "audioVolume": (item, v) => {
+            item.data.audioVolume = v;
         },
 
-        "textStyleFill": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.fill = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleAlignment": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.align = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleLineHeight": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.lineHeight = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleWrapWidth": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.wordWrapWidth = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleWrap": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.wordWrap = !!v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleLetterSpacing": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.letterSpacing = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleStroke": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.stroke = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleStrokeThickness": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.strokeThickness = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleStrokeLinejoin": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.lineJoin = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleDropShadow": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.dropShadow = !!v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleDropShadowColor": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.dropShadowColor = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleDropShadowDistance": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.dropShadowDistance = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleDropShadowAngle": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.dropShadowAngle = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleDropShadowBlur": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.dropShadowBlur = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "textStyleDropShadowOpacity": (item, v) => {
-            if (item.node?.userData?.editorType === "text") {
-                this.ensureTextStyle(item);
-                item.node.userData.textState.style.dropShadowAlpha = v;
-                this.updateTextNode(item);
-            }
-        },
-
-        "volume": (item, v) => {
-            item.data.volume = v;
-            if(item.__mediaElement) item.__mediaElement.volume = Math.min(Math.max(v, 0), 1);
-        },
-
-        "muted": (item, v) => {
-            item.data.muted = !!v;
-            if(item.__mediaElement) item.__mediaElement.muted = !!v;
+        "audioPan": (item, v) => {
+            item.data.audioPan = v;
         },
 
         "playbackRate": (item, v) => {
             item.data.playbackRate = v;
-            if(item.__mediaElement && v > 0) item.__mediaElement.playbackRate = v;
         },
 
-        "loop": (item, v) => {
-            item.data.loop = !!v;
-            if(item.__mediaElement) item.__mediaElement.loop = !!v;
+        "mediaOffset": (item, v) => {
+            item.data.mediaOffset = v;
         },
 
-        "mediaStartTime": (item, v) => {
-            item.data.mediaStartTime = v;
+        "loopMode": (item, v) => {
+            item.data.loopMode = v;
+        },
+
+        "videoFrameRate": (item, v) => {
+            item.data.videoFrameRate = v;
         },
 
         "cameraFov": (item, v) => {
@@ -800,9 +750,6 @@ class ThreeRendererAdapter extends RendererAdapter {
         "height": (item) => item.node?.userData? item.node.userData.height: (item.data.height || 1),
         "depth": (item) => item.data.depth || 1,
         "visible": (item) => item.node? item.node.visible: (item.data.visible !== undefined? item.data.visible: true),
-        "tint": (item) => item.data.tint || item.data.materialColor || 0xFFFFFF,
-        "color": (item) => item.data.color || item.data.tint || 0xFFFFFF,
-        "fill": (item) => item.data.fill || item.data.color || item.data.tint || 0xFFFFFF,
         "materialColor": (item) => item.data.materialColor || item.data.color || item.data.tint || 0xFFFFFF,
         "opacity": (item) => item.data.opacity !== undefined? item.data.opacity: (item.data.alpha !== undefined? item.data.alpha: 1),
         "alpha": (item) => item.data.alpha !== undefined? item.data.alpha: (item.data.opacity !== undefined? item.data.opacity: 1),
@@ -810,11 +757,14 @@ class ThreeRendererAdapter extends RendererAdapter {
         "wireframe": (item) => !!item.data.wireframe,
         "castShadow": (item) => !!(item.node? item.node.castShadow: item.data.castShadow),
         "receiveShadow": (item) => !!(item.node? item.node.receiveShadow: item.data.receiveShadow),
+        "dithering": (item) => !!item.data.dithering,
+
         "textContent": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.text: (item.data.textContent || ""),
+        "textStyleFontSize": (item) => item.textRenderer? item.textRenderer.fontSize: (item.data.textStyleFontSize || 24),
+
         "textStyle": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style: (item.data.textStyle || {}),
         "textStyleWeight": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.fontWeight: (item.data.textStyleWeight || 'normal'),
         "textStyleStyle": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.fontStyle: (item.data.textStyleStyle || 'normal'),
-        "textStyleFontSize": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.fontSize: (item.data.textStyleFontSize || 26),
         "textStyleFontFamily": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.fontFamily: (item.data.textStyleFontFamily || 'Arial'),
         "textStyleFill": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.fill: (item.data.textStyleFill || '#ffffff'),
         "textStyleAlignment": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.align: (item.data.textStyleAlignment || 'left'),
@@ -831,17 +781,21 @@ class ThreeRendererAdapter extends RendererAdapter {
         "textStyleDropShadowAngle": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.dropShadowAngle: (item.data.textStyleDropShadowAngle || Math.PI / 6),
         "textStyleDropShadowBlur": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.dropShadowBlur: (item.data.textStyleDropShadowBlur || 0),
         "textStyleDropShadowOpacity": (item) => item.node?.userData?.editorType === "text"? item.node.userData.textState.style.dropShadowAlpha: (item.data.textStyleDropShadowAlpha || 1),
-        "volume": (item) => item.__mediaElement? item.__mediaElement.volume: (item.data.volume ?? 1),
-        "muted": (item) => item.__mediaElement? item.__mediaElement.muted: !!item.data.muted,
-        "playbackRate": (item) => item.__mediaElement? item.__mediaElement.playbackRate: (item.data.playbackRate || 1),
-        "loop": (item) => item.__mediaElement? item.__mediaElement.loop: !!item.data.loop,
-        "mediaStartTime": (item) => item.data.mediaStartTime || 0,
+
+        "audioVolume": (item) => (item.data.audioVolume ?? 1),
+        "audioPan": (item) => (item.data.audioPan ?? 0),
+        "playbackRate": (item) => (item.data.playbackRate || 1),
+        "loopMode": (item) => item.data.loopMode || "loop",
+        "mediaOffset": (item) => item.data.mediaOffset || 0,
+        "videoFrameRate": (item) => item.data.videoFrameRate || -1,
+
         "cameraFov": (item) => item.node?.isPerspectiveCamera? item.node.fov: (item.data.cameraFov || item.data.fov || 50),
         "cameraNear": (item) => item.node?.isCamera? item.node.near: (item.data.cameraNear || item.data.near || 0.1),
-        "cameraFar": (item) => item.node?.isCamera? item.node.far: (item.data.cameraFar || item.data.far || 10000),
+        "cameraFar": (item) => item.node?.isCamera? item.node.far: (item.data.cameraFar || item.data.far || 1000),
+
         "automationEnabled": (item) => !!item.data.automationEnabled,
         "automationBaseValue": (item) => item.data.automationBaseValue || 0,
-        "automationFunction": (item) => item.data.automationFunction || ""
+        "automationFunction": (item) => item.data.automationFunction || "",
     }
 
     destroy() {
