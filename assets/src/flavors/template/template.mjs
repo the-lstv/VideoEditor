@@ -52,7 +52,7 @@ class TemplateFlavor extends FlavorBase {
      */
     static setupIn(app) {
         app.setIcon(this.iconSet);
-        app.flavor = new this(app.currentProject || (app.currentProject = new Project()));
+        app.flavorInstance = new this(app.currentProject || (app.currentProject = new Project()));
     }
 }
 

@@ -71,7 +71,7 @@ class QuickSand extends FlavorBase {
      */
     static setupIn(app) {
         app.setIcon(this.iconSet);
-        app.flavor = new QuickSand(app.currentProject || (app.currentProject = new Project()));
+        app.flavorInstance = new QuickSand(app.currentProject || (app.currentProject = new Project()));
     }
 }
 

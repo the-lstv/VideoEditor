@@ -92,6 +92,7 @@ window.addEventListener('load', async () => {
     try {
         // Setup the video editor flavor (prepares views, rendering, etc. for video editing)
         // This is now the only thing workflow specific in this file
+
         VideoEditor.setupIn(app);
         // QuickSand.setupIn(app);
 
@@ -218,13 +219,13 @@ window.addEventListener('load', async () => {
             settingsModal.open();
         });
 
-        app.shortcutManager.assign("TIMELINE_TOOL_SELECT", () =>  { app.flavor.timelineInstance.tool = "select"  });
-        app.shortcutManager.assign("TIMELINE_TOOL_SLICE", () =>   { app.flavor.timelineInstance.tool = "slice"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { app.flavor.timelineInstance.tool = "preview" });
-        app.shortcutManager.assign("TIMELINE_TOOL_GROUP", () =>   { app.flavor.timelineInstance.tool = "group"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_ERASE", () =>   { app.flavor.timelineInstance.tool = "erase"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_PAINT", () =>   { app.flavor.timelineInstance.tool = "paint"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_SLIDE", () =>   { app.flavor.timelineInstance.tool = "slide"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_SELECT", () =>  { app.flavorInstance.timelineInstance.tool = "select"  });
+        app.shortcutManager.assign("TIMELINE_TOOL_SLICE", () =>   { app.flavorInstance.timelineInstance.tool = "slice"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { app.flavorInstance.timelineInstance.tool = "preview" });
+        app.shortcutManager.assign("TIMELINE_TOOL_GROUP", () =>   { app.flavorInstance.timelineInstance.tool = "group"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_ERASE", () =>   { app.flavorInstance.timelineInstance.tool = "erase"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_PAINT", () =>   { app.flavorInstance.timelineInstance.tool = "paint"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_SLIDE", () =>   { app.flavorInstance.timelineInstance.tool = "slide"   });
 
         undoButton.addEventListener('click', () => {
             app.currentProject.historyManager.undo();
@@ -359,15 +360,15 @@ window.addEventListener('load', async () => {
                 { type: "separator" },
 
                 { text: "About", icon: "bi-stars", action() {
-                    if(app.flavor && app.flavor.onAboutDialog) {
-                        app.flavor.onAboutDialog();
+                    if(app.flavorInstance && app.flavorInstance.onAboutDialog) {
+                        app.flavorInstance.onAboutDialog();
                         return;
                     }
 
                     LS.Modal.buildEphemeral({
                         content: [
-                            { tag: 'img', src: app.flavor ? app.flavor.icon : document.getElementById('logo').src || 'assets/images/icon.svg', style: 'height: 5em; width: 100%; margin: auto' },
-                            { tag: 'h2', inner: app.flavor ? app.flavor.constructor.name : 'LS interface', style: 'text-align: center' },
+                            { tag: 'img', src: app.flavorInstance ? app.flavorInstance.icon : document.getElementById('logo').src || 'assets/images/icon.svg', style: 'height: 5em; width: 100%; margin: auto' },
+                            { tag: 'h2', inner: app.flavorInstance ? app.flavorInstance.constructor.name : 'LS interface', style: 'text-align: center' },
                             { tag: 'p', inner: `Version ${app.VERSION}, running LS ${LS.version}` },
                             { tag: 'p', inner: ['Created with love and hard work by Lukas (', { tag: 'a', href: 'https://lstv.space', target: '_blank', inner: 'https://lstv.space' }, ')'] },
                             { tag: 'p', inner: ['Source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }] },

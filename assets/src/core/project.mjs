@@ -13,8 +13,16 @@ import { ResourceManager } from "./resources.mjs";
  * It can be used for different types of editors; video editing, daw, game engine, etc.
  */
 class Project extends LS.Context {
-    constructor(data) {
+    constructor(data, flavor) {
         super();
+
+        // if(app.flavorInstance) {
+        //     throw new Error("A flavor instance already exists. Creating a new project instance will replace it.");
+        // }
+
+        if(app.flavor || flavor) {
+            app.flavorInstance = new (flavor || app.flavor)(this);
+        }
 
         // The views currently connected to this project
         this.connectedViews = new Map();

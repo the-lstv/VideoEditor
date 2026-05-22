@@ -157,6 +157,8 @@ class VideoEditor extends FlavorBase {
                     this.setTimeline(this.currentTimeline || "main");
 
                     this.addExternalEventListener(this.timelineInstance, 'seek', () => {
+                        console.log(this);
+                        
                         this.quickEmit(this.__seekEventRef, view.timeline.seek);
                         this.render();
                     });
@@ -332,6 +334,8 @@ class VideoEditor extends FlavorBase {
         this.project.on("export", (data) => {
             this.#exportTo(data);
         });
+
+        LS.emit("flavor-ready", [this]);
     }
 
     /**
@@ -346,25 +350,30 @@ class VideoEditor extends FlavorBase {
         const propertyEditorView = new PropertyEditorView();
 
         app.setIcon(this.iconSet);
+        app.focusedPreview = previewView;
 
         app.layoutManager.add(previewView, timelineView, assetManagerView, propertyEditorView);
 
-        app.flavor = new VideoEditor(app.currentProject || (app.currentProject = new Project()));
-        app.focusedPreview = previewView;
+        app.flavor = this;
+
+        //app.flavorInstance = new VideoEditor(app.currentProject || (app.currentProject = ));
+        app.currentProject = new Project();
+
+        if(app.currentProject && app.currentProject.loaded) {
+            throw new Error("The current project is already loaded. The flavor must be set up while loading a project.");
+        }
 
         // Connect views to the project when it's ready
         app.currentProject.once('ready', () => {
-            app.currentProject.connect(previewView, app.flavor);
-            app.currentProject.connect(timelineView, app.flavor);
-            app.currentProject.connect(assetManagerView, app.flavor);
-            app.currentProject.connect(propertyEditorView, app.flavor);
+            app.currentProject.connect(previewView, app.flavorInstance);
+            app.currentProject.connect(timelineView, app.flavorInstance);
+            app.currentProject.connect(assetManagerView, app.flavorInstance);
+            app.currentProject.connect(propertyEditorView, app.flavorInstance);
         });
 
         // Expose some globals for debugging
         window.timelineView = timelineView;
         window.timeline = timelineView.timeline;
-
-        LS.emit("flavor-ready", [app.flavor]);
     }
 
     #exportTo(data) {
@@ -583,7 +592,7 @@ class VideoEditor extends FlavorBase {
     }
 
     /**
-     * Destroys the project and optionally all connected views
+     * Destroys the flavor and optionally all connected views
      * @param {Boolean} destroyViews Whether to destroy connected views
      */
     destroy(destroyViews = false) {
@@ -597,7 +606,9 @@ class VideoEditor extends FlavorBase {
 
         if(this.renderer) this.renderer.destroy();
         this.currentTimeline = null;
-        this.timelines.clear();
+
+        if(this.timelines) this.timelines.clear();
+
         this.renderingCanvas.remove();
         this.frameScheduler.destroy();
         this.frameScheduler = null;

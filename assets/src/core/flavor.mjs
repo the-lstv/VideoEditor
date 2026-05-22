@@ -34,4 +34,9 @@ export default class Flavor extends LS.Context {
 
         return this.project.config.flavorSpecific[name] || {};
     }
+
+    destroy() {
+        app.flavorInstance = null;
+        super.destroy();
+    }
 }
