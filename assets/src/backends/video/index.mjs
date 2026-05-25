@@ -6,211 +6,36 @@
 
 // import * as THREE from 'three';
 
-// I love this library
-// It covers and does everything and just works, in a variety of ways.
-// I usually despise 3rd party libraries and do everything myself whenever I can
-// Nevermind, I just read some of it's code... oh god
+// I usually despise 3rd party libraries but I love this library
+// It covers and does everything and just works
+// Nevermind, I just read some of it's code... oh god :'(
+// Either way pretty neat. Let's hope it won't turn into slop.
 const { 
     Input, Output, UrlSource, FilePathSource,
-    Mp4OutputFormat, WebMOutputFormat, BufferTarget, 
+
+    OutputFormat,
+
+    // Video formats
+    Mp4OutputFormat, WebMOutputFormat, MkvOutputFormat,
+
+    // Audio formats
+    WavOutputFormat, OggOutputFormat, FlacOutputFormat, Mp3OutputFormat,
+    
+    BufferTarget, FilePathTarget,
     VideoSampleSink, ALL_FORMATS, VideoSample, CanvasSink,
 
-    getFirstEncodableVideoCodec, CanvasSource, QUALITY_HIGH
+    getFirstEncodableVideoCodec, CanvasSource,
+    
+    // QUALITY_HIGH, ...
+    Quality
 } = require("mediabunny");
 
-/**
- * Video encoder/renderer helper class
- * 
- * ! todo
- * 
- * Types:
- * - FFMPEG (WebAssembly) / native on Node.js
- * - WebCodecs API
- * - MediaRecorder API
- * - none (image sequence only)
- */
-class VideoEncoder {
-    /**
-     * Creates a video encoder
-     * @param {*} project Target project to render
-     * @param {*} options Encoding options
-     * @param {number} options.fps Frames per second
-     * @param {boolean} options.alpha Whether to include alpha channel
-     * @param {string} options.type Encoding type: 'ffmpeg', 'webcodecs', 'mediarecorder', 'none'
-     * @param {boolean} options.audio Whether to include an audio stream (if supported)
-     */
-    constructor(project, options = {}) {
-        this.project = project;
-
-        this.options = LS.Util.defaults({
-            fps: 30,
-            alpha: false,
-            type: 'webcodecs', // 'ffmpeg', 'webcodecs', 'mediarecorder', 'none'
-            audio: true
-        }, options);
-
-        switch(this.options.type) {
-            case 'ffmpeg':
-                if(!isNode && !FFMPEG.isLoaded()) {
-                    console.warn("VideoEncoder: FFMPEG is not loaded, falling back to WebCodecs");
-                    this.options.type = 'webcodecs';
-                }
-                break;
-
-            case 'webcodecs':
-                if(typeof window === "undefined" || !('VideoEncoder' in window)) {
-                    console.warn("VideoEncoder: WebCodecs API is not supported, falling back to MediaRecorder");
-                    this.options.type = 'mediarecorder';
-                }
-                break;
-
-            case 'mediarecorder':
-                if(typeof window === "undefined" || !('MediaRecorder' in window)) {
-                    console.warn("VideoEncoder: MediaRecorder API is not supported, falling back to image sequence only");
-                    this.options.type = 'none';
-                }
-                break;
-        }
-    }
-
-    /**
-     * Extracts pixel data from the renderer
-     * @param {*} renderer The renderer to extract from
-     * @param {*} pixels The array to store pixel data in (optional)
-     * @returns The pixel data array (RGBA or RGB depending on options)
-     * 
-     * Todo: should not be three.js specific
-     */
-    extractFrame(renderer, pixels) {
-        renderer = renderer?.isWebGLRenderer? renderer: renderer?.renderer;
-        if(!renderer?.getContext) return;
-
-        const gl = renderer.getContext();
-        const width = renderer.width || renderer.domElement.width;
-        const height = renderer.height || renderer.domElement.height;
-
-        if(this.options.alpha) {
-            gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-            return;
-        }
-
-        const rgba = new Uint8Array(width * height * 4);
-        gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
-
-        // What was the thing below even for
-        // for(let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
-        //     pixels[j] = rgba[i];
-        //     pixels[j + 1] = rgba[i + 1];
-        //     pixels[j + 2] = rgba[i + 2];
-        // }
-
-        return pixels? pixels.set(rgba): rgba;
-    }
-
-    /**
-     * Renders video frames between the specified start and end times
-     * @param {*} startTime The start time
-     * @param {*} endTime The end time
-     */
-    async renderFrames(startTime, endTime) {
-        const frameDuration = 1 / (this.options.fps || 30);
-        const totalFrames = Math.ceil((endTime - startTime) / frameDuration);
-
-        const wasPlaying = this.project.playing;
-        if(wasPlaying) this.project.pause();
-
-        for(let i = 0; i < totalFrames; i++) {
-            const currentTime = startTime + i * frameDuration;
-            await this.project.renderFrameAtTime(currentTime);
-
-            // Extract frame pixels and feed to an encoder
-            const width = this.project.renderer.renderer.width || this.project.renderer.width;
-            const height = this.project.renderer.renderer.height || this.project.renderer.height;
-            const pixelSize = this.options.alpha? 4: 3;
-            const pixels = new Uint8Array(width * height * pixelSize);
-            this.extractFrame(this.project.renderer, pixels);
-            await this.digest({ time: currentTime, pixels, width, height });
-        }
-
-        if(wasPlaying) this.project.play();
-    }
-
-    /**
-     * Processes a video frame to be encoded
-     * @param {*} frame The frame to process
-     */
-    async digest(frame) {
-        // ...
-    }
-
-    static async benchmark({ frameRate = 30, totalFrames = 300 } = {}) {
-        const resultVideo = document.createElement("video");
-
-        const renderCanvas = new OffscreenCanvas(1280, 720);
-        const renderCtx = renderCanvas.getContext('2d', { alpha: false });
-
-        // Benchmark encoding frames as fast as possible
-        const output = new Output({
-			target: new BufferTarget(), // Stored in memory
-			format: new Mp4OutputFormat(),
-		});
-
-		// Retrieve the first video codec supported by this browser that can be contained in the output format
-		const videoCodec = await getFirstEncodableVideoCodec(output.format.getSupportedVideoCodecs(), {
-			width: renderCanvas.width,
-			height: renderCanvas.height,
-		});
-
-		if (!videoCodec) {
-			throw new Error('Your browser doesn\'t support video encoding.');
-		}
-
-        const canvasSource = new CanvasSource(renderCanvas, {
-			codec: videoCodec,
-			bitrate: QUALITY_HIGH,
-		});
-
-		output.addVideoTrack(canvasSource, { frameRate });
-
-        await output.start();
-
-        let currentFrame = 0, lastTime = performance.now(), times = [];
-        for (currentFrame; currentFrame < totalFrames; currentFrame++) {
-			const currentTime = currentFrame / frameRate;
-            
-			// Update the scene
-            renderCtx.fillStyle = `hsl(${(currentTime * 60) % 360}, 100%, 50%)`;
-            renderCtx.fillRect(0, 0, renderCanvas.width, renderCanvas.height);
-            // renderCtx.fillStyle = "#fff";
-            // renderCtx.font = "bold 48px sans-serif";
-            // renderCtx.fillText(`Frame ${currentFrame + 1}, Time: ${currentTime.toFixed(2)}s, last time took: ${times[times.length - 1]?.toFixed?.(2) || 0}ms`, 50, 100);
-
-            renderCtx.fillStyle = "#fff";
-            renderCtx.fillRect(Math.cos(currentFrame) * 50 + 50, Math.sin(currentFrame) * 50 + 50, 50, 50);
-
-			// Add the current state of the canvas as a frame to the video. Using `await` here is crucial to
-			// automatically slow down the rendering loop when the encoder can't keep up.
-			await canvasSource.add(currentTime, 1 / frameRate);
-
-            const time = performance.now();
-            times.push(time - lastTime);
-            lastTime = time;
-		}
-
-        canvasSource.close();
-		await output.finalize();
-
-        const videoBlob = new Blob([output.target.buffer], { type: output.format.mimeType });
-		resultVideo.src = URL.createObjectURL(videoBlob);
-		void resultVideo.play();
-
-        const avg = times.reduce((a, b) => a + b, 0) / times.length;
-        console.log(`Finished encoding`, resultVideo.src, `()\nAverage time per frame: ${avg}ms`, `\nAverage FPS: ${1000 / avg}\nA minute of video could take around ${avg * frameRate * 60 / 1000} minutes to encode at this speed.`);
-
-        resultVideo.style.width = "320px";
-        resultVideo.controls = true;
-        return resultVideo;
-    }
+// We can just set ._factor to get anything i guess, no need to overcomplicate it
+// The getters seem to recalculate it every time anyway
+const SHARED_QUALITY = new Quality(1);
+function getQuality(factor) {
+    SHARED_QUALITY._factor = factor;
+    return SHARED_QUALITY;
 }
 
 if(localStorage.getItem("suppressSlowFramesWarning") === "true") {
@@ -275,29 +100,29 @@ class VideoDecoder {
      * Seeks to a specific time in the video and decodes the corresponding frame, then updates the target texture
      * @param {*} time The time to seek to (in seconds)
      * @param {Object} options Additional options for seeking (optional)
-     * @param {boolean} options.unlockedFramerate Disable framerate limit
      * @param {number} options.videoFrameRate Custom framerate
      * @param {number} options.playbackRate Playback rate to simulate
      * @param {number} options.mediaOffset Time offset to apply to the media (in seconds)
      * @param {string} options.loopMode Loop mode for the media ("none", "loop", "pingpong")
      * @param {Object} target The target texture to update with the decoded frame
+     * @param {number} offset Additional offset to apply in seconds
      */
-    async seek(time, options = {}, target) {
+    async seek(time, options = {}, target, offset = 0) {
         if (!this.ready) await this._initPromise;
         if (!this.ready || !this.sink) return false;
 
-        const playbackFramerate = options.unlockedFramerate ? (options.videoFrameRate || -1) : (options.videoFrameRate < 1 ? 30 : Math.min(30, options.videoFrameRate || 30));
+        const framerateLimit = options.videoFrameRate || -1;
         const playbackRate = options.playbackRate ?? 1;
         const mediaOffset = options.mediaOffset ?? 0;
         const loopMode = options.loopMode || "loop";
         const duration = this.duration;
 
-        if (playbackFramerate > 0) {
-            time = (time * playbackFramerate | 0) / playbackFramerate;
+        if (framerateLimit > 0) {
+            time = (time * framerateLimit | 0) / framerateLimit;
         }
 
         // Apply media offset and playback rate
-        time = (time - mediaOffset) * playbackRate;
+        time = (time - mediaOffset - offset) * playbackRate;
 
         // Looping (ping-pong takes precedence over regular loop).
         if (duration > 0) {
@@ -334,7 +159,11 @@ class VideoDecoder {
 
         while (true) {
             const currentTarget = this.targetTime;
-            if (this.currentTime === currentTarget) break;
+            if (this.currentTime === currentTarget) {
+                this.isSeeking = false;
+                return false;
+            }
+
             this.currentTime = currentTarget;
 
             let sample;
@@ -357,10 +186,8 @@ class VideoDecoder {
             break;
         }
 
-        // console.log("Completed seeking");
-
         this.isSeeking = false;
-        return false;
+        return true;
     }
 
     /**
@@ -689,5 +516,260 @@ class VideoDecoder {
         this.options = null;
     }
 }
+
+
+
+/**
+ * Video encoder/renderer helper class
+ * 
+ * ! todo
+ * 
+ * Types:
+ * - FFMPEG (WebAssembly) / native on Node.js
+ * - WebCodecs API
+ * - MediaRecorder API
+ * - none (image sequence only)
+ */
+class VideoEncoder {
+    /**
+     * Creates a video encoder
+     * @param {*} project Target project to render
+     * @param {*} options Encoding options
+     * @param {number} options.fps Frames per second
+     * @param {boolean} options.alpha Whether to include alpha channel
+    //  * @param {string} options.type Encoding type: 'ffmpeg', 'webcodecs', 'mediarecorder', 'none'
+     * @param {boolean} options.audio Whether to include an audio stream (if supported)
+     */
+    constructor() {}
+
+    /**
+     * Exports a video from a renderer
+     * @param {*} videoFlavor The videoFlavor instance to export from. Expected shape is: { renderer: { canvas: HTMLCanvasElement }, renderAtTime: function(time), timelineInstance: { duration: number } }, but the simple shape { canvas, renderAtTime(time), totalDuration } is also supported
+     * @param {*} options Export options
+     * @param {number} options.fps Frames per second
+     * @param {boolean} options.alpha Whether to include alpha channel
+     * @param {number} options.quality Subjective quality level
+     * @param {number} options.offset Offset in seconds to start rendering from (defaults to 0)
+     * @param {number} options.end Optional end time in seconds to stop rendering at (defaults to the end of the timeline)
+     * @param {number} options.endPadding Optional padding in seconds to add after the end time (defaults to 0)
+     * @param {string|OutputFormat} options.format The output video format (e.g. "mp4", "webm", "mkv") or a custom OutputFormat instance
+     * @param {string} options.filePath Optional file path to save the video to (Node.js only)
+     * 
+     * @returns {Promise<Blob|string|ArrayBuffer>} A promise that resolves to the exported video as a Blob (browser) or file path (Node.js) or ArrayBuffer (if no filePath is provided). If options.getPreview is true, resolves to a temporary URL for previewing the video in the browser.
+     * 
+     * TODO: support audio export
+     */
+    static async exportVideo(videoFlavor, options = {}) {
+        const canvas = videoFlavor.canvas || (videoFlavor.renderer?.renderer? videoFlavor.renderer.renderer : videoFlavor.renderer).canvas;
+
+        videoFlavor.renderingMode = 1; // Set rendering mode to "export"
+        
+        if(!canvas) {
+            throw new Error("VideoEncoder.exportVideo: Renderer does not have a canvas to capture");
+        }
+
+        const output = new Output({
+			target: options.filePath? new FilePathTarget(options.filePath) : new BufferTarget(),
+			format: options.format instanceof OutputFormat ? options.format : (options.format === "webm" ? new WebMOutputFormat() : options.format === "mkv" ? new MkvOutputFormat() : new Mp4OutputFormat()),
+		});
+
+		// Retrieve the first video codec supported by this browser that can be contained in the output format
+		const videoCodec = await getFirstEncodableVideoCodec(output.format.getSupportedVideoCodecs(), {
+			width: canvas.width,
+			height: canvas.height,
+		});
+
+        if (!videoCodec) {
+            throw new Error('Your browser doesn\'t support video encoding in this format: ' + output.format.name + '.');
+        }
+
+        const canvasSource = new CanvasSource(canvas, {
+			codec: videoCodec,
+			bitrate: getQuality(options.quality || 2),
+		});
+
+        const frameRate = options.fps || 30;
+
+		output.addVideoTrack(canvasSource, { frameRate });
+
+        await output.start();
+
+        let timeOffset = options.offset ?? 0;
+
+        const rawEnd = options.end ?? (videoFlavor.totalDuration? videoFlavor.totalDuration: (videoFlavor.timelineInstance ? videoFlavor.timelineInstance.duration : 0));
+        const endTime = Math.max(0, rawEnd + (options.endPadding ?? 0));
+        const totalFrames = Math.ceil((endTime - timeOffset) * frameRate);
+
+        if (typeof videoFlavor.renderAtTime !== "function") {
+            throw new Error("VideoFlavor does not have a render function");
+        }
+
+        for (let currentFrame = 0; currentFrame < totalFrames; currentFrame++) {
+            const currentTime = (currentFrame / frameRate) + timeOffset;
+
+            await videoFlavor.renderAtTime(currentTime);
+            await canvasSource.add(currentTime, 1 / frameRate);
+        }
+
+        this.renderingMode = 0; // Reset rendering mode to "normal"
+
+        canvasSource.close();
+		await output.finalize();
+
+        if(options.filePath) {
+            return options.filePath;
+        }
+
+        if(options.getPreview) {
+            const videoBlob = new Blob([output.target.buffer], { type: output.format.mimeType });
+            const videoURL = URL.createObjectURL(videoBlob);
+            return videoURL;
+        }
+
+        return output.target.buffer;
+    }
+
+    static async benchmark({ frameRate = 30, totalFrames = 300 } = {}) {
+        const resultVideo = document.createElement("video");
+
+        const renderCanvas = new OffscreenCanvas(1280, 720);
+        const renderCtx = renderCanvas.getContext('2d', { alpha: false });
+
+        // Benchmark encoding frames as fast as possible
+        const output = new Output({
+			target: new BufferTarget(), // Stored in memory
+			format: new Mp4OutputFormat(),
+		});
+
+		// Retrieve the first video codec supported by this browser that can be contained in the output format
+		const videoCodec = await getFirstEncodableVideoCodec(output.format.getSupportedVideoCodecs(), {
+			width: renderCanvas.width,
+			height: renderCanvas.height,
+		});
+
+		if (!videoCodec) {
+			throw new Error('Your browser doesn\'t support video encoding.');
+		}
+
+        const canvasSource = new CanvasSource(renderCanvas, {
+			codec: videoCodec,
+			bitrate: getQuality(2),
+		});
+
+		output.addVideoTrack(canvasSource, { frameRate });
+
+        await output.start();
+
+        let currentFrame = 0, lastTime = performance.now(), times = [];
+        for (currentFrame; currentFrame < totalFrames; currentFrame++) {
+			const currentTime = currentFrame / frameRate;
+            
+			// Update the scene
+            renderCtx.fillStyle = `hsl(${(currentTime * 60) % 360}, 100%, 50%)`;
+            renderCtx.fillRect(0, 0, renderCanvas.width, renderCanvas.height);
+            // renderCtx.fillStyle = "#fff";
+            // renderCtx.font = "bold 48px sans-serif";
+            // renderCtx.fillText(`Frame ${currentFrame + 1}, Time: ${currentTime.toFixed(2)}s, last time took: ${times[times.length - 1]?.toFixed?.(2) || 0}ms`, 50, 100);
+
+            renderCtx.fillStyle = "#fff";
+            renderCtx.fillRect(Math.cos(currentFrame) * 50 + 50, Math.sin(currentFrame) * 50 + 50, 50, 50);
+
+			// Add the current state of the canvas as a frame to the video. Using `await` here is crucial to
+			// automatically slow down the rendering loop when the encoder can't keep up.
+			await canvasSource.add(currentTime, 1 / frameRate);
+
+            const time = performance.now();
+            times.push(time - lastTime);
+            lastTime = time;
+		}
+
+        canvasSource.close();
+		await output.finalize();
+
+        const videoBlob = new Blob([output.target.buffer], { type: output.format.mimeType });
+		resultVideo.src = URL.createObjectURL(videoBlob);
+		void resultVideo.play();
+
+        const avg = times.reduce((a, b) => a + b, 0) / times.length;
+        console.log(`Finished encoding`, resultVideo.src, `()\nAverage time per frame: ${avg}ms`, `\nAverage FPS: ${1000 / avg}\nA minute of video could take around ${avg * frameRate * 60 / 1000} minutes to encode at this speed.`);
+
+        resultVideo.style.width = "320px";
+        resultVideo.controls = true;
+        return resultVideo;
+    }
+
+    // /**
+    //  * Extracts pixel data from the renderer
+    //  * @param {*} renderer The renderer to extract from
+    //  * @param {*} pixels The array to store pixel data in (optional)
+    //  * @returns The pixel data array (RGBA or RGB depending on options)
+    //  * 
+    //  * Todo: should not be three.js specific
+    //  */
+    // extractFrame(renderer, pixels) {
+    //     renderer = renderer?.isWebGLRenderer? renderer: renderer?.renderer;
+    //     if(!renderer?.getContext) return;
+
+    //     const gl = renderer.getContext();
+    //     const width = renderer.width || renderer.domElement.width;
+    //     const height = renderer.height || renderer.domElement.height;
+
+    //     if(this.options.alpha) {
+    //         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    //         return;
+    //     }
+
+    //     const rgba = new Uint8Array(width * height * 4);
+    //     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
+
+    //     // What was the thing below even for
+    //     // for(let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
+    //     //     pixels[j] = rgba[i];
+    //     //     pixels[j + 1] = rgba[i + 1];
+    //     //     pixels[j + 2] = rgba[i + 2];
+    //     // }
+
+    //     return pixels? pixels.set(rgba): rgba;
+    // }
+
+    // /**
+    //  * Renders video frames between the specified start and end times
+    //  * @param {*} startTime The start time
+    //  * @param {*} endTime The end time
+    //  */
+    // async renderFrames(startTime, endTime) {
+    //     const frameDuration = 1 / (this.options.fps || 30);
+    //     const totalFrames = Math.ceil((endTime - startTime) / frameDuration);
+
+    //     const wasPlaying = this.project.playing;
+    //     if(wasPlaying) this.project.pause();
+
+    //     for(let i = 0; i < totalFrames; i++) {
+    //         const currentTime = startTime + i * frameDuration;
+    //         await this.project.renderFrameAtTime(currentTime);
+
+    //         // Extract frame pixels and feed to an encoder
+    //         const width = this.project.renderer.renderer.width || this.project.renderer.width;
+    //         const height = this.project.renderer.renderer.height || this.project.renderer.height;
+    //         const pixelSize = this.options.alpha? 4: 3;
+    //         const pixels = new Uint8Array(width * height * pixelSize);
+    //         this.extractFrame(this.project.renderer, pixels);
+    //         await this.digest({ time: currentTime, pixels, width, height });
+    //     }
+
+    //     if(wasPlaying) this.project.play();
+    // }
+
+    // /**
+    //  * Processes a video frame to be encoded
+    //  * @param {*} frame The frame to process
+    //  */
+    // async digest(frame) {
+    //     // ...
+    // }
+}
+
+window._VideoDecoder = VideoDecoder;
+window._VideoEncoder = VideoEncoder;
 
 export { VideoEncoder, VideoDecoder };

@@ -63,6 +63,8 @@
         "fontSize": " Velikost písma:",
         "fontFamily": " Rodina písma:",
 
+        "drawOrder": " Pořadí vykreslování:",
+
         "textContent": " Obsah:",
         "textStyleWeight": " Tloušťka písma:",
         "automationEnabled": " Povolit:",
@@ -70,10 +72,7 @@
         "automationFunction": " Globální mapovací funkce:",
 
         "nothingSelected": "Nic není vybráno",
-        "selectElement": "Vyberte prvek pro úpravy",
-        
-        "audioTip": "TIP: Další audio efekty a možnosti najdete na záložce \"Pipeline\".",
-        "effectsTip": "TIP: Další efekty, pokročilé režimy prolínání a filtry najdete na záložce \"Pipeline\"."
+        "selectElement": "Vyberte prvek pro úpravy"
     },
 
     "assets": {
@@ -127,5 +126,11 @@
         "options": "Možnosti",
         "layout": "Rozvržení",
         "help": "Nápověda"
+    },
+
+    "tips": {
+        "animation": "TIP: K vytváření animací můžete použít různé způsoby: tato záložka je pro jednodušší animace založené na klíčových snímcích. Pro pokročilejší, více-cílové nebo reaktivní animace můžete také použít klipy automatizace, datové uzly nebo skripty.",
+        "audio": "TIP: Další audio efekty a možnosti najdete na záložce \"Pipeline\".",
+        "effects": "TIP: Další efekty, pokročilé režimy prolínání a filtry najdete na záložce \"Pipeline\"."
     }
 }

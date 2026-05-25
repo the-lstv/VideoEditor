@@ -267,7 +267,7 @@ window.addEventListener('load', async () => {
                 { text: "Open Project...", action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN"); } },
                 { text: "Save Project", action() { app.shortcutManager.triggerMapping("GLOBAL_SAVE"); } },
                 { type: "separator" },
-                { text: "Export...", icon: "bi-box-arrow-right", action() {
+                { text: "Render...", icon: "bi-box-arrow-right", action() {
                     // ... Open export dialog
                 } },
 

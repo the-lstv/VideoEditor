@@ -1,3 +1,5 @@
+import * as EditorBaseClasses from "../core/base.mjs";
+
 /**
  * Property editor view class
  * A bit of a monolith at the moment
@@ -48,9 +50,56 @@ class PropertyEditorView extends LS.Multipane.View {
         });
 
         this.tabs.add("Properties", this.editorContainer = LS.Create("ls-tab.property-editor-container"));
-        this.tabs.add("Pipeline", LS.Create());
-        this.tabs.add("Animation", LS.Create());
-        this.tabs.add("Behavior", LS.Create());
+        this.tabs.add("Pipeline", this.pipelineEditorContainer = LS.Create("ls-tab.property-editor-pipeline-tab"));
+        this.tabs.add("Animation", this.animationEditorContainer = LS.Create("ls-tab.property-editor-animation-tab"));
+        this.tabs.add("Behavior", this.behaviorEditorContainer = LS.Create("ls-tab.property-editor-behavior-tab", {
+            inner: { tag: "textarea", placeholder: "Behavior scripts coming soon!", value: `// Example behavior script
+
+// You can register inputs and outputs.
+// This returns a function, which either sets or gets a value.
+// The name can be anything. Using any of the built-in property names will modulate those (you can right-click a property and click "Copy value ID"  to get the ID).
+// Custom inputs will be saved in the node on demand but may not be as performant.
+const posIn  = input("positionX", 0);
+const posOut = output("positionX", 0);
+
+// When reading inputs, the current vs saved values may differ (eg. after animations and other modulations are applied, that do not affect the saved value).
+// To specifically get the saved value rather than fetch the currently rendered value, you can do:
+// getSaved("positionX");
+
+// If applicable, you can get a reference to the current node.
+// This allows you to obtain or change some information about it.
+// This does not apply to custom graph nodes however, only to timeline nodes.
+const node = getNode();
+
+// For certain objects, you can get access to their scripting API, for example dynamic text:
+const dynamicText = node.textRenderer;
+
+function update(time) {
+    // This function is called when time updates, aka a frame is to be rendered.
+    // The 'time' parameter is the current video time in seconds.
+
+    // Example of modulating the input value into a new output value.
+    posOut(posIn() + Math.sin(time) * 50);
+
+    // If you want the time relative to the start of the clip, you can do:
+    // const offsetTime = time - node.start;
+
+    // Example of using the dynamic text API to render realtime information
+    if(dynamicText) {
+        dynamicText.clear();
+        dynamicText.write(\`Hello world! Current time: \${time}, this node's track: \${node.track}\`, {});
+
+        // You can also use some low-level operations when performance is critical:
+        // The below sets the first character to 'h'. The char color is perserved, however it can also be changed with this method.
+        dynamicText._updateVertex(0, 0, 104);
+    }
+}
+
+function cleanup() {
+    // You can perform any needed cleanup here.
+}
+`, disabled: true }
+        }));
         this.tabs.set(0);
 
         // Setup (i separated it because the constructor became way too big)
@@ -58,6 +107,8 @@ class PropertyEditorView extends LS.Multipane.View {
         this.#setupValueHandle();
         this.#setupPropertyGroups();
         this.#setupEditAid();
+
+        this.#setupAnimationEditor();
 
         this.container.appendChild(this.emptyMessage);
 
@@ -86,6 +137,8 @@ class PropertyEditorView extends LS.Multipane.View {
 
         this.editorContainer.replaceChildren();
         this.editorContainer.appendChild(this.propertyGroups.general);
+
+        this.animationEditorTreeView.loadData(target.data.animations || []);
 
         this.currentTarget = target;
 
@@ -361,6 +414,8 @@ class PropertyEditorView extends LS.Multipane.View {
             e.preventDefault();
 
             this.__valueContextMenu_createAutomationButton.hidden = !inputObject.animatable;
+            this.__valueContextMenu_createAnimationButton.hidden  = !inputObject.animatable;
+            // this.__valueContextMenu_enableOutputCheckbox.hidden   = !inputObject.animatable;
 
             this.focusedInput = inputObject;
             this.__valueContextMenu.open(e.clientX, e.clientY);
@@ -541,7 +596,10 @@ class PropertyEditorView extends LS.Multipane.View {
 
                 { text: "Copy value", icon: "bi-clipboard", action: () => {
                     if(this.focusedInput) {
-                        navigator.clipboard.writeText(this.focusedInput.input.value);
+                        let value = this.focusedInput.input.value;
+                        if(this.focusedInput.type === "checkbox") value = this.focusedInput.input.checked;
+                        LS.Util.copy(value);
+                        LS.Toast.show("Copied \"" + value + "\" to clipboard", { timeout: 2000 });
                     }
                 } },
 
@@ -551,6 +609,15 @@ class PropertyEditorView extends LS.Multipane.View {
                             this.focusedInput.input.value = text;
                             this.focusedInput.input.dispatchEvent(new Event('input'));
                         });
+                    }
+                } },
+
+                { type: "separator" },
+
+                { text: "Copy value ID", icon: "bi-hash", action: () => {
+                    if(this.focusedInput) {
+                        LS.Util.copy(this.focusedInput.id);
+                        LS.Toast.show("Copied \"" + this.focusedInput.id + "\" to clipboard", { timeout: 2000 });
                     }
                 } },
 
@@ -585,7 +652,11 @@ class PropertyEditorView extends LS.Multipane.View {
 
                         timelineInstance.add(clip);
                     }
-                } }
+                } },
+
+                this.__valueContextMenu_createAnimationButton = { text: "Create animation", icon: "bi-play-circle", action: () => { } },
+
+                // this.__valueContextMenu_enableOutputCheckbox = { text: "Output in graph", type: "checkbox", action: () => { } },
             ]
         });
     }
@@ -642,6 +713,32 @@ class PropertyEditorView extends LS.Multipane.View {
                 input = null;
             }
         });
+    }
+
+    #setupAnimationEditor() {
+        // Animation targets are rendered in a tree view for virtualized rendering.
+        this.animationEditorTreeView = new LS.Tree({
+            rowHeight: 100,
+            nested: false, // Optimization hint since we do not need nested nodes
+
+            createNode: () => {
+                return LS.Create({
+                    class: "animation-target-node",
+                    inner: [
+                        { tag: "h4" },
+                        { tag: "p" }
+                    ]
+                });
+            },
+
+            updateNode: (node, element) => {
+                element.querySelector("h4").textContent = node.label;
+                element.querySelector("p").textContent = node.id;
+            }
+        });
+
+        EditorBaseClasses.createTip("animation", "TIP: You can link any input to an animation. There are also multiple ways to create animations: this tab is for simpler keyframe-based animation, but you can also use automation clips, data nodes, or scripts, when more complex, multi-target or reactive animations are needed.", this.animationEditorContainer);
+        this.animationEditorContainer.append(this.animationEditorTreeView.container);
     }
 
     // -- Property groups & inputs
@@ -704,6 +801,8 @@ class PropertyEditorView extends LS.Multipane.View {
             { tag: "h3", i18n: "properties.transform", text: "Transform", class: "property-editor-header" },
             {
                 class: "property-editor-group level-1", inner: [
+                    [{ tag: "span", tooltip: "Changes the draw order regardless of Z position.\n-1 is default and draws items based on the track order of\nyour timeline from top to bottom.\nIt is useful to set if you want multiple items to draw on\nthe same layer or customize their order.", inner: [{ tag: "i", class: "bi-stack" }, { tag: "label", i18n: "properties.drawOrder", text: " Custom Draw Order:" }] }, this.#createInput("clipDrawOrder", { type: "number", attributes: { min: 0, step: 1 }, defaultValue: -1 })],
+
                     // Position Group
                     [
                         { tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", i18n: "properties.position", text: " Position:" }] },
@@ -834,7 +933,7 @@ class PropertyEditorView extends LS.Multipane.View {
                 ]
             },
 
-            { tag: "ls-box", class: "elevated", i18n: "properties.effectsTip", text: "TIP: For more effects, advanced blend modes and filters see the pipeline tab." }
+            EditorBaseClasses.createTip("effects", "TIP: For more effects, advanced blend modes and filters see the pipeline tab.")
         ]);
 
         this.propertyGroups.source = LS.Create([
@@ -882,7 +981,7 @@ class PropertyEditorView extends LS.Multipane.View {
                 ]
             },
 
-            { tag: "ls-box", class: "elevated", i18n: "properties.audioTip", text: "TIP: For more audio effects and options, see the pipeline tab." }
+            EditorBaseClasses.createTip("audio", "TIP: For more audio effects and options, see the pipeline tab.")
         ]);
 
         this.propertyGroups.video = LS.Create([

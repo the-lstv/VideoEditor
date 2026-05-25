@@ -192,9 +192,45 @@ const dragState = new class DragState extends LS.Util.FrameScheduler {
     }
 }
 
+/**
+ * Create a closeable tip element with the given text content. The user can close the tip to not be shown again.
+ * Translations are under the "tips" namespace, eg. "tips.myTip".
+ * Warning: This returns null if the user has previously closed this tip.
+ * @param {*} id The id of the tip, used for translations and storage.
+ * @param {*} text The text content of the tip.
+ * @param {*} target Optional the target element to which the tip is attached.
+ * @returns {HTMLElement|null} The tip element or null if the user has hidden the tip.
+ */
+function createTip(id, text, target = null) {
+    if(localStorage.getItem("hideTip_" + id)) {
+        return null;
+    }
+
+    const hint = LS.Create("ls-box.elevated.editor-tip", {
+        inner: [LS.Create("button.small.square.clear", {
+            inner: { tag: "i", class: "bi-x-lg" },
+            onclick() {
+                localStorage.setItem("hideTip_" + id, "true");
+                hint.remove();
+            }
+        }), {
+            tag: "span",
+            i18n: "tips." + id,
+            text
+        }]
+    });
+
+    if(target) {
+        target.appendChild(hint);
+    }
+
+    return hint;
+}
+
 
 export {
     Command,
     HistoryManager,
-    dragState
+    dragState,
+    createTip
 };

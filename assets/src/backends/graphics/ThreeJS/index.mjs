@@ -121,7 +121,7 @@ class ThreeRendererAdapter extends RendererAdapter {
      */
     createObject(item) {
         if(!item || item.node) return null;
-        if(!item.data) item.data = {};
+        item.data ??= {};
 
         if(item.type === "automation" || item.type === "events" || item.type === "script") {
             return null;
@@ -264,7 +264,7 @@ class ThreeRendererAdapter extends RendererAdapter {
                     texture.magFilter = THREE.LinearFilter;
                     texture.generateMipmaps = false;
                     texture.colorSpace = THREE.SRGBColorSpace;
-                    texture.needsUpdate = false;
+                    // texture.needsUpdate = false;
 
                     item.node.userData.canvasTexture = texture;
                 }

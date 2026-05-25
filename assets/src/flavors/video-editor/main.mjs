@@ -34,6 +34,9 @@ import Project from "../../core/project.mjs";
 import { Variable, mappingCompiler } from "../../core/variable.mjs";
 import { ResourceManager, Resource } from "../../core/resources.mjs";
 
+
+const TRACK_STRIDE = 1000; // The distance in renderOrder between each track
+
 // --- Video editor flavor
 class VideoEditor extends FlavorBase {
     static name = "video-editor";
@@ -94,14 +97,12 @@ class VideoEditor extends FlavorBase {
         this.currentTimeline = null;
 
         // Set of currently active render items
-        this.activeRenderItems = new Set();
-
-        this.__renderTargets = [];
+        this.activeRenderItems = [];
 
         this.editingItem = null;
 
-        this.frameRerender = false;
-        this.__maybeRerenderCallback = this.#maybeRerender.bind(this);
+        this.renderingMode = 0; // 0 = editing mode, 1 = export mode
+        this.rerenderCallback = this.#maybeRerender.bind(this);
 
         // Cache event references that are emitted frequently (small benefit but skips event lookup)
         // In general this doesn't do much BUT in high-perf scenarios any detail matters so why not do it
@@ -112,7 +113,7 @@ class VideoEditor extends FlavorBase {
             if(delta > 0 && this.timelineInstance) {
                 this.timelineInstance.setSeek(this.timelineInstance.seek + (delta / 1000));
             }
-            
+
             this.renderAtTime(this.timelineInstance.seek || 0);
         }, {
             deltaTime: true
@@ -468,10 +469,10 @@ class VideoEditor extends FlavorBase {
         this.playing = false;
     }
 
-    seek(time, moveCamera = false) {
+    seek(time, moveTimelineView = false) {
         if(this.timelineInstance) {
             this.timelineInstance.setSeek(time);
-            if(moveCamera) {
+            if(moveTimelineView) {
                 this.timelineInstance.offset = time * this.timelineInstance.zoom;
             }
         }
@@ -500,21 +501,18 @@ class VideoEditor extends FlavorBase {
      * 
      * @param {Number} time Time in seconds of the frame to render. If not provided, it will render the current time of the timeline.
      */
-    renderAtTime(time) {
+    async renderAtTime(time) {
         if(!this.timelineInstance || !this.renderer) return;
         if(time === undefined) time = this.timelineInstance.seek;
 
-        // TODO: optimize
+        // Hide items that are currently rendered
         for(const item of this.activeRenderItems) {
             if(item.node) item.node.visible = false;
         }
-        this.activeRenderItems.clear();
+        this.activeRenderItems.length = 0;
 
         // Clear screen
-        this.renderer.clear();
-
-        const renderTargets = this.__renderTargets;
-        renderTargets.length = 0;
+        // this.renderer.clear();
 
         // First loop to process automation items and values
         // We find intersecting items at the current time via a binary search
@@ -540,79 +538,79 @@ class VideoEditor extends FlavorBase {
 
             // Ensure we have a visual node/rendering object
             if(!item.node) this.renderer.createObject(item);
-            if(!item.node) continue;
+            const node = item.node;
+
+            if(!node || item.data.visible === false) continue;
 
             if(item.type === "camera") {
-                activeCamera = item.node;
+                activeCamera = node;
                 continue;
             }
 
-            // Check for material resource updates
-            if(item.resourceUpdated !== false) {
-                this.renderer.updateNodeResource(item);
-            }
+            if(item.data.resource) {
+                // Check for material resource updates
+                if(item.resourceUpdated !== false) {
+                    this.renderer.updateNodeResource(item);
+                }
 
-            // This should be more well optimized rather than check resources every time;
-            const resource = this.project.resources.getResource(item.data.resource);
-            if(resource) {
-                if(resource.type === "video") {
+                const resource = this.project.resources.getResource(item.data.resource);
+                if(resource && resource.type === "video") {
                     // Seek and update the video texture using the video decoder, which is assumed to have been created by the above renderer.updateNodeResource call
-                    const decoder = item.__videoDecoder || (item.__videoDecoder = resource.assets.videoDecoder);
+                    const decoder = resource.assets.videoDecoder;
                     if(decoder) {
-                        // ! todo: rerender callback doesnt seem to work
-                        decoder.seek(time - item.start, item.data, item.node?.userData.canvasTexture).then(this.__maybeRerenderCallback);
+                        // ! todo: rerender callback doesnt seem to work right
+                        const seekPromise = decoder.seek(time - item.start, item.data, node.userData.canvasTexture, item.offset || 0);
+
+                        if(this.renderingMode === 1) {
+                            // Exporting, so we must wait for the frame to be ready
+                            await seekPromise;
+                        } else {
+                            // Editing, so we can render later
+                            seekPromise.then(this.rerenderCallback);
+                        }
                     }
                 }
             }
 
+            // Apply local animations
             if(item.data.animations) {
                 for(const anim of item.data.animations) {
-                    if(anim.enabled === false) continue;
                     mappingCompiler.processTimelinedAutomation(anim, time, this.timelineInstance, this.renderer);
                 }
             }
 
-            renderTargets.push(item);
-        }
+            // Basic linear fadeIn/fadeOut
+            if(item.data.fadeIn || item.data.fadeOut) {
+                const progress = Math.min(
+                    item.data.fadeIn? (time - item.start) / item.data.fadeIn: 1,
+                    item.data.fadeOut? ((item.start + item.duration) - time) / item.data.fadeOut: 1
+                );
 
-        // TODO: Optimize
-        renderTargets.sort((a, b) => (a.data.zIndex || a.row || 0) - (b.data.zIndex || b.row || 0));
-
-        console.log(renderTargets);
-
-        // Render all items to the main renderer
-        // TODO: whotf built this
-        let renderOrder = 0;
-        for(const item of renderTargets) {
-            if(!item.node) continue;
-
-            item.node.visible = true;
-            item.node.renderOrder = renderOrder;
-            item.node.traverse((child) => child.renderOrder = renderOrder);
-
-            // console.log("Rendering item", item.id, "at time", time, "with zIndex", item.data.zIndex, "and row", item.row);
-
-            if(item.data.positionZ === undefined) {
-                item.node.position.z = item.data.zIndex || item.row || 0;
+                this.renderer.constructor.setMaterialOpacity(item, progress);
             }
 
-            this.activeRenderItems.add(item);
-            renderOrder++;
+            if(!node.visible) node.visible = true;
+            const renderOrder = (item.row * TRACK_STRIDE) + (item.data.zIndex || 0);
+
+            // Temporary
+            if(renderOrder !== node._renderOrder) {
+                node.renderOrder = renderOrder;
+                node._renderOrder = renderOrder;
+                node.traverse((child) => child.renderOrder = renderOrder);
+            }
+
+            // Mark as active
+            this.activeRenderItems.push(item);
         }
 
         this.renderer.render(activeCamera);
+        // this.frameRerender = false;
     }
 
-    #maybeRerender(needsToRerender) {
-
-        // Render again if a video frame took longer than the render frame to decode
-        // Eg. if a frame at a certain time wasn't ready by the time everything else was rendered, we let the decoder do it's thing and render again once the frame is ready so the user sees an accurate preview without nerfing the smoothness of everything else.
-        // This must NOT happen while exporting, only while editing
-        if(needsToRerender) {
-            console.log("Video frame arrived late, re-rendering frame");
-            this.frameRerender = true;
+    #maybeRerender(frameChanged) {
+        if(this.destroyed) return;
+        if(frameChanged) {
             this.render();
-            this.frameRerender = false;
         }
     }
 

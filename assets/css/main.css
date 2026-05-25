@@ -620,3 +620,14 @@ pre.log-message {
     user-select: text;
     border-radius: var(--border-radius);
 }
+
+.editor-tip {
+    display: flex;
+    align-items: flex-start;
+    justify-content: flex-start;
+    gap: 6px;
+}
+
+.editor-tip button {
+    flex-shrink: 0;
+}
