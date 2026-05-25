@@ -13,7 +13,9 @@
 const { 
     Input, Output, UrlSource, FilePathSource,
     Mp4OutputFormat, WebMOutputFormat, BufferTarget, 
-    VideoSampleSink, ALL_FORMATS, VideoSample, CanvasSink
+    VideoSampleSink, ALL_FORMATS, VideoSample, CanvasSink,
+
+    getFirstEncodableVideoCodec, CanvasSource, QUALITY_HIGH
 } = require("mediabunny");
 
 /**
@@ -139,6 +141,75 @@ class VideoEncoder {
      */
     async digest(frame) {
         // ...
+    }
+
+    static async benchmark({ frameRate = 30, totalFrames = 300 } = {}) {
+        const resultVideo = document.createElement("video");
+
+        const renderCanvas = new OffscreenCanvas(1280, 720);
+        const renderCtx = renderCanvas.getContext('2d', { alpha: false });
+
+        // Benchmark encoding frames as fast as possible
+        const output = new Output({
+			target: new BufferTarget(), // Stored in memory
+			format: new Mp4OutputFormat(),
+		});
+
+		// Retrieve the first video codec supported by this browser that can be contained in the output format
+		const videoCodec = await getFirstEncodableVideoCodec(output.format.getSupportedVideoCodecs(), {
+			width: renderCanvas.width,
+			height: renderCanvas.height,
+		});
+
+		if (!videoCodec) {
+			throw new Error('Your browser doesn\'t support video encoding.');
+		}
+
+        const canvasSource = new CanvasSource(renderCanvas, {
+			codec: videoCodec,
+			bitrate: QUALITY_HIGH,
+		});
+
+		output.addVideoTrack(canvasSource, { frameRate });
+
+        await output.start();
+
+        let currentFrame = 0, lastTime = performance.now(), times = [];
+        for (currentFrame; currentFrame < totalFrames; currentFrame++) {
+			const currentTime = currentFrame / frameRate;
+            
+			// Update the scene
+            renderCtx.fillStyle = `hsl(${(currentTime * 60) % 360}, 100%, 50%)`;
+            renderCtx.fillRect(0, 0, renderCanvas.width, renderCanvas.height);
+            // renderCtx.fillStyle = "#fff";
+            // renderCtx.font = "bold 48px sans-serif";
+            // renderCtx.fillText(`Frame ${currentFrame + 1}, Time: ${currentTime.toFixed(2)}s, last time took: ${times[times.length - 1]?.toFixed?.(2) || 0}ms`, 50, 100);
+
+            renderCtx.fillStyle = "#fff";
+            renderCtx.fillRect(Math.cos(currentFrame) * 50 + 50, Math.sin(currentFrame) * 50 + 50, 50, 50);
+
+			// Add the current state of the canvas as a frame to the video. Using `await` here is crucial to
+			// automatically slow down the rendering loop when the encoder can't keep up.
+			await canvasSource.add(currentTime, 1 / frameRate);
+
+            const time = performance.now();
+            times.push(time - lastTime);
+            lastTime = time;
+		}
+
+        canvasSource.close();
+		await output.finalize();
+
+        const videoBlob = new Blob([output.target.buffer], { type: output.format.mimeType });
+		resultVideo.src = URL.createObjectURL(videoBlob);
+		void resultVideo.play();
+
+        const avg = times.reduce((a, b) => a + b, 0) / times.length;
+        console.log(`Finished encoding`, resultVideo.src, `()\nAverage time per frame: ${avg}ms`, `\nAverage FPS: ${1000 / avg}\nA minute of video could take around ${avg * frameRate * 60 / 1000} minutes to encode at this speed.`);
+
+        resultVideo.style.width = "320px";
+        resultVideo.controls = true;
+        return resultVideo;
     }
 }
 

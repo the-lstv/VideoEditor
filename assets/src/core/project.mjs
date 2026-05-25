@@ -21,8 +21,19 @@ class Project extends LS.Context {
         // }
 
         if(app.flavor || flavor) {
+            if(app.flavorInstance) {
+                app.flavorInstance.destroy();
+            }
+
             app.flavorInstance = new (flavor || app.flavor)(this);
+            console.log("Project: Created flavor instance:", app.flavorInstance);
         }
+
+        if(app.currentProject) {
+            console.warn("Another project is already loaded, and at this moment it is sadly not possible to open multiple projects simultaneously. Destroying the existing project.", app.currentProject);
+            app.currentProject.destroy(true);
+        }
+        app.currentProject = this;
 
         // The views currently connected to this project
         this.connectedViews = new Map();
@@ -56,18 +67,12 @@ class Project extends LS.Context {
         this.completed('ready');
     }
 
-    connect(view, attachedTo = undefined) {
+    connect(view) {
         if(view.parent) {
             view.parent?.disconnect(view);
         }
 
         view.parent = this;
-
-        if(attachedTo !== undefined) {
-            view.attachedTo = attachedTo;
-        } else if(view.attachedTo === undefined) {
-            view.attachedTo = null;
-        }
         
         this.emit("view-connected", [view]);
 
@@ -239,6 +244,47 @@ class Project extends LS.Context {
     }
 
     /**
+     * Replaces this project with another one
+     * @param {*} otherProject 
+     * @returns {Project} The other project
+     */
+    replaceWith(otherProject) {
+        if(!(otherProject instanceof Project)) {
+            throw new Error("Project.replaceWith: otherProject must be an instance of Project");
+        }
+
+        // TODO: Replace only views that support it; otherwise destroy and recreate
+        for(const view of this.connectedViews.values()) {
+            this.disconnect(view);
+            otherProject.connect(view);
+        }
+
+        this.destroy();
+        return otherProject;
+    }
+
+    static openFromZipFile(callback) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.zip,application/zip';
+        input.onchange = async () => {
+            if (input.files.length > 0) {
+                // ! tempoarary
+                app.currentProject && app.currentProject.destroy(true);
+
+                const file = input.files[0];
+                const project = new Project(file);
+                if(callback) callback(project);
+                return project;
+            }
+        };
+        input.click();
+    }
+
+    // static repairProjectData(data) {}
+    // static backup(project) {}
+
+    /**
      * Destroys the project and optionally all connected views
      * @param {Boolean} destroyViews Whether to destroy connected views (warning: this could destroy more than you expect, and is not always necessary)
      */
@@ -262,48 +308,12 @@ class Project extends LS.Context {
         this.historyManager.destroy();
         this.config = null;
 
+        if(app.currentProject === this) {
+            app.currentProject = null;
+        }
+
         super.destroy();
     }
-
-    /**
-     * Replaces this project with another one
-     * @param {*} otherProject 
-     * @returns {Project} The other project
-     */
-    replaceWith(otherProject) {
-        if(!(otherProject instanceof Project)) {
-            console.error("Project.replaceWith: otherProject must be an instance of Project");
-            return;
-        }
-
-        // TODO: Replace only views that support it; otherwise destroy and recreate
-        for(const view of this.connectedViews.values()) {
-            const attachedTo = view.attachedTo;
-            this.disconnect(view);
-            otherProject.connect(view, attachedTo);
-        }
-
-        this.destroy();
-        return otherProject;
-    }
-
-    static openFromZipFile(callback) {
-        const input = document.createElement('input');
-        input.type = 'file';
-        input.accept = '.zip,application/zip';
-        input.onchange = async () => {
-            if (input.files.length > 0) {
-                const file = input.files[0];
-                const project = new Project(file);
-                if(callback) callback(project);
-                return project;
-            }
-        };
-        input.click();
-    }
-
-    // static repairProjectData(data) {}
-    // static backup(project) {}
 }
 
 export default Project;

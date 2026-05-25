@@ -15,7 +15,7 @@ import Project from "./core/project.mjs";
 import VideoEditor from "./flavors/video-editor/main.mjs";
 
 // --- QuickSand flavor
-import QuickSand from "./flavors/quicksand/main.mjs";
+// import QuickSand from "./flavors/quicksand/main.mjs";
 
 // Small miscellaneous helpers
 function createIfNotExists(selector, whereShouldItGo = document.body) { return document.querySelector(selector) || LS.Create(selector).addTo(whereShouldItGo) }
@@ -48,7 +48,7 @@ const app = globalThis.app = {
     statusBar: new StatusBar(statusBarContainer),
 
     GITHUB_REPO: "https://github.com/the-lstv/videoeditor",
-    VERSION: "2.2.0-alpha",
+    VERSION: "2.2.1-alpha",
 
     /**
      * Enters the loading/transition shade
@@ -141,22 +141,25 @@ window.addEventListener('load', async () => {
         app.shortcutManager.assign("GLOBAL_OPEN", () => {
             // Temporary
             Project.openFromZipFile(project => {
-                project.once('ready', () => {
-                    if(!project) return;
+                // project.once('ready', () => {
+                //     if(!project) return;
 
-                    app.currentProject.replaceWith(project);
+                    // app.currentProject.replaceWith(project);
                     app.currentProject = project;
-                });
+                // });
             });
         });
 
         app.shortcutManager.assign("GLOBAL_NEW_PROJECT", () => {
             // Temporary
-            const oldProject = app.currentProject;
+            app.currentProject && app.currentProject.destroy(true);
             app.currentProject = new Project();
-            app.currentProject.once('ready', () => {
-                oldProject.replaceWith(app.currentProject);
-            });
+
+            // const oldProject = app.currentProject;
+            // app.currentProject = new Project();
+            // app.currentProject.once('ready', () => {
+            //     oldProject.replaceWith(app.currentProject);
+            // });
         });
 
         app.shortcutManager.assign("GLOBAL_PAUSE", () => {
@@ -445,3 +448,8 @@ const mobileWarningSwitch = new LS.Util.Switch(value => {
 window.addEventListener('resize', selfInvoke(() => {
     mobileWarningSwitch.set(window.innerWidth < MIN_EDITOR_WIDTH);
 }));
+
+// --- Debug
+window.Project = Project;
+window.VideoEditor = VideoEditor;
+// window.QuickSand = QuickSand;

@@ -17,6 +17,7 @@ export default class Flavor extends LS.Context {
         this.project = project;
 
         this.project.once("destroy", () => {
+            console.log("Flavor: Project is being destroyed, destroying flavor instance as well.");
             this.destroy();
         });
     }
@@ -36,6 +37,7 @@ export default class Flavor extends LS.Context {
     }
 
     destroy() {
+        if(this.destroyed) return;
         app.flavorInstance = null;
         super.destroy();
     }

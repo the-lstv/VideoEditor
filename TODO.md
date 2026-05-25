@@ -1,14 +1,16 @@
 ## TODO List
-- [-] Make Three.js rendering work..
 - [ ] Multiple render backends
 
 - [ ] Resize modes/behavior
 - [ ] Layout system
 
 - [ ] Video encoding
-- [-] Video decoding
+- [x] Video decoding
 - [ ] Proxy file management and proxies in resource system
 - [ ] Handle symlinks in the file browser
+- [ ] Animated GIF support
+- [ ] Asset preview
+- [ ] Thumbnail generations
 
 - [ ] Export screen
 - [-] Better resource management
@@ -65,7 +67,6 @@
 - [ ] Efficient sync system & remote editing (multiplayer/collaboration mode maybe?)
 - [ ] Collaboration features
 
-- [ ] Acid Kaiju
 - [ ] Pixel-perfect previewing tools
 - [ ] Shader interface & modules & library
 - [ ] General UI improvements
@@ -73,13 +74,12 @@
 - [ ] Custom color picker
 - [-] Custom file picker
 - [ ] Static text objects
-- [ ] Dynamic text objects
+- [-] Dynamic text objects
 - [ ] Subtitles editing tools
 - [ ] Auto-captioning
 
 - [ ] Motion graphics templates
 - [ ] Smart editing tools
-- [ ] No, I don't want to add AI features, stop asking
 - [ ] Drop directly on the preview
 
 - [ ] Welcome screen

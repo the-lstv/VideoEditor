@@ -21,6 +21,8 @@
 import FlavorBase from "../../core/flavor.mjs";
 import ThreeRendererAdapter from "../../backends/graphics/ThreeJS/index.mjs";
 
+import AudioRenderer from "../../backends/audio/index.mjs";
+
 // --- Views
 import { AssetManagerView } from "../../views/asset-manager.mjs";
 import PreviewView from "../../views/preview.mjs";
@@ -43,7 +45,7 @@ class VideoEditor extends FlavorBase {
         desktopIcon: 'assets/src/flavors/video-editor/images/favicon.png'
     };
 
-    static version = "0.2.0-alpha";
+    static version = "2.2.1-alpha";
 
     async #init() {
         this.renderingCanvas = this.addDestroyable(document.createElement('canvas'));
@@ -119,6 +121,31 @@ class VideoEditor extends FlavorBase {
         // Limit FPS in the editor (exports can have any framerate)
         this.frameScheduler.limitFPS(60);
 
+        // ! ---- todo: move elsewhere
+        // Initialize editor GUI with views for video editing
+        const previewView = new PreviewView();
+        const timelineView = new TimelineView();
+        const assetManagerView = new AssetManagerView();
+        const propertyEditorView = new PropertyEditorView();
+
+        app.layoutManager.add(previewView, timelineView, assetManagerView, propertyEditorView);
+
+        app.setIcon(this.constructor.iconSet);
+        app.focusedPreview = previewView;
+
+        this.project.on("ready", () => {
+            this.project.connect(previewView);
+            this.project.connect(timelineView);
+            this.project.connect(assetManagerView);
+            this.project.connect(propertyEditorView);
+        });
+
+        // Expose some globals for debugging
+        window.timelineView = timelineView;
+        window.timeline = timelineView.timeline;
+        // ! ----
+
+        // this.masterAudioOut = null;
 
         // --- Project hooks
 
@@ -157,8 +184,8 @@ class VideoEditor extends FlavorBase {
                     this.setTimeline(this.currentTimeline || "main");
 
                     this.addExternalEventListener(this.timelineInstance, 'seek', () => {
-                        console.log(this);
-                        
+                        if(this.destroyed) return console.error("Timeline emitted seek event for a destroyed instance! This is a bug!", this);
+
                         this.quickEmit(this.__seekEventRef, view.timeline.seek);
                         this.render();
                     });
@@ -278,25 +305,45 @@ class VideoEditor extends FlavorBase {
                                     duration: 1
                                 };
 
-                                if(resource.type === "video") {
-                                    // Compute length & size
-                                    const meta = await resource.getVideoMetadata();
-                                    newItem.duration = meta.duration;
+                                const isVideo = resource.type === "video";
+                                if(resource.type === "image" || isVideo) {
+                                    const meta = isVideo? await resource.getVideoMetadata(): await resource.getImageDimensions();
+
+                                    if(isVideo) newItem.duration = meta.duration;
 
                                     // todo: use w/h
-                                    newItem.data.scaleX = meta.width;
-                                    newItem.data.scaleY = meta.height;
-                                    // newItem.data.loopMode = "loop"; // default to enabled looping for videos
-                                }
+                                    // newItem.data.scaleX = meta.width;
+                                    // newItem.data.scaleY = meta.height;
 
-                                if(resource.type === "image") {
-                                    const dimensions = await resource.getImageDimensions();
-                                    newItem.data.scaleX = dimensions.width;
-                                    newItem.data.scaleY = dimensions.height;
+                                    const viewportWidth = this.flavorConfig.rendererOptions.width || 1280;
+                                    const viewportHeight = this.flavorConfig.rendererOptions.height || 720;
+                                    const resourceWidth = meta.width;
+                                    const resourceHeight = meta.height;
+
+                                    // TODO: temporary, this should later be done by the renderer based on fitMode
+                                    const scale = Math.min(
+                                        viewportWidth / resourceWidth,
+                                        viewportHeight / resourceHeight
+                                    )
+
+                                    newItem.data.scaleX = resourceWidth * scale;
+                                    newItem.data.scaleY = resourceHeight * scale;
+
+                                    newItem.data.positionX = (viewportWidth - newItem.data.scaleX) * 0.5;
+                                    newItem.data.positionY = (viewportHeight - newItem.data.scaleY) * 0.5;
+
+                                    // newItem.data.layoutSnap = "fit"; // Snap to video viewport.
+
+                                    // newItem.data.loopMode = "loop"; // default to enabled looping for videos
+
+                                    // newItem.data.layoutSnap = "fit"; // Snap to video viewport.
                                 }
 
                                 if(resource.type === "audio") {
                                     // todo: handle audio resource
+
+                                    const meta = await resource.getAudioMetadata();
+                                    newItem.duration = meta.duration;
                                 }
 
                                 timeline.add(newItem);
@@ -340,20 +387,10 @@ class VideoEditor extends FlavorBase {
 
     /**
      * The default setup for the video editor flavor.
+     * TODO: direction on how flavors get initiated is undecided and the current implementation is tempoarary
      * @param {*} app 
      */
     static setupIn(app) {
-        // Initialize editor GUI with views for video editing
-        const previewView = new PreviewView();
-        const timelineView = new TimelineView();
-        const assetManagerView = new AssetManagerView();
-        const propertyEditorView = new PropertyEditorView();
-
-        app.setIcon(this.iconSet);
-        app.focusedPreview = previewView;
-
-        app.layoutManager.add(previewView, timelineView, assetManagerView, propertyEditorView);
-
         app.flavor = this;
 
         //app.flavorInstance = new VideoEditor(app.currentProject || (app.currentProject = ));
@@ -362,18 +399,6 @@ class VideoEditor extends FlavorBase {
         if(app.currentProject && app.currentProject.loaded) {
             throw new Error("The current project is already loaded. The flavor must be set up while loading a project.");
         }
-
-        // Connect views to the project when it's ready
-        app.currentProject.once('ready', () => {
-            app.currentProject.connect(previewView, app.flavorInstance);
-            app.currentProject.connect(timelineView, app.flavorInstance);
-            app.currentProject.connect(assetManagerView, app.flavorInstance);
-            app.currentProject.connect(propertyEditorView, app.flavorInstance);
-        });
-
-        // Expose some globals for debugging
-        window.timelineView = timelineView;
-        window.timeline = timelineView.timeline;
     }
 
     #exportTo(data) {

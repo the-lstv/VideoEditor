@@ -95,7 +95,9 @@
             "particle_emitter": "Emiter částic",
             "events": "Události",
             "timeline_script": "Skript časové osy",
-            "empty_item": "Prázdná položka"
+            "empty_item": "Prázdná položka",
+
+            "anotherTimeline": "Další časová osa (kompozitní)"
         },
 
         "empty_state": "Žádné položky k zobrazení",
