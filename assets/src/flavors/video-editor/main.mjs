@@ -235,10 +235,30 @@ class VideoEditor extends FlavorBase {
                     });
 
                     this.addExternalEventListener(this.timelineInstance, "item-cleanup", (item) => {
+                        if(this.editingItem === item) {
+                            this.editingItem = null;
+
+                            const itemEditor = this.project.connectedViews.get('propertyEditor');
+                            if(itemEditor) {
+                                itemEditor.setTarget(null);
+                            }
+                        }
+
                         if(item.node) {
                             ThreeRendererAdapter.disposeObject(item.node);
                             item.node = null;
                         }
+
+                        if(item.data.resource) {
+                            const used = this.currentTimeline.some(item => item.data.resource === item.data.resource);
+                            if(!used) {
+                                const resource = this.project.resources.getResource(item.data.resource);
+                                if(resource) {
+                                    resource.unload();
+                                }
+                            }
+                        }
+                        this.render();
                     });
 
                     if(!this.firstFrameRendered) {
@@ -542,6 +562,10 @@ class VideoEditor extends FlavorBase {
 
             if(!node || item.data.visible === false) continue;
 
+            if(item.__dirtyPosition) {
+                ThreeRendererAdapter.updateItemPosition(item);
+            }
+
             if(item.type === "camera") {
                 activeCamera = node;
                 continue;
@@ -586,7 +610,9 @@ class VideoEditor extends FlavorBase {
                     item.data.fadeOut? ((item.start + item.duration) - time) / item.data.fadeOut: 1
                 );
 
-                this.renderer.constructor.setMaterialOpacity(item, progress);
+                this.renderer.constructor.setMaterialOpacity(item, progress * (item.data.opacity ?? 1));
+            } else {
+                this.renderer.constructor.setMaterialOpacity(item, item.data.opacity ?? 1);
             }
 
             if(!node.visible) node.visible = true;

@@ -226,14 +226,24 @@ class Resource {
         return this.id;
     }
 
-    destroy() {
-        if(this.destroyed) return;
-
+    /**
+     * Unload from memory but keep the resource available for use
+     */
+    unload() {
         // Dispose cached assets
         for(const asset of Object.values(this.assets)) {
             if(typeof asset.dispose === "function") asset.dispose();
             if(typeof asset.destroy === "function") asset.destroy();
         }
+
+        console.log("Unloaded resource", this);
+        this.assets = {};
+    }
+
+    destroy() {
+        if(this.destroyed) return;
+
+        this.unload();
 
         this.assets = null;
         this.resourceManager = null;

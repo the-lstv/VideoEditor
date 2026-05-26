@@ -133,33 +133,12 @@ class ThreeRendererAdapter extends RendererAdapter {
                 item.node.userData.editorType = "container";
                 break;
 
-            /* Vector graphics node */
-            case "graphics":
-                const data = item.data || {};
-                const node = this.constructor.createSurfaceNode("graphics", data, this.parent);
-                const material = node.userData.material;
-
-                material.color.set(data.fill ?? data.color ?? data.tint ?? 0xffffff);
-                material.opacity = data.opacity ?? data.alpha ?? 1;
-                material.transparent = material.opacity < 1 || data.transparent !== false;
-
-                if(data.shape === "circle") {
-                    const radius = data.radius ?? Math.max(data.width ?? 100, data.height ?? 100) / 2;
-                    const geometry = new THREE.CircleGeometry(radius, data.segments || 64);
-                    geometry.translate(radius, radius, 0);
-                    node.userData.surface.geometry = geometry;
-                    node.userData.width = radius * 2;
-                    node.userData.height = radius * 2;
-                }
-
-                item.node = node;
-                break;
-
             /* Sprite/image/video (2D surface) node */
             case "sprite":
-            case "image":  // technically, this type is identical to sprite
-                if(item.type === "image") item.type = "sprite"; // Normalize to prefer sprite
-                item.node = this.constructor.createSurfaceNode(item.type, item.data, this.parent);
+            case "image":  // technically, this type is identical to sprite, and should not be used
+            case "video":  // technically, this type is identical to sprite, and should not be used
+                if(item.type !== "sprite") item.type = "sprite"; // Normalize to prefer sprite
+                item.node = this.constructor.createSurfaceNode(item, this.parent);
                 break;
 
             /* Using the native dynamic text renderer (good for dynamic text) */
@@ -179,8 +158,17 @@ class ThreeRendererAdapter extends RendererAdapter {
                 break;
 
             /* Using canvas text rendering & a static texture (good for static text) */
+            /* Technically also just a sprite with a text canvas as its texture */
             case "static_text":
                 // TBA
+                break;
+
+            /* Vector graphics node */
+            case "graphics":
+                // Container
+                item.node = new THREE.Group();
+
+                // Then shapes will be added or SVG
                 break;
 
             /* Mesh node */
@@ -214,19 +202,46 @@ class ThreeRendererAdapter extends RendererAdapter {
         }
 
         this.applyInitialNodeProperties(item);
+        this.constructor.updateItemPosition(item);
         return item.node;
     }
 
     static createCameraNode(item, width = 1280, height = 720) {
         const data = item.data || {};
 
-        // HELP i don't really understand this and what the defaults shouls be :'(
         const camera = data.cameraType === "orthographic"?
             new THREE.OrthographicCamera(data.cameraLeft ?? 0, data.cameraRight ?? width, data.cameraTop ?? 0, data.cameraBottom ?? height, data.cameraNear ?? 0.1, data.cameraFar ?? 1000):
             new THREE.PerspectiveCamera (data.cameraFov ?? 50, data.cameraAspect ?? width / height, data.cameraNear ?? 0.1, data.cameraFar ?? 1000);
 
         camera.lookAt(0, 0, 0);
         return camera;
+    }
+
+    static createSurfaceNode(item, parent = null) {
+        const node = new THREE.Group();
+
+        const material = new THREE.MeshBasicMaterial({
+            color: item.data.tint ?? item.data.materialColor ?? 0xffffff,
+            transparent: true,
+            opacity: item.data.opacity ?? item.data.alpha ?? 1,
+            depthTest: !!item.data.depthTest,
+            depthWrite: !!item.data.depthWrite,
+            side: THREE.DoubleSide
+        });
+
+        const mesh = new THREE.Mesh(this.getUnitPlaneGeometry(), material);
+
+        mesh.matrixAutoUpdate = false;
+
+        node.add(mesh);
+        node.userData.editorType = item.type;
+        node.userData.surface = mesh;
+        node.userData.material = material;
+        node.userData.width = item.data.width ?? item.data.w ?? 1;
+        node.userData.height = item.data.height ?? item.data.h ?? 1;
+
+        item.node = node;
+        return node;
     }
 
     async applyInitialNodeProperties(item) {
@@ -309,46 +324,93 @@ class ThreeRendererAdapter extends RendererAdapter {
         return item.data[property] || (fallback ? this.getNodeProperty(item, property) : null); // Fallback to reading from node
     }
 
-    static createSurfaceNode(type, data = {}, parent = null) {
-        const node = new THREE.Group();
+    static #tempOffset = new THREE.Vector3();
+    static #tempEuler = new THREE.Euler();
+    static updateItemPosition(item) {
+        // TODO: optimization
+        // Sadly due to there being no way to do a proper anchor in THREE.js we have to recalculate everything every time anything changes
+        // Even if 90% of this does NOTHING 90 of the time
 
-        const material = new THREE.MeshBasicMaterial({
-            color: data.tint ?? data.materialColor ?? 0xffffff,
-            transparent: true,
-            opacity: data.opacity ?? data.alpha ?? 1,
-            depthTest: !!data.depthTest,
-            depthWrite: !!data.depthWrite,
-            side: THREE.DoubleSide
-        });
+        item.data ??= {};
 
-        const mesh = new THREE.Mesh(this.getUnitPlaneGeometry(), material);
+        const data = item.data;
+        const node = item.node;
 
-        mesh.matrixAutoUpdate = false;
+        item.__dirtyPosition = false;
 
-        node.add(mesh);
-        node.userData.editorType = type;
-        node.userData.surface = mesh;
-        node.userData.material = material;
-        node.userData.width = data.width ?? data.w ?? 1;
-        node.userData.height = data.height ?? data.h ?? 1;
+        if(item.type === "camera") {
+            node.position.x = data.positionX || 0;
+            node.position.y = data.positionY || 0;
+            node.position.z = data.positionZ || 0;
+            node.rotation.x = data.rotationX || 0;
+            node.rotation.y = data.rotationY || 0;
+            node.rotation.z = data.rotationZ || 0;
+            return;
+        }
+    
+        const w = data.width                 ?? 1;
+        const h = data.height                ?? 1;
+        const d = data.depth                 ?? 1;
 
-        this.updateNodeLocalShape(node);
-        return node;
-    }
+        const x = data.positionX             || 0;
+        const y = data.positionY             || 0;
+        const z = data.positionZ             || 0;
 
-    static updateNodeLocalShape(node) {
-        // TODO: separate dimensions with scale
-        node.scale.set(node.userData.width || 1, node.userData.height || 1, 1);
+        const rotationX = data.rotationX     || 0;
+        const rotationY = data.rotationY     || 0;
+        const rotationZ = data.rotationZ     || 0;
 
-        // const anchorX = node.userData.anchorX || 0;
-        // const anchorY = node.userData.anchorY || 0;
-        // const skewX = node.userData.skewX || 0;
-        // const skewY = node.userData.skewY || 0;
+        const scaleX = data.scaleX           ?? 1;
+        const scaleY = data.scaleY           ?? 1;
+        const scaleZ = data.scaleZ           ?? 1;
 
-        // geometry.translate(0.5, -0.5, 0); // Anchor but dawg why per gaymetry ts complicates it sum
+        const anchorX = data.anchorX         || 0;
+        const anchorY = data.anchorY         || 0;
+        const anchorZ = data.anchorZ         || 0;
 
-        node.updateMatrix();                 // local
-        node.updateMatrixWorld(true);        // world
+        // final scaled size
+        const sx = w * scaleX;
+        const sy = h * scaleY;
+        const sz = d * scaleZ;
+
+        // local anchor offset
+        const offset = this.#tempOffset.set(
+            anchorX * sx,
+            anchorY * sy,
+            anchorZ * sz
+        );
+
+        // rotate offset
+        const euler = this.#tempEuler.set(
+            rotationX,
+            rotationY,
+            rotationZ
+        );
+
+        offset.applyEuler(euler);
+
+        // subtract rotated offset
+        node.position.set(
+            x - offset.x,
+            y - offset.y,
+            z - offset.z
+        );
+
+        node.rotation.set(
+            rotationX,
+            rotationY,
+            rotationZ
+        );
+
+        node.scale.set(
+            sx,
+            sy,
+            sz
+        );
+
+        // // is this needed?
+        // node.updateMatrix();                  // local
+        // node.updateMatrixWorld(true);         // world
     }
 
     static disposeObject(object) {
@@ -381,6 +443,9 @@ class ThreeRendererAdapter extends RendererAdapter {
         ], 2));
 
         geometry.setIndex([0, 1, 2, 0, 2, 3]);
+
+        // Ideally this would be better but sadly we can't set this per-mesh
+        // geometry.translate(-0.5, -0.5, -0.5);
 
         geometry.computeVertexNormals();
         geometry.userData.sharedEditorGeometry = true;
@@ -439,90 +504,91 @@ class ThreeRendererAdapter extends RendererAdapter {
         },
 
         "positionX": (item, v) => {
-            if (item.node) item.node.position.x = v;
+            item.data.positionX = v;
+            item.__dirtyPosition = true;
         },
 
         "positionY": (item, v) => {
-            if (item.node) item.node.position.y = v;
+            item.data.positionY = v;
+            item.__dirtyPosition = true;
         },
 
         "positionZ": (item, v) => {
-            if (item.node) item.node.position.z = v;
+            item.data.positionZ = v;
+            item.__dirtyPosition = true;
         },
 
         "scaleX": (item, v) => {
-            if (item.node) item.node.scale.x = v;
+            item.data.scaleX = v;
+            item.__dirtyPosition = true;
         },
 
         "scaleY": (item, v) => {
-            if (item.node) item.node.scale.y = v;
+            item.data.scaleY = v;
+            item.__dirtyPosition = true;
         },
 
         "scaleZ": (item, v) => {
-            if (item.node) item.node.scale.z = v;
+            item.data.scaleZ = v;
+            item.__dirtyPosition = true;
         },
 
         "rotationX": (item, v) => {
-            if (item.node) item.node.rotation.x = v;
+            item.data.rotationX = v;
+            item.__dirtyPosition = true;
         },
 
         "rotationY": (item, v) => {
-            if (item.node) item.node.rotation.y = v;
+            item.data.rotationY = v;
+            item.__dirtyPosition = true;
         },
 
         "rotationZ": (item, v) => {
-            if (item.node) item.node.rotation.z = v;
+            item.data.rotationZ = v;
+            item.__dirtyPosition = true;
         },
 
         "anchorX": (item, v) => {
-            if (item.node?.userData) {
-                item.node.userData.anchorX = v;
-                ThreeRendererAdapter.updateNodeLocalShape(item.node);
-            }
+            item.data.anchorX = v;
+            item.__dirtyPosition = true;
         },
 
         "anchorY": (item, v) => {
-            if (item.node?.userData) {
-                item.node.userData.anchorY = v;
-                ThreeRendererAdapter.updateNodeLocalShape(item.node);
-            }
+            item.data.anchorY = v;
+            item.__dirtyPosition = true;
         },
 
-        "skewX": (item, v) => {
-            if (item.node?.userData) {
-                item.node.userData.skewX = v;
-                ThreeRendererAdapter.updateNodeLocalShape(item.node);
-            }
-        },
-
-        "skewY": (item, v) => {
-            if (item.node?.userData) {
-                item.node.userData.skewY = v;
-                ThreeRendererAdapter.updateNodeLocalShape(item.node);
-            }
+        "anchorZ": (item, v) => {
+            item.data.anchorZ = v;
+            item.__dirtyPosition = true;
         },
 
         "width": (item, v) => {
-            if (item.node?.userData) {
-                item.node.userData.width = v;
-                ThreeRendererAdapter.updateNodeLocalShape(item.node);
-            }
+            item.data.width = v;
+            item.__dirtyPosition = true;
         },
 
         "height": (item, v) => {
-            if (item.node?.userData) {
-                item.node.userData.height = v;
-                ThreeRendererAdapter.updateNodeLocalShape(item.node);
-            }
+            item.data.height = v;
+            item.__dirtyPosition = true;
         },
 
         "depth": (item, v) => {
             item.data.depth = v;
+            item.__dirtyPosition = true;
         },
 
         "visible": (item, v) => {
             v = !!v;
             if (item.node) item.node.visible = v;
+        },
+
+        "fadeIn": (item, v) => {
+            item.data.fadeIn = v;
+        },
+
+        "fadeOut": (item, v) => {
+            item.data.fadeOut = v;
         },
 
         "materialColor": (item, v) => {
@@ -532,7 +598,7 @@ class ThreeRendererAdapter extends RendererAdapter {
         "sourceFitMode": (item, v) => {
             if (item.node?.userData) {
                 item.node.userData.sourceFitMode = v;
-                ThreeRendererAdapter.updateNodeLocalShape(item.node);
+                ThreeRendererAdapter.updateItemPosition(item);
             }
         },
 
@@ -744,8 +810,7 @@ class ThreeRendererAdapter extends RendererAdapter {
         "rotationZ": (item) => item.node? item.node.rotation.z: (item.data.rotationZ || item.data.rotation || 0),
         "anchorX": (item) => item.node?.userData? item.node.userData.anchorX: (item.data.anchorX?? 0),
         "anchorY": (item) => item.node?.userData? item.node.userData.anchorY: (item.data.anchorY?? 0),
-        "skewX": (item) => item.node?.userData? item.node.userData.skewX: (item.data.skewX || 0),
-        "skewY": (item) => item.node?.userData? item.node.userData.skewY: (item.data.skewY || 0),
+        "anchorZ": (item) => item.node?.userData? item.node.userData.anchorZ: (item.data.anchorZ?? 0),
         "width": (item) => item.node?.userData? item.node.userData.width: (item.data.width || 1),
         "height": (item) => item.node?.userData? item.node.userData.height: (item.data.height || 1),
         "depth": (item) => item.data.depth || 1,
@@ -796,6 +861,9 @@ class ThreeRendererAdapter extends RendererAdapter {
         "automationEnabled": (item) => !!item.data.automationEnabled,
         "automationBaseValue": (item) => item.data.automationBaseValue || 0,
         "automationFunction": (item) => item.data.automationFunction || "",
+
+        "fadeIn": (item) => item.data.fadeIn || 0,
+        "fadeOut": (item) => item.data.fadeOut || 0
     }
 
     destroy() {

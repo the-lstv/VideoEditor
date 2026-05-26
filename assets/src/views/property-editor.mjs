@@ -296,8 +296,8 @@ function cleanup() {
                         const wy = initialWorldY + dy;
 
                         this.__editAid.style.transform = `translate3d(${wx * worldOffset.scale + worldOffset.left}px, ${wy * worldOffset.scale + worldOffset.top}px, 0)`;
-                        this.#updateProp("positionX", wx);
-                        this.#updateProp("positionY", wy);
+                        this.updateProp("positionX", event.domEvent.shiftKey? initialWorldX : wx);
+                        this.updateProp("positionY", event.domEvent.shiftKey? initialWorldY : wy);
                     }
                 });
 
@@ -308,15 +308,15 @@ function cleanup() {
                         evt.preventDefault();
                         const baseScaleX = attachment?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleX") ?? 1;
                         const baseScaleY = attachment?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleY") ?? 1;
-                        this.#updateProp("scaleX", baseScaleX * (evt.deltaY < 0 ? 1.1 : 0.9));
-                        this.#updateProp("scaleY", baseScaleY * (evt.deltaY < 0 ? 1.1 : 0.9));
+                        this.updateProp("scaleX", baseScaleX * (evt.deltaY < 0 ? 1.1 : 0.9));
+                        this.updateProp("scaleY", baseScaleY * (evt.deltaY < 0 ? 1.1 : 0.9));
                         this.updateAidPosition();
                     }
 
                     if(evt.shiftKey) {
                         evt.preventDefault();
                         const baseRotation = attachment?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationZ") ?? 0;
-                        this.#updateProp("rotationZ", (baseRotation + (evt.deltaY < 0 ? 0.1 : -0.1)) % (Math.PI * 2));
+                        this.updateProp("rotationZ", (baseRotation + (evt.deltaY < 0 ? 0.1 : -0.1)) % (Math.PI * 2));
                         this.updateAidPosition();
                     }
                 });
@@ -362,7 +362,7 @@ function cleanup() {
             if(type === "checkbox") value = inputObject.input.checked;
             if(inputObject.inputType === "angle") value = value * (Math.PI / 180);
 
-            if(!inputObject.dontUpdate) this.#updateProp(id, value);
+            if(!inputObject.dontUpdate) this.updateProp(id, value);
             if(typeof inputObject.callback === "function") {
                 inputObject.callback(value);
             }
@@ -478,7 +478,7 @@ function cleanup() {
         }
     }
 
-    #updateProp(property, value) {
+    updateProp(property, value) {
         if(this.currentTarget) {
             if(this.__addingTarget) {
                 LS.Toast.show("Linked " + property + " as automation target.", {
@@ -551,6 +551,7 @@ function cleanup() {
                 const h = attachment?.renderer?.getSavedNodeProperty?.(t, "scaleY") ?? 0;
                 const ax = attachment?.renderer?.getSavedNodeProperty?.(t, "anchorX") ?? 0;
                 const ay = attachment?.renderer?.getSavedNodeProperty?.(t, "anchorY") ?? 0;
+                const az = attachment?.renderer?.getSavedNodeProperty?.(t, "anchorZ") ?? 0;
                 const rot = attachment?.renderer?.getSavedNodeProperty?.(t, "rotationZ") ?? 0;
 
                 // Calculate anchor offset
@@ -663,7 +664,7 @@ function cleanup() {
 
     // -- Handle for dragging on number inputs
     #setupValueHandle() {
-        let startValue, min, max, input, step, precision;
+        let startValue, min, max, input, step, precision, moveTarget;
         console.log("Setting up value handle", this.editorContainer);
         
         this.__valueHandle = new LS.Util.TouchHandle(this.editorContainer, {
@@ -671,11 +672,33 @@ function cleanup() {
             pointerLock: true,
             buttons: [0],
 
-            onStart(event) {
-                console.log(event.domEvent.target);
-                
-                if (event.domEvent.target.tagName !== "INPUT" || event.domEvent.target.type !== "number" || (event.domEvent.type === "mousedown" && event.domEvent.button !== 0) || this.__addingTarget) return event.cancel();
+            onStart: (event) => {
                 input = event.domEvent.target;
+
+                moveTarget = input.closest(".move-target") && (input = input.closest(".move-target")) && input.getAttribute("data-input-id");
+
+                if (!moveTarget && (input.tagName !== "INPUT" || input.type !== "number" || (event.domEvent.type === "mousedown" && event.domEvent.button !== 0) || this.__addingTarget)) return event.cancel();
+
+                if(moveTarget) {
+                    switch(moveTarget) {
+                        case "position":
+                            startValue = [
+                                this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionX") ?? 0,
+                                this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionY") ?? 0,
+                                this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionZ") ?? 0
+                            ];
+                            break;
+                        
+                        case "scale":
+                            startValue = (this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleX") + this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleY")) / 2 || 1;
+                            break;
+                        
+                        case "rotation":
+                            startValue = this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationZ") ?? 0;
+                            break;
+                    }
+                    return;
+                }
 
                 startValue = Number(input.value);
                 input.focus();
@@ -685,15 +708,37 @@ function cleanup() {
                 step = input.step && input.step !== "any" ? Number(input.step) : 1;
 
                 // Calculate precision based on step
-                if (Math.floor(step) === step) precision = 0;
-                else {
+                if (Math.floor(step) === step) precision = 0; else {
                     const str = step.toString();
                     if (str.indexOf("e-") > -1) precision = parseInt(str.split("e-")[1]);
                     else precision = str.split(".")[1]?.length || 0;
                 }
             },
 
-            onMove(event) {
+            onMove: (event) => {
+                if(moveTarget) {
+                    switch(moveTarget) {
+                        case "position":
+                            // Resize evenly
+                            this.updateProp("positionX", startValue[0] + event.offsetX * 0.1);
+                            this.updateProp("positionY", startValue[1] + event.offsetY * 0.1);
+                            this.updateProp("positionZ", startValue[2] + event.offsetY * 0.1);
+                            break;
+
+                        case "scale":
+                            const scaleChange = 1 + event.offsetY * 0.01;
+                            this.updateProp("scaleX", startValue * scaleChange);
+                            this.updateProp("scaleY", startValue * scaleChange);
+                            this.updateProp("scaleZ", startValue * scaleChange);
+                            break;
+                        
+                        case "rotation":
+                            this.updateProp("rotationZ", startValue + event.offsetX * 0.01);
+                            break;
+                    }
+                    return;
+                }
+
                 let modifier = 1;
                 if (event.domEvent) {
                     if (event.domEvent.shiftKey) modifier = 10;
@@ -793,6 +838,16 @@ function cleanup() {
                         animatable: false, type: "number", attributes: { min: 0, step: 0.1 }, defaultValue: 0, onchange: () => {
                             this.#updateTimeline();
                     }})],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-graph-up" }, { tag: "label", i18n: "properties.fadeIn", text: " Basic Fade In (s):" }] }, this.#createInput("fadeIn", {
+                        animatable: false, type: "number", attributes: { min: 0, step: 0.1 }, defaultValue: 0, onchange: () => {
+                            this.#updateTimeline();
+                    }})],
+
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-graph-down" }, { tag: "label", i18n: "properties.fadeOut", text: " Basic Fade Out (s):" }] }, this.#createInput("fadeOut", {
+                        animatable: false, type: "number", attributes: { min: 0, step: 0.1 }, defaultValue: 0, onchange: () => {
+                            this.#updateTimeline();
+                    }})]
                 ]
             },
         ]);
@@ -813,7 +868,9 @@ function cleanup() {
                                 { tag: "label", inner: "Y", class: "input-label-small" },
                                 this.#createInput("positionY", { type: "number", attributes: { step: 1 }, defaultValue: 0 }),
                                 { tag: "label", inner: "Z", class: "input-label-small" },
-                                this.#createInput("positionZ", { type: "number", attributes: { step: 1 }, defaultValue: 0 })
+                                this.#createInput("positionZ", { type: "number", attributes: { step: 1 }, defaultValue: 0 }),
+
+                                { tag: "button", tooltip: "Move", class: "square clear small move-target", attributes: { "data-input-id": "position" }, inner: { tag: "i", class: "bi-arrows-move" } }
                             ]
                         }
                     ],
@@ -827,7 +884,9 @@ function cleanup() {
                                 { tag: "label", inner: "Y", class: "input-label-small" },
                                 this.#createInput("scaleY", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 }),
                                 { tag: "label", inner: "Z", class: "input-label-small" },,
-                                this.#createInput("scaleZ", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 })
+                                this.#createInput("scaleZ", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 }),
+
+                                { tag: "button", tooltip: "Resize", class: "square clear small move-target", attributes: { "data-input-id": "scale" }, inner: { tag: "i", class: "bi-arrows-vertical" } }
                             ]
                         }
                     ],
@@ -841,22 +900,24 @@ function cleanup() {
                                 { tag: "label", inner: "Y", class: "input-label-small" },
                                 this.#createInput("rotationY", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
                                 { tag: "label", inner: "Z", class: "input-label-small" },
-                                this.#createInput("rotationZ", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 })
+                                this.#createInput("rotationZ", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
+
+                                { tag: "button", tooltip: "Rotate", class: "square clear small move-target", attributes: { "data-input-id": "rotation" }, inner: { tag: "i", class: "bi-arrows" } }
                             ]
                         }
                     ],
-                    // Skew Group
-                    [
-                        { tag: "span", inner: [{ tag: "i", class: "bi-slash-square" }, { tag: "label", i18n: "properties.skew", text: " Skew:" }] },
-                        {
-                            class: "input-group", inner: [
-                                { tag: "label", inner: "X", class: "input-label-small" },
-                                this.#createInput("skewX", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
-                                { tag: "label", inner: "Y", class: "input-label-small" },
-                                this.#createInput("skewY", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 })
-                            ]
-                        }
-                    ],
+                    // // Skew Group
+                    // [
+                    //     { tag: "span", inner: [{ tag: "i", class: "bi-slash-square" }, { tag: "label", i18n: "properties.skew", text: " Skew:" }] },
+                    //     {
+                    //         class: "input-group", inner: [
+                    //             { tag: "label", inner: "X", class: "input-label-small" },
+                    //             this.#createInput("skewX", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
+                    //             { tag: "label", inner: "Y", class: "input-label-small" },
+                    //             this.#createInput("skewY", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 })
+                    //         ]
+                    //     }
+                    // ],
                     // Anchor Group
                     [
                         { tag: "span", inner: [{ tag: "i", class: "bi-pin-angle" }, { tag: "label", i18n: "properties.anchor", text: " Anchor:" }] },
@@ -865,9 +926,20 @@ function cleanup() {
                                 { tag: "label", inner: "X", class: "input-label-small" },
                                 this.#createInput("anchorX", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0 }),
                                 { tag: "label", inner: "Y", class: "input-label-small" },
-                                this.#createInput("anchorY", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0 })
+                                this.#createInput("anchorY", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0 }),
+                                { tag: "label", inner: "Z", class: "input-label-small" },
+                                this.#createInput("anchorZ", { type: "number", attributes: { step: 0.1, min: 0, max: 1 }, defaultValue: 0 }),
+                                { tag: "button", tooltip: "Center", class: "square clear small", inner: { tag: "i", class: "bi-crosshair" }, onclick: () => {
+                                    this.updateProp("anchorX", 0.5);
+                                    this.updateProp("anchorY", 0.5);
+                                    this.updateProp("anchorZ", 0.5);
+                                } }
                             ]
                         }
+                    ],
+                    
+                    [{ tag: "span", inner: [{ tag: "label", i18n: "properties.applyAnchorToPosition", text: " Apply anchor to position:" }] },
+                        this.#createInput("applyAnchorToPosition", { type: "checkbox", defaultValue: true })
                     ],
                 ]
             },
@@ -1435,15 +1507,15 @@ function cleanup() {
             {
                 class: "property-editor-group level-1", inner: [
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", i18n: "properties.cameraFov", text: " Field of view:" }] },
-                        this.#createInput("cameraFov", { type: "number", defaultValue: 75, callback: (v) => this.#updateProp({ fov: v }) })
+                        this.#createInput("cameraFov", { type: "number", defaultValue: 75, callback: (v) => this.updateProp({ fov: v }) })
                     ],
 
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", i18n: "properties.cameraNear", text: " Near clip:" }] },
-                        this.#createInput("cameraNear", { type: "number", defaultValue: 0.1, callback: (v) => this.#updateProp({ near: v }) })
+                        this.#createInput("cameraNear", { type: "number", defaultValue: 0.1, callback: (v) => this.updateProp({ near: v }) })
                     ],
 
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", i18n: "properties.cameraFar", text: " Far clip:" }] },
-                        this.#createInput("cameraFar", { type: "number", defaultValue: 1000, callback: (v) => this.#updateProp({ far: v }) })
+                        this.#createInput("cameraFar", { type: "number", defaultValue: 1000, callback: (v) => this.updateProp({ far: v }) })
                     ]
                 ]
             }
@@ -1476,12 +1548,12 @@ function cleanup() {
                 height /= contained.scale;
 
                 // TODO: w/h system for THREE (well, all) objects
-                this.#updateProp("scaleX", width / (isContainer ? 1 : this.currentTarget.node?.bounds?.width ?? 1));
-                this.#updateProp("scaleY", height / (isContainer ? 1 : this.currentTarget.node?.bounds?.height ?? 1));
+                this.updateProp("scaleX", width / (isContainer ? 1 : this.currentTarget.node?.bounds?.width ?? 1));
+                this.updateProp("scaleY", height / (isContainer ? 1 : this.currentTarget.node?.bounds?.height ?? 1));
 
                 if(side.toLowerCase().includes("left") || side.toLowerCase().includes("top")) {
-                    this.#updateProp("positionX", (leftOffset - contained.left) / contained.scale);
-                    this.#updateProp("positionY", (topOffset - contained.top) / contained.scale);
+                    this.updateProp("positionX", (leftOffset - contained.left) / contained.scale);
+                    this.updateProp("positionY", (topOffset - contained.top) / contained.scale);
                 }
             }
         });
