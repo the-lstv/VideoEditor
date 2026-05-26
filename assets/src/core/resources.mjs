@@ -50,10 +50,10 @@ const RESOURCE_MIME_TYPES = {
 
 const textureLoader = new THREE.TextureLoader();
 
-let fs, path, electron;
+let fs, nodePath, electron;
 if(typeof require !== "undefined") {
     fs = require("fs");
-    path = require("path");
+    nodePath = require("path");
     electron = require("electron");
 }
 
@@ -96,7 +96,7 @@ class Resource {
         if(this.folderName) {
             const folder = this.resourceManager.projectFolders.get(this.folderName);
             if(folder) {
-                return path.join(folder.path, this.path);
+                return nodePath.join(folder.path, this.path);
             } else {
                 console.warn("Resource.fullPath: folder not found for resource", this);
                 return this.path;
@@ -290,28 +290,17 @@ class ResourceManager extends LS.EventEmitter {
      */
     getResource(ref) {
         if(typeof ref === "string") {
-            if(ref.startsWith("~/")) {
-                // Search in project folders
-                const folderName = ref.slice(2, ref.indexOf("/", 2));
-                const folder = this.projectFolders.get(folderName);
+            const byId = this.resources.get(ref);
+            if(byId) return byId;
 
-                if(folder) {
-                    const relativePath = ref.slice(2 + folderName.length);
-                    return { path: path.join(folder.path, relativePath) };
-                } else {
-                    console.warn("ResourceManager.getResource: folder not found for path", ref);
-                    return null;
-                }
-            }
-
-            return this.resources.get(ref);
+            this.getResourceByPath(ref);
         } else if(ref instanceof Resource) {
             return ref;
         } else if(ref && typeof ref === "object") {
             if(ref.id) {
                 return this.resources.get(ref.id);
             } else if(ref.path) {
-                return this.resources.get(ref.path);
+                return this.getResourceByPath(ref);
             } else if(ref.name) {
                 // Search by name
                 for(const resource of this.resources.values()) {
@@ -319,6 +308,34 @@ class ResourceManager extends LS.EventEmitter {
                 }
             }
         }
+
+        return null;
+    }
+
+    getResourceByPath(path) {
+        if(typeof path === "object") {
+            const folderName = path.folderName;
+            const folder = this.projectFolders.get(folderName);
+            if(folder) {
+                return this.getResourceByPath(nodePath.join(folder.path, path.path));
+            }
+        }
+
+        if(path.startsWith("~/")) {
+            // Search in project folders
+            const folderName = path.slice(2, path.indexOf("/", 2));
+            const folder = this.projectFolders.get(folderName);
+
+            return folder ? this.getResourceByPath(nodePath.join(folder.path, relativePath)) : null;
+        }
+
+        path = nodePath.normalize(path);
+
+        // Search by absolute path
+        for(const resource of this.resources.values()) {
+            if(resource.fullPath === path) return resource;
+        }
+        return null;
     }
 
     async listDirectory(name, path) {
@@ -402,8 +419,18 @@ class ResourceManager extends LS.EventEmitter {
      * @returns {Resource} The added resource object
      */
     addResource(resource) {
+        if(this.getResource(resource)) {
+            console.log("ResourceManager.addResource: resource added twice", resource);
+            return this.getResource(resource);
+        }
+
         if(!(resource instanceof Resource)) {
             resource = new Resource(resource, this);
+        }
+
+        if(!resource) {
+            console.warn("ResourceManager.addResource: failed to create resource from", resource);
+            return null;
         }
 
         this.resources.set(resource.id, resource);
@@ -465,7 +492,7 @@ class ResourceManager extends LS.EventEmitter {
                 return;
             }
 
-            let folderName = path.basename(folderPath);
+            let folderName = nodePath.basename(folderPath);
 
             if(this.projectFolders.has(folderName)) {
                 // If a folder with the same name already exists, append a number to the name

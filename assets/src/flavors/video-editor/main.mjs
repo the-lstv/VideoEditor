@@ -281,95 +281,19 @@ class VideoEditor extends FlavorBase {
                         // Dropped on a timeline
                         // TODO: This is quite hacky
                         const timeline = elementsFromPoint.find(el => el.classList.contains('ls-timeline'))?.__lsComponent || null;
+                        let time, row;
                         if(timeline) {
                             if(!(timeline instanceof LS.Timeline)) {
                                 LS.Toast.show("Sorry, something went wrong while adding the item to a timeline.", { timeout: 3000, accent: "red" });
                                 return;
                             }
 
-                            const { time, row } = timeline.transformCoords(event.x, event.y);
-
-                            console.log("Adding item to timeline at time", time, "row", row);
-
-                            // It is a timeline item/template, we can simply clone it.
-                            if(event.data.item) {
-                                const newItem = timeline.cloneItem(event.data.item);
-                                newItem.start = time;
-                                newItem.row = row;
-                                newItem.duration = newItem.duration || 1;
-
-                                timeline.add(newItem);
-                            }
-
-                            // External file dropped, so we need to ensure it is saved as a resource,
-                            // and then create a new timeline item.
-                            else {
-                                const isResource = event.data instanceof Resource;
-
-                                if(!isResource) {
-                                    event.data.isExternal = true;
-                                    event.data.type = null; // :shrug:
-                                    event.data.id = null; // :shrug:
-                                }
-
-                                const resource = isResource? event.data: this.project.resources.addResource(event.data);
-
-                                // Now we need to make an item for the asset
-                                // TODO: this is temporary, just testing
-                                const newItem = {
-                                    type: resource.guessNodeType(),
-                                    // resource: ResourceManager.createReference(resource),
-                                    data: { resource },
-                                    label: event.data.label || resource.name,
-                                    start: time,
-                                    row,
-                                    duration: 1
-                                };
-
-                                const isVideo = resource.type === "video";
-                                if(resource.type === "image" || isVideo) {
-                                    const meta = isVideo? await resource.getVideoMetadata(): await resource.getImageDimensions();
-
-                                    if(isVideo) newItem.duration = meta.duration;
-
-                                    // todo: use w/h
-                                    // newItem.data.scaleX = meta.width;
-                                    // newItem.data.scaleY = meta.height;
-
-                                    const viewportWidth = this.flavorConfig.rendererOptions.width || 1280;
-                                    const viewportHeight = this.flavorConfig.rendererOptions.height || 720;
-                                    const resourceWidth = meta.width;
-                                    const resourceHeight = meta.height;
-
-                                    // TODO: temporary, this should later be done by the renderer based on fitMode
-                                    const scale = Math.min(
-                                        viewportWidth / resourceWidth,
-                                        viewportHeight / resourceHeight
-                                    )
-
-                                    newItem.data.scaleX = resourceWidth * scale;
-                                    newItem.data.scaleY = resourceHeight * scale;
-
-                                    newItem.data.positionX = (viewportWidth - newItem.data.scaleX) * 0.5;
-                                    newItem.data.positionY = (viewportHeight - newItem.data.scaleY) * 0.5;
-
-                                    // newItem.data.layoutSnap = "fit"; // Snap to video viewport.
-
-                                    // newItem.data.loopMode = "loop"; // default to enabled looping for videos
-
-                                    // newItem.data.layoutSnap = "fit"; // Snap to video viewport.
-                                }
-
-                                if(resource.type === "audio") {
-                                    // todo: handle audio resource
-
-                                    const meta = await resource.getAudioMetadata();
-                                    newItem.duration = meta.duration;
-                                }
-
-                                timeline.add(newItem);
-                            }
+                            const coords = timeline.transformCoords(event.x, event.y);
+                            time = coords.time;
+                            row = coords.row;
                         }
+
+                        this.fileDrop(event, timeline, time, row);
                     });
             }
         });
@@ -637,6 +561,128 @@ class VideoEditor extends FlavorBase {
         if(this.destroyed) return;
         if(frameChanged) {
             this.render();
+        }
+    }
+
+    /**
+     * Handles file drops on the timeline, either as new resources or as timeline items.
+     * @param {*} event The file drop event
+     * @param {*} event.data The data associated with the drop, which can be a Resource or raw file data
+     * @param {*} event.data.item If the dropped data is a timeline item template, it will be included here for cloning
+     * @param {*} event.data.label A label for the dropped item
+     * @param {*} event.data.path File path may be included here
+     * @param {*} event.data.folderName If a file and belongs to a project folder, the folder name may be included here for better resource organization
+     * @param {*} event.data.mimeType Optional MIME type may be included here
+     * @param {*} timeline The timeline the file was dropped on, or null if not dropped on a timeline. OR set to true to try to detect based on event coordinates.
+     * @param {*} time Optional custom time the file was dropped at, if applicable.
+     * @param {*} row Optional custom row the file was dropped on, if applicable.
+     * @returns 
+     */
+    async fileDrop(event, timeline, time, row) {
+        if(timeline === true) {
+            const elementsFromPoint = document.elementsFromPoint(event.x, event.y);
+            timeline = elementsFromPoint.find(el => el.classList.contains('ls-timeline'))?.__lsComponent || null;
+
+            if(timeline) {
+                if(!(timeline instanceof LS.Timeline)) {
+                    LS.Toast.show("Sorry, something went wrong while adding the item to a timeline.", { timeout: 3000, accent: "red" });
+                    return;
+                }
+            }
+        }
+
+        if(timeline && (time === undefined || row === undefined)) {
+            const coords = timeline.transformCoords(event.x, event.y);
+            time = coords.time;
+            row = coords.row;
+        }
+
+        console.log("Adding item to timeline at time", time, "row", row);
+
+        // It is a timeline item/template, we can simply clone it.
+        if(event.data.item) {
+            if(!timeline) return;
+
+            const newItem = timeline.cloneItem(event.data.item);
+            newItem.start = time;
+            newItem.row = row;
+            newItem.duration = newItem.duration || 1;
+
+            timeline.add(newItem);
+        }
+
+        // External file dropped, so we need to ensure it is saved as a resource,
+        // and then create a new timeline item.
+        else {
+            const isResource = event.data instanceof Resource;
+
+            if(!isResource) {
+                event.data.isExternal = true;
+                event.data.type = null; // :shrug:
+                event.data.id = null; // :shrug:
+            }
+
+            const resource = isResource? event.data: this.project.resources.addResource(event.data);
+
+            // If not dropping to a timeline, then all we need to do is add the resource to the project
+            if(!timeline) {
+                LS.Toast.show("Resource added: " + event.data.label || resource.name || resource.path, { timeout: 3000 });
+                return;
+            }
+
+            // Now we need to make an item for the asset
+            const newItem = {
+                type: resource.guessNodeType(),
+                // resource: ResourceManager.createReference(resource),
+                data: { resource },
+                label: event.data.label || resource.name,
+                start: time,
+                row,
+                duration: 1
+            };
+
+            const isVideo = resource.type === "video";
+            if(resource.type === "image" || isVideo) {
+                const meta = isVideo? await resource.getVideoMetadata(): await resource.getImageDimensions();
+
+                if(isVideo) newItem.duration = meta.duration;
+
+                // todo: use w/h
+                // newItem.data.scaleX = meta.width;
+                // newItem.data.scaleY = meta.height;
+
+                const viewportWidth = this.flavorConfig.rendererOptions.width || 1280;
+                const viewportHeight = this.flavorConfig.rendererOptions.height || 720;
+                const resourceWidth = meta.width;
+                const resourceHeight = meta.height;
+
+                // TODO: temporary, this should later be done by the renderer based on fitMode
+                const scale = Math.min(
+                    viewportWidth / resourceWidth,
+                    viewportHeight / resourceHeight
+                )
+
+                newItem.data.scaleX = resourceWidth * scale;
+                newItem.data.scaleY = resourceHeight * scale;
+
+                newItem.data.positionX = (viewportWidth - newItem.data.scaleX) * 0.5;
+                newItem.data.positionY = (viewportHeight - newItem.data.scaleY) * 0.5;
+
+                // newItem.data.layoutSnap = "fit"; // Snap to video viewport.
+
+                // newItem.data.loopMode = "loop"; // default to enabled looping for videos
+
+                // newItem.data.layoutSnap = "fit"; // Snap to video viewport.
+            }
+
+            if(resource.type === "audio") {
+                // todo: handle audio resource
+
+                const meta = await resource.getAudioMetadata();
+                newItem.duration = meta.duration;
+            }
+
+            timeline.add(newItem);
         }
     }
 

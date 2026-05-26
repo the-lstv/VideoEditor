@@ -41,6 +41,8 @@ const mappingCompiler = new class {
         'smoothstep': '((edge0,edge1,x)=>{let t=Math.min(Math.max((x - edge0)/(edge1 - edge0),0),1);return t*t*(3 - 2*t);})',
         'y': 'y', 'time': 'y',
 
+        'start': 'start', 'length': 'length',
+
         'global': 'global'
     };
 
@@ -75,7 +77,7 @@ const mappingCompiler = new class {
         if(automationItem.__cTargets && !automationItem.__dirty) {
             for (const cTarget of automationItem.__cTargets) {
                 const baseValue = cTarget.isRelative? cTarget.target.data[cTarget.property] || 0: 0;
-                cTarget.setter(cTarget.target, baseValue + cTarget.mappingFn(automationValue, time));
+                cTarget.setter(cTarget.target, baseValue + cTarget.mappingFn(automationValue, time, cTarget.target.data.start, cTarget.target.data.length));
             }
             return;
         }
@@ -103,7 +105,7 @@ const mappingCompiler = new class {
             target.__mappingCache = mappingFn;
 
             const isRelative = target.isRelative;
-            const finalValue = isRelative? (targetNode.data[target.property] || 0) + (mappingFn(automationValue, time)): mappingFn(automationValue, time);
+            const finalValue = isRelative? (targetNode.data[target.property] || 0) + (mappingFn(automationValue, time, targetNode.data.start, targetNode.data.length)): mappingFn(automationValue, time, targetNode.data.start, targetNode.data.length);
 
             setter(targetNode, finalValue);
 
@@ -269,7 +271,7 @@ const mappingCompiler = new class {
         }
 
         const generatedCode = "return (" + (operations.join('') || "0") + ") || 0;";
-        const func = new Function('x', 'y', generatedCode);
+        const func = new Function('x', 'y', 'start', 'length', generatedCode);
         // this.cache.set(code, func);
         return func;
     }

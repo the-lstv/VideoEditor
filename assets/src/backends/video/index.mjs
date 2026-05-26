@@ -590,6 +590,8 @@ class VideoEncoder {
 
         const frameRate = options.fps || 30;
 
+        videoFlavor.pause?.();
+
 		output.addVideoTrack(canvasSource, { frameRate });
 
         await output.start();
