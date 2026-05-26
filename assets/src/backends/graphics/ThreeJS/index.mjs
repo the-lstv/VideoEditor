@@ -390,11 +390,20 @@ class ThreeRendererAdapter extends RendererAdapter {
         offset.applyEuler(euler);
 
         // subtract rotated offset
-        node.position.set(
-            x - offset.x,
-            y - offset.y,
-            z - offset.z
-        );
+        if(data.preserveAnchorPosition) {
+            // restore original position while keeping anchor for rotation & scale
+            node.position.set(
+                x - offset.x + anchorX * sx,
+                y - offset.y + anchorY * sy,
+                z - offset.z + anchorZ * sz,
+            );
+        } else {
+            node.position.set(
+                x - offset.x,
+                y - offset.y,
+                z - offset.z
+            );
+        }
 
         node.rotation.set(
             rotationX,
@@ -789,6 +798,11 @@ class ThreeRendererAdapter extends RendererAdapter {
                 item.mappingFn = v;
                 item.__dirtyMapping = false;
             }
+        },
+
+        "preserveAnchorPosition": (item, v) => {
+            item.data.preserveAnchorPosition = !!v;
+            item.__dirtyPosition = true;
         }
     }
 
@@ -863,7 +877,9 @@ class ThreeRendererAdapter extends RendererAdapter {
         "automationFunction": (item) => item.data.automationFunction || "",
 
         "fadeIn": (item) => item.data.fadeIn || 0,
-        "fadeOut": (item) => item.data.fadeOut || 0
+        "fadeOut": (item) => item.data.fadeOut || 0,
+
+        "preserveAnchorPosition": (item) => !!item.data.preserveAnchorPosition,
     }
 
     destroy() {
