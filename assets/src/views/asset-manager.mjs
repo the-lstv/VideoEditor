@@ -1,4 +1,5 @@
 import * as EditorBaseClasses from "../core/base.mjs";
+import { Resource } from "../core/resources.mjs";
 
 /**
  * Asset manager view class (standalone)
@@ -112,29 +113,45 @@ class AssetManagerView extends LS.Multipane.View {
                 if(node.tileColor) element.setAttribute("ls-accent", node.tileColor); else element.removeAttribute("ls-accent");
                 if(node.description) element.setAttribute("title", node.description); else element.removeAttribute("title");
 
-                if(this.searchQuery) {
-                    const matches = (node.label || '').toLowerCase().includes(this.searchQuery);
-                    element.classList.toggle('search-hidden', !matches);
-                } else {
-                    element.classList.remove('search-hidden');
+                const badgeContainer = element.querySelector(".ls-tree-node-badge");
+                if (badgeContainer && !badgeContainer.querySelector("i")) {
+                    LS.Create({
+                        tag: 'i', parent: badgeContainer, i18n: { tooltip: "assets.click_for_more_info" }, onclick: () => {
+                            const node = tree.getNodeDataByElement(button.closest(".ls-tree-node"));
+                            if (!node) return;
+
+                            if (node.helpText) {
+                                LS.Modal.buildEphemeral({
+                                    title: node.label,
+                                    content: { style: "white-space: pre-wrap;", inner: node.helpText }
+                                });
+                            } else {
+                                console.log(this.parent)
+                            }
+                        }, style: 'margin-left: auto; opacity: 0.5;'
+                    });
                 }
 
+                const button = element.querySelector("i");
                 if(node.helpText) {
-                    const badgeContainer = element.querySelector(".ls-tree-node-badge");
-                    if(badgeContainer && !badgeContainer.querySelector(".bi-info-circle")) {
-                        // TODO: Optimize to not create a new badge every time
-                        const badge = LS.Create({ tag: 'i', class: 'bi-info-circle', i18n: { tooltip: "assets.click_for_more_info" }, tooltip: "Click for more info", onclick() {
-                            LS.Modal.buildEphemeral({
-                                title: node.label,
-                                content: { style: "white-space: pre-wrap;", inner: node.helpText }
-                            });
-                        }, style: 'margin-left: auto; opacity: 0.5;' });
-
-                        badgeContainer.appendChild(badge);
+                    button.className = "bi-info-circle";
+                    button.setAttribute("ls-tooltip", "Click for more info");
+                    button.style.display = "block";
+                } else if(node.type === 'file') {
+                    if(!node.favorited) {
+                        button.className = "bi-star";
+                        button.setAttribute("ls-tooltip", "Favorite");
+                    } else {
+                        button.className = "bi-star-fill";
+                        button.setAttribute("ls-tooltip", "Remove from favorites");
                     }
+                    button.style.display = "block";
+                } else if(node instanceof Resource) {
+                    button.className = "bi-x-lg";
+                    button.setAttribute("ls-tooltip", "Remove asset");
+                    button.style.display = "block";
                 } else {
-                    const badge = element.querySelector(".ls-tree-node-badge .bi-info-circle");
-                    if(badge) badge.remove();
+                    button.style.display = "none";
                 }
             }
         });

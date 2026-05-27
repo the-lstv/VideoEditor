@@ -112,10 +112,13 @@ function cleanup() {
 
         this.container.appendChild(this.emptyMessage);
 
-        this.__resizeObserver = new ResizeObserver(() => {
+        this.__resizeObserver = new ResizeObserver(this.__resizeCallback = () => {
             this.updateAidPosition();
         });
+
         this.__resizeObserver.observe(this.container);
+
+        window.addEventListener("resize", this.__resizeCallback);
 
         this.frameScheduler = new LS.Util.FrameScheduler(() => this.#render());
     }
@@ -180,7 +183,7 @@ function cleanup() {
             case "automation":
                 this.__automationTargetsBody.innerHTML = "";
 
-                const timelineInstance = this.#getAttachment()?.timelineInstance;
+                const timelineInstance = this.attachedTo?.timelineInstance;
                 if (timelineInstance) for (const [i, t] of (target.data.targets || []).entries()) {
                     const targetNode = timelineInstance.getItemById(t.nodeId);
                     const targetLabel = targetNode ? (targetNode.label || targetNode.type || targetNode.id) : "Unknown Node";
@@ -254,13 +257,16 @@ function cleanup() {
 
         // Edit aid for visual nodes
         if(this.targetNodeIsVisual) {
-            const attachment = this.#getAttachment();
+            const attachment = this.attachedTo;
             if(!target.node) {
                 attachment?.createItemNode?.(target);
             }
 
             const project = this.#getProject();
             const connectedPreview = project?.connectedViews.get("videoPreview");
+
+            let snapDivisX = 10, snapDivisY = 10;
+
             if(connectedPreview) {
                 const previewContainer = connectedPreview.container.querySelector(".preview-container");
                 previewContainer.appendChild(this.__editAid);
@@ -336,6 +342,12 @@ function cleanup() {
                             lockedAxis = null;
                         }
 
+                        // Snap to grid if alt is not held
+                        if(!event.domEvent.altKey) {
+                            wx = Math.round(wx / snapDivisX) * snapDivisX;
+                            wy = Math.round(wy / snapDivisY) * snapDivisY;
+                        }
+
                         this.__editAid.style.transform = `translate3d(${wx * worldOffset.scale + worldOffset.left}px, ${wy * worldOffset.scale + worldOffset.top}px, 0)`;
                         this.updateProp("positionX", wx);
                         this.updateProp("positionY", wy);
@@ -375,10 +387,6 @@ function cleanup() {
 
         this.emptyMessage.remove();
         this.container.appendChild(this.tabContainer);
-    }
-
-    #getAttachment() {
-        return this.attachedTo || this.parent;
     }
 
     #getProject() {
@@ -479,7 +487,7 @@ function cleanup() {
         const inputObject = this.inputs.get(id);
         if(inputObject) {
             if(value === undefined && this.currentTarget) {
-                value = this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, id);
+                value = this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, id);
             }
 
             if(inputObject.type === "color" && typeof value === "number") {
@@ -501,7 +509,7 @@ function cleanup() {
     }
 
     linkingAutomationTarget() {
-        if (!this.currentTarget || this.currentTarget.type !== "automation" || !this.#getAttachment()?.timelineInstance) return;
+        if (!this.currentTarget || this.currentTarget.type !== "automation" || !this.attachedTo?.timelineInstance) return;
 
         this.__addingTarget = this.currentTarget;
         LS._topLayer.appendChild(this.__addingTargetElement || (this.__addingTargetElement = LS.Create({
@@ -557,7 +565,7 @@ function cleanup() {
             // Should not happen, but if it somehow does, this prevents exploding the program
             if(Number.isNaN(value)) value = 0;
 
-            this.#getAttachment()?.renderer?.applyNodeProperty?.(this.currentTarget, property, value);
+            this.attachedTo?.renderer?.applyNodeProperty?.(this.currentTarget, property, value);
             this.updateInputValue(property, value);
 
             if(this.targetNodeIsVisual) {
@@ -568,14 +576,14 @@ function cleanup() {
     }
 
     #updateTimeline() {
-        const timelineInstance = this.#getAttachment()?.timelineInstance;
+        const timelineInstance = this.attachedTo?.timelineInstance;
         if(this.currentTarget && timelineInstance) {
             timelineInstance.render(true);
         }
     }
 
     #updateRender(){
-        const attachment = this.#getAttachment();
+        const attachment = this.attachedTo;
         if(this.currentTarget && attachment?.renderer) {
             attachment.render();
         }
@@ -590,7 +598,7 @@ function cleanup() {
                 if (!worldOffset) return;
 
                 // Get values with fallback
-                const attachment = this.#getAttachment();
+                const attachment = this.attachedTo;
                 const x = attachment?.renderer?.getSavedNodeProperty?.(t, "positionX") ?? 0;
                 const y = attachment?.renderer?.getSavedNodeProperty?.(t, "positionY") ?? 0;
                 // ! todo: width/height
@@ -602,16 +610,19 @@ function cleanup() {
                 const ay = attachment?.renderer?.getSavedNodeProperty?.(t, "anchorY") ?? 0;
                 const az = attachment?.renderer?.getSavedNodeProperty?.(t, "anchorZ") ?? 0;
                 const rot = attachment?.renderer?.getSavedNodeProperty?.(t, "rotationZ") ?? 0;
+                const preserveAnchorPosition = attachment?.renderer?.getSavedNodeProperty?.(t, "preserveAnchorPosition") ?? false;
 
                 // Calculate anchor offset
                 const anchorOffsetX = -ax * w;
                 const anchorOffsetY = -ay * h;
 
                 // Apply rotation to anchor offset
-                const cos = Math.cos(rot);
-                const sin = Math.sin(rot);
-                const rotatedOffsetX = anchorOffsetX * cos - anchorOffsetY * sin;
-                const rotatedOffsetY = anchorOffsetX * sin + anchorOffsetY * cos;
+                // const cos = Math.cos(rot);
+                // const sin = Math.sin(rot);
+                // const rotatedOffsetX = anchorOffsetX * cos - anchorOffsetY * sin;
+                // const rotatedOffsetY = anchorOffsetX * sin + anchorOffsetY * cos;
+                const rotatedOffsetX = preserveAnchorPosition ? 0:  anchorOffsetX;
+                const rotatedOffsetY = preserveAnchorPosition ? 0:  anchorOffsetY;
 
                 // Final position in screen space
                 const screenX = (x + rotatedOffsetX) * worldOffset.scale + worldOffset.left;
@@ -626,6 +637,10 @@ function cleanup() {
 
     updateAidPosition() {
         this.__aidDirty = true;
+
+        // Sync with the frame scheduler of the attached renderer
+        this.frameScheduler.limiter = this.attachedTo?.frameScheduler?.limiter;
+
         this.frameScheduler.schedule();
     }
 
@@ -680,7 +695,7 @@ function cleanup() {
                         const propertyName = this.focusedInput.id;
                         if(!propertyName) return;
 
-                        const timelineInstance = this.#getAttachment()?.timelineInstance;
+                        const timelineInstance = this.attachedTo?.timelineInstance;
                         if(!timelineInstance) return;
 
                         const clip = {
@@ -737,25 +752,25 @@ function cleanup() {
                         case "position":
                             this.__valueHandle.cursor = "--ls-timeline-cursor-move";
                             startValue = [
-                                this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionX") ?? 0,
-                                this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionY") ?? 0,
-                                this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionZ") ?? 0
+                                this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionX") ?? 0,
+                                this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionY") ?? 0,
+                                this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionZ") ?? 0
                             ];
                             break;
                         
                         case "scale":
                             startValue = [
-                                this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleX") ?? 1,
-                                this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleY") ?? 1,
-                                this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleZ") ?? 1
+                                this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleX") ?? 1,
+                                this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleY") ?? 1,
+                                this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "scaleZ") ?? 1
                             ];
                             break;
                         
                         case "rotation":
                             this.__valueHandle.cursor = "--ls-timeline-cursor-rotate3d";
-                            startRotationX = this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationX") ?? 0;
-                            startRotationY = this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationY") ?? 0;
-                            startRotationZ = this.#getAttachment()?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationZ") ?? 0;
+                            startRotationX = this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationX") ?? 0;
+                            startRotationY = this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationY") ?? 0;
+                            startRotationZ = this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationZ") ?? 0;
                             break;
                     }
                     return;
@@ -921,7 +936,7 @@ function cleanup() {
         ]);
 
         this.propertyGroups.transform = LS.Create([
-            { tag: "h3", i18n: "properties.transform", text: "Transform", class: "property-editor-header" },
+            { tag: "h3", i18n: "properties.transform", text: "Transform & Layout", class: "property-editor-header" },
             {
                 class: "property-editor-group level-1", inner: [
                     [{ tag: "span", tooltip: "Changes the draw order regardless of Z position.\n-1 is default and draws items based on the track order of\nyour timeline from top to bottom.\nIt is useful to set if you want multiple items to draw on\nthe same layer or customize their order.", inner: [{ tag: "i", class: "bi-stack" }, { tag: "label", i18n: "properties.drawOrder", text: " Custom Draw Order:" }] }, this.#createInput("clipDrawOrder", { type: "number", attributes: { min: 0, step: 1 }, defaultValue: -1 })],
@@ -938,7 +953,12 @@ function cleanup() {
                                 { tag: "label", inner: "Z", class: "input-label-small" },
                                 this.#createInput("positionZ", { type: "number", attributes: { step: 1 }, defaultValue: 0 }),
 
-                                { tag: "button", tooltip: "Move (hold & drag)", class: "square clear small move-target", attributes: { "data-move-target": "position" }, inner: { tag: "i", class: "bi-arrows-move" } }
+                                { tag: "button", tooltip: "Move (hold & drag)\nRight click to reset", class: "square clear small move-target", attributes: { "data-move-target": "position" }, inner: { tag: "i", class: "bi-arrows-move" }, oncontextmenu: (e) => {
+                                    e.preventDefault();
+                                    this.updateProp("positionX", 0);
+                                    this.updateProp("positionY", 0);
+                                    this.updateProp("positionZ", 0);
+                                } }
                             ]
                         }
                     ],
@@ -954,7 +974,12 @@ function cleanup() {
                                 { tag: "label", inner: "Z", class: "input-label-small" },,
                                 this.#createInput("scaleZ", { type: "number", attributes: { step: 0.1 }, defaultValue: 1 }),
 
-                                { tag: "button", tooltip: "Resize (hold & drag)", class: "square clear small move-target", attributes: { "data-move-target": "scale" }, inner: { tag: "i", class: "bi-arrows-vertical" } }
+                                { tag: "button", tooltip: "Resize (hold & drag)\nRight click to reset", class: "square clear small move-target", attributes: { "data-move-target": "scale" }, inner: { tag: "i", class: "bi-arrows-vertical" }, oncontextmenu: (e) => {
+                                    e.preventDefault();
+                                    this.updateProp("scaleX", 1);
+                                    this.updateProp("scaleY", 1);
+                                    this.updateProp("scaleZ", 1);
+                                } }
                             ]
                         }
                     ],
@@ -970,7 +995,12 @@ function cleanup() {
                                 { tag: "label", inner: "Z", class: "input-label-small" },
                                 this.#createInput("rotationZ", { type: "number", inputType: "angle", attributes: { min: 0, max: 360 }, defaultValue: 0 }),
 
-                                { tag: "button", tooltip: "3D Rotate (hold & drag)", class: "square clear small move-target", attributes: { "data-move-target": "rotation" }, inner: { tag: "i", class: "bi-arrow-repeat" } }
+                                { tag: "button", tooltip: "3D Rotate (hold & drag)\nRight click to reset", class: "square clear small move-target", attributes: { "data-move-target": "rotation" }, inner: { tag: "i", class: "bi-arrow-repeat" }, oncontextmenu: (e) => {
+                                    e.preventDefault();
+                                    this.updateProp("rotationX", 0);
+                                    this.updateProp("rotationY", 0);
+                                    this.updateProp("rotationZ", 0);
+                                } }
                             ]
                         }
                     ],
@@ -1001,6 +1031,11 @@ function cleanup() {
                                     this.updateProp("anchorX", 0.5);
                                     this.updateProp("anchorY", 0.5);
                                     this.updateProp("anchorZ", 0.5);
+                                }, oncontextmenu: (e) => {
+                                    e.preventDefault();
+                                    this.updateProp("anchorX", 0);
+                                    this.updateProp("anchorY", 0);
+                                    this.updateProp("anchorZ", 0);
                                 } }
                             ]
                         }
@@ -1591,7 +1626,7 @@ function cleanup() {
                     ],
 
                     [{ tag: "span", inner: [{ tag: "i", class: "bi-arrows-move" }, { tag: "label", i18n: "properties.cameraFar", text: " Far clip:" }] },
-                        this.#createInput("cameraFar", { type: "number", defaultValue: 1000, callback: (v) => this.updateProp({ far: v }) })
+                        this.#createInput("cameraFar", { type: "number", defaultValue: 10000, callback: (v) => this.updateProp({ far: v }) })
                     ]
                 ]
             }
@@ -1604,23 +1639,46 @@ function cleanup() {
             class: "editAid",
         });
 
+        let contained = null, preview;
+
         // Edit aid resize handles
         const aidResizerEntry = LS.Resize.set(this.__editAid, {
             sides: true,
             corners: true,
-            translate: true
+            translate: true,
+            map: (data) => {
+                if (data.event.domEvent.altKey || !preview) {
+                    return null;
+                }
+
+                contained = preview.getContainedCoords();
+
+                let x;
+                console.log(x = {
+                    // Apply snapping if alt is not held
+                    width:  (Math.round(data.width  / contained.scale / 10) * 10) * contained.scale,
+                    height: (Math.round(data.height / contained.scale / 10) * 10) * contained.scale,
+                    posX:   (Math.round(data.posX   / contained.scale / 10) * 10) * contained.scale,
+                    posY:   (Math.round(data.posY   / contained.scale / 10) * 10) * contained.scale,
+                    cancelIfUnchanged: true
+                });
+
+                return x;
+            }
+        });
+
+        aidResizerEntry.handler.on("start", (event) => {
+            const project = this.#getProject();
+            preview = project?.connectedViews.get("videoPreview");
         });
 
         aidResizerEntry.handler.on("resize", (side, width, height, leftOffset, topOffset, state) => {
             if(!this.currentTarget) return;
 
-            const project = this.#getProject();
-            const preview = project?.connectedViews.get("videoPreview");
             if(preview) {
-                const contained = preview.getContainedCoords();
                 // TODO:
                 const isContainer = false// this.currentTarget.node.constructor === PIXI.Container;
-                width /= contained.scale;
+                width  /= contained.scale;
                 height /= contained.scale;
 
                 // TODO: w/h system for THREE (well, all) objects
@@ -1634,7 +1692,7 @@ function cleanup() {
             }
         });
         
-        aidResizerEntry.handler.on("resize-end", () => {
+        aidResizerEntry.handler.on("end", () => {
             if(!this.currentTarget) return;
             this.updateAidPosition();
         });
@@ -1696,6 +1754,9 @@ function cleanup() {
             this.__resizeObserver.disconnect();
             this.__resizeObserver = null;
         }
+
+        window.removeEventListener("resize", this.__resizeCallback);
+        this.__resizeCallback = null;
 
         super.destroy();
     }

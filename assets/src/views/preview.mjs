@@ -300,7 +300,9 @@ class PreviewView extends LS.Multipane.View {
             top,
             width: renderedWidth,
             height: renderedHeight,
-            scale: contentAspect > canvasAspect ? renderedWidth / contentWidth : renderedHeight / contentHeight
+            scale: contentAspect > canvasAspect ? renderedWidth / contentWidth : renderedHeight / contentHeight,
+            contentWidth,
+            contentHeight
         };
     }
 

@@ -210,8 +210,8 @@ class ThreeRendererAdapter extends RendererAdapter {
         const data = item.data || {};
 
         const camera = data.cameraType === "orthographic"?
-            new THREE.OrthographicCamera(data.cameraLeft ?? 0, data.cameraRight ?? width, data.cameraTop ?? 0, data.cameraBottom ?? height, data.cameraNear ?? 0.1, data.cameraFar ?? 1000):
-            new THREE.PerspectiveCamera (data.cameraFov ?? 50, data.cameraAspect ?? width / height, data.cameraNear ?? 0.1, data.cameraFar ?? 1000);
+            new THREE.OrthographicCamera(data.cameraLeft ?? 0, data.cameraRight ?? width, data.cameraTop ?? 0, data.cameraBottom ?? height, data.cameraNear ?? 0.1, data.cameraFar ?? 10000):
+            new THREE.PerspectiveCamera (data.cameraFov ?? 50, data.cameraAspect ?? width / height, data.cameraNear ?? 0.1, data.cameraFar ?? 10000);
 
         camera.lookAt(0, 0, 0);
         return camera;
@@ -870,7 +870,7 @@ class ThreeRendererAdapter extends RendererAdapter {
 
         "cameraFov": (item) => item.node?.isPerspectiveCamera? item.node.fov: (item.data.cameraFov || item.data.fov || 50),
         "cameraNear": (item) => item.node?.isCamera? item.node.near: (item.data.cameraNear || item.data.near || 0.1),
-        "cameraFar": (item) => item.node?.isCamera? item.node.far: (item.data.cameraFar || item.data.far || 1000),
+        "cameraFar": (item) => item.node?.isCamera? item.node.far: (item.data.cameraFar || item.data.far || 10000),
 
         "automationEnabled": (item) => !!item.data.automationEnabled,
         "automationBaseValue": (item) => item.data.automationBaseValue || 0,
