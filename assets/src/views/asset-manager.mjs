@@ -282,7 +282,16 @@ class AssetManagerView extends LS.Multipane.View {
 
             e.preventDefault();
             this.__contentContainer.classList.remove("drag-over");
-            this.parent?.resources.addProjectResources(e.dataTransfer.files);
+
+            const items = Array.from(e.dataTransfer?.items || []);
+            const files = items
+                .map(item => item?.kind === "file" ? item.getAsFile() : null)
+                .filter(Boolean);
+
+            const fallbackFiles = Array.from(e.dataTransfer?.files || []).filter(Boolean);
+            const droppedFiles = files.length > 0 ? files : fallbackFiles;
+
+            app.flavorInstance?.fileDrop({ data: { files: droppedFiles } }, false);
         });
 
         this._boundRefreshFolders = () => this.updateTab();

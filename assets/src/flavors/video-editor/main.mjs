@@ -25,14 +25,16 @@ import AudioRenderer from "../../backends/audio/index.mjs";
 
 // --- Views
 import { AssetManagerView } from "../../views/asset-manager.mjs";
-import PreviewView from "../../views/preview.mjs";
-import PropertyEditorView from "../../views/property-editor.mjs";
-import TimelineView from "../../views/timeline.mjs";
+import PreviewView          from "../../views/preview.mjs";
+import PropertyEditorView   from "../../views/property-editor.mjs";
+import TimelineView         from "../../views/timeline.mjs";
 
 import Project from "../../core/project.mjs";
 
 import { Variable, mappingCompiler } from "../../core/variable.mjs";
 import { ResourceManager, Resource } from "../../core/resources.mjs";
+
+const { webUtils } = typeof require !== "undefined" ? require("electron") : {};
 
 
 const TRACK_STRIDE = 1000; // The distance in renderOrder between each track
@@ -84,6 +86,16 @@ class VideoEditor extends FlavorBase {
 
         console.log("Video editor initialized with renderer options:", rendererOptions);
         
+    }
+
+    #getFilePath(file) {
+        if(!file) return null;
+
+        if(webUtils?.getPathForFile) {
+            return webUtils.getPathForFile(file);
+        }
+
+        return file.path || file.fullPath || null;
     }
 
     constructor(project) {
@@ -227,7 +239,7 @@ class VideoEditor extends FlavorBase {
                     });
 
                     this.addExternalEventListener(this.timelineInstance, 'file-dropped', async (files, row, offset) => {
-                        this.project.resources.addProjectResources(files, row, offset);
+                        await this.fileDrop({ data: { files } }, this.timelineInstance, offset, row);
                     });
 
                     this.addExternalEventListener(this.timelineInstance, 'action', (action) => {
@@ -276,24 +288,7 @@ class VideoEditor extends FlavorBase {
 
                 case "assetManager":
                     this.addExternalEventListener(view, 'asset-dropped', async (event) => {
-                        const elementsFromPoint = document.elementsFromPoint(event.x, event.y);
-
-                        // Dropped on a timeline
-                        // TODO: This is quite hacky
-                        const timeline = elementsFromPoint.find(el => el.classList.contains('ls-timeline'))?.__lsComponent || null;
-                        let time, row;
-                        if(timeline) {
-                            if(!(timeline instanceof LS.Timeline)) {
-                                LS.Toast.show("Sorry, something went wrong while adding the item to a timeline.", { timeout: 3000, accent: "red" });
-                                return;
-                            }
-
-                            const coords = timeline.transformCoords(event.x, event.y);
-                            time = coords.time;
-                            row = coords.row;
-                        }
-
-                        this.fileDrop(event, timeline, time, row);
+                        this.fileDrop(event, true);
                     });
             }
         });
@@ -580,27 +575,96 @@ class VideoEditor extends FlavorBase {
      */
     async fileDrop(event, timeline, time, row) {
         if(timeline === true) {
-            const elementsFromPoint = document.elementsFromPoint(event.x, event.y);
+            const dropX = event.x ?? event.clientX ?? event.data?.x;
+            const dropY = event.y ?? event.clientY ?? event.data?.y;
+            const elementsFromPoint = document.elementsFromPoint(dropX, dropY);
             timeline = elementsFromPoint.find(el => el.classList.contains('ls-timeline'))?.__lsComponent || null;
 
-            if(timeline) {
-                if(!(timeline instanceof LS.Timeline)) {
-                    LS.Toast.show("Sorry, something went wrong while adding the item to a timeline.", { timeout: 3000, accent: "red" });
-                    return;
-                }
+            if(timeline && !(timeline instanceof LS.Timeline)) {
+                LS.Toast.show("Sorry, something went wrong while adding the item to a timeline.", { timeout: 3000, accent: "red" });
+                return;
             }
         }
 
         if(timeline && (time === undefined || row === undefined)) {
-            const coords = timeline.transformCoords(event.x, event.y);
+            const dropX = event.x ?? event.clientX ?? event.data?.x;
+            const dropY = event.y ?? event.clientY ?? event.data?.y;
+            const coords = timeline.transformCoords(dropX, dropY);
             time = coords.time;
             row = coords.row;
         }
 
         console.log("Adding item to timeline at time", time, "row", row);
 
+        const droppedFiles = event?.data?.files || event?.files || event?.dataTransfer?.files;
+        if(droppedFiles && typeof droppedFiles.length === "number") {
+            const files = Array.from(droppedFiles).map(file => {
+                if(typeof file === "string") return file;
+
+                const filePath = this.#getFilePath(file);
+                return filePath || file?.name || null;
+            }).filter(Boolean);
+            if(files.length === 0) return;
+
+            const resources = await this.project.resources.addProjectResources(files, row, time);
+
+            if(!timeline) {
+                return resources;
+            }
+
+            if(time === undefined) time = this.timelineInstance?.seek || 0;
+            if(row === undefined) row = 0;
+
+            for(let index = 0; index < resources.length; index++) {
+                const resource = resources[index];
+                if(!resource) continue;
+
+                // Now we need to make an item for the asset
+                const newItem = {
+                    type: resource.guessNodeType(),
+                    data: { resource },
+                    label: resource.label,
+                    start: time,
+                    row: row + index,
+                    duration: 1
+                };
+
+                const isVideo = resource.type === "video";
+                if(resource.type === "image" || isVideo) {
+                    const meta = isVideo ? await resource.getVideoMetadata() : await resource.getImageDimensions();
+
+                    if(isVideo) newItem.duration = meta.duration;
+
+                    const viewportWidth = this.flavorConfig.rendererOptions.width || 1280;
+                    const viewportHeight = this.flavorConfig.rendererOptions.height || 720;
+                    const resourceWidth = meta.width;
+                    const resourceHeight = meta.height;
+
+                    const scale = Math.min(
+                        viewportWidth / resourceWidth,
+                        viewportHeight / resourceHeight
+                    );
+
+                    newItem.data.scaleX = resourceWidth * scale;
+                    newItem.data.scaleY = resourceHeight * scale;
+
+                    newItem.data.positionX = (viewportWidth - newItem.data.scaleX) * 0.5;
+                    newItem.data.positionY = (viewportHeight - newItem.data.scaleY) * 0.5;
+                }
+
+                if(resource.type === "audio") {
+                    const meta = await resource.getAudioMetadata();
+                    newItem.duration = meta.duration;
+                }
+
+                timeline.add(newItem);
+            }
+
+            return resources;
+        }
+
         // It is a timeline item/template, we can simply clone it.
-        if(event.data.item) {
+        if(event?.data?.item) {
             if(!timeline) return;
 
             const newItem = timeline.cloneItem(event.data.item);
@@ -614,19 +678,20 @@ class VideoEditor extends FlavorBase {
         // External file dropped, so we need to ensure it is saved as a resource,
         // and then create a new timeline item.
         else {
-            const isResource = event.data instanceof Resource;
+            const data = event?.data || {};
+            const isResource = data instanceof Resource;
 
             if(!isResource) {
-                event.data.isExternal = true;
-                event.data.type = null; // :shrug:
-                event.data.id = null; // :shrug:
+                data.isExternal = true;
+                data.type = null; // :shrug:
+                data.id = null; // :shrug:
             }
 
-            const resource = isResource? event.data: this.project.resources.addResource(event.data);
+            const resource = isResource? data: this.project.resources.addResource(data);
 
             // If not dropping to a timeline, then all we need to do is add the resource to the project
             if(!timeline) {
-                LS.Toast.show("Resource added: " + event.data.label || resource.name || resource.path, { timeout: 3000 });
+                LS.Toast.show("Resource added: " + data.label || resource.name || resource.path, { timeout: 3000 });
                 return;
             }
 
@@ -635,7 +700,7 @@ class VideoEditor extends FlavorBase {
                 type: resource.guessNodeType(),
                 // resource: ResourceManager.createReference(resource),
                 data: { resource },
-                label: event.data.label || resource.name,
+                label: data.label || resource.name,
                 start: time,
                 row,
                 duration: 1

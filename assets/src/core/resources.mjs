@@ -313,12 +313,20 @@ class ResourceManager extends LS.EventEmitter {
     }
 
     getResourceByPath(path) {
+        console.log(path)
         if(typeof path === "object") {
             const folderName = path.folderName;
-            const folder = this.projectFolders.get(folderName);
-            if(folder) {
-                return this.getResourceByPath(nodePath.join(folder.path, path.path));
+
+            if(folderName) {
+                const folder = this.projectFolders.get(folderName);
+                if(folder) {
+                    return this.getResourceByPath(nodePath.join(folder.path, path.path));
+                }
+            } else {
+                return this.getResourceByPath(path.path);
             }
+
+            return null;
         }
 
         if(path.startsWith("~/")) {
@@ -336,6 +344,40 @@ class ResourceManager extends LS.EventEmitter {
             if(resource.fullPath === path) return resource;
         }
         return null;
+    }
+
+    /**
+     * Resolve the project folder a path belongs to, if any.
+     * Returns the best matching folder when multiple folders overlap.
+     * @param {string} path
+     * @returns {{ folderName: string, path: string, fullPath: string } | null}
+     */
+    getProjectFolderForPath(path) {
+        if(typeof path !== "string" || !path) return null;
+        if(typeof nodePath === "undefined") return null;
+
+        const normalizedPath = ResourceManager.normalizePath(path, true);
+        let bestMatch = null;
+
+        for(const [folderName, folder] of this.projectFolders.entries()) {
+            if(!folder?.path) continue;
+
+            const folderPath = ResourceManager.normalizePath(folder.path, true);
+            const relativePath = nodePath.relative(folderPath, normalizedPath).replace(/\\/g, "/");
+            const isInsideFolder = relativePath === "" || (!relativePath.startsWith("..") && !nodePath.isAbsolute(relativePath));
+
+            if(!isInsideFolder) continue;
+
+            if(!bestMatch || folderPath.length > bestMatch.fullPath.length) {
+                bestMatch = {
+                    folderName,
+                    path: relativePath,
+                    fullPath: folderPath
+                };
+            }
+        }
+
+        return bestMatch;
     }
 
     async listDirectory(name, path) {
@@ -406,6 +448,30 @@ class ResourceManager extends LS.EventEmitter {
     // TODO: row/offset doesn't belong here
     async addProjectResources(files, row, offset) {
         console.log("Adding project resources from files", files);
+
+        const addedResources = [];
+        for(const file of Array.from(files || [])) {
+            const filePath = typeof file === "string" ? file : file?.path || file?.fullPath || file?.name;
+            if(!filePath) continue;
+
+            const normalizedPath = typeof nodePath !== "undefined" ? ResourceManager.normalizePath(filePath, true) : filePath;
+            const folderInfo = this.getProjectFolderForPath(normalizedPath);
+            const resource = this.addResource({
+                path: folderInfo?.path || normalizedPath,
+                folderName: folderInfo?.folderName || null,
+                name: typeof file === "string" ? String(filePath).split(/[\\/]/).pop() : (file.name || String(filePath).split(/[\\/]/).pop()),
+                mimeType: file?.type,
+                isExternal: true
+            });
+
+            if(resource) addedResources.push(resource);
+        }
+
+        if(addedResources.length) {
+            this.emit("resources-added", [addedResources]);
+        }
+
+        return addedResources;
     }
 
     /**
