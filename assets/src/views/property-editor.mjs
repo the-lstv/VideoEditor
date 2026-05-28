@@ -1653,17 +1653,14 @@ function cleanup() {
 
                 contained = preview.getContainedCoords();
 
-                let x;
-                console.log(x = {
+                return {
                     // Apply snapping if alt is not held
                     width:  (Math.round(data.width  / contained.scale / 10) * 10) * contained.scale,
                     height: (Math.round(data.height / contained.scale / 10) * 10) * contained.scale,
                     posX:   (Math.round(data.posX   / contained.scale / 10) * 10) * contained.scale,
                     posY:   (Math.round(data.posY   / contained.scale / 10) * 10) * contained.scale,
                     cancelIfUnchanged: true
-                });
-
-                return x;
+                }
             }
         });
 
