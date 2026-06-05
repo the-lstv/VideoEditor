@@ -4,6 +4,8 @@
  * @license GPL-3.0
  */
 
+// const sqlite = require("sqlite");
+
 /**
  * Rough polyfill implementation of ConfigStore class
  * Temporarily using localStorage; in the future, this could be swapped
@@ -24,6 +26,10 @@ class ConfigStore {
                 }
             }
         }
+    }
+
+    // The storage class can implement whatever it needs to await when initalizing here
+    async open() {
     }
 
     set(key, value) {

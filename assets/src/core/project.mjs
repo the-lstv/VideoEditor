@@ -134,20 +134,6 @@ class Project extends LS.Context {
 
                     await this.resources.loadFrom(data.resources || []);
                     resourcesLoaded = true;
-
-                    // ! TODO
-                    // const assetFolder = 'assets/';
-                    // for (const [filename, fileData] of Object.entries(unzipped)) {
-                    //     if (filename.startsWith(assetFolder)) {
-                    //         const hash = filename.substring(assetFolder.length);
-
-                    //         // Load file data into resource manager
-                    //         const file = this.resources.resources.get(hash);
-                    //         if (file) {
-                    //             file.data = fileData;
-                    //         }
-                    //     }
-                    // }
                 } else {
                     throw new Error('project.json not found in zip');
                 }
