@@ -665,6 +665,9 @@ class ResourceManager extends LS.EventEmitter {
      * I think this is from LinuxJS lmao
      */
     static normalizePath(path, isAbsolute = null) {
+        console.log("Normalizing path", path);
+        const isMicroslopShitdows = path.match(/^([a-zA-Z]:)(\/?)/);
+
         path = String(path || "").replace(/\\/g, "/").trim();
 
         const parts = path.split("/");
@@ -681,7 +684,8 @@ class ResourceManager extends LS.EventEmitter {
         const normalizedPath = normalizedParts.join("/");
 
         if(isAbsolute === null) isAbsolute = path.startsWith("/");
-        return (isAbsolute ? "/" : "") + normalizedPath;
+        console.log("Normalized path:", (isAbsolute ? (isMicroslopShitdows? "/": "") : "") + normalizedPath, "isAbsolute:", isAbsolute, "isMicroslopShitdows:", isMicroslopShitdows);
+        return (isAbsolute ? (isMicroslopShitdows? "/": "") : "") + normalizedPath;
     }
 }
 

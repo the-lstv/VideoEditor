@@ -604,6 +604,7 @@ class VideoEditor extends FlavorBase {
                 const filePath = this.#getFilePath(file);
                 return filePath || file?.name || null;
             }).filter(Boolean);
+
             if(files.length === 0) return;
 
             const resources = await this.project.resources.addProjectResources(files, row, time);
