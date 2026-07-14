@@ -61,6 +61,14 @@
         @keyframes l1 { to { transform: rotate(.5turn) } }
     </style>
 
+    <!-- Build: -->
+    <!-- <script src="./assets/ls/ls.js"></script>
+    <link rel=stylesheet href="./assets/ls/ls.css"> -->
+
+    <!-- Development/Hosted/Akeno: -->
+    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,i18n,node,resize,tree,tabs,timeline,toast,tooltips,gl,range,multipane/ls.js"></script>
+    <link rel=stylesheet href="https://cdn-origin.extragon.localhost/ls/beta/flat,knob,timeline/ls.css">
+
     <script>
         window.LS_INIT_OPTIONS = {
             autoScheme: true,
@@ -81,14 +89,6 @@
     <!-- <link rel="stylesheet" href="./assets/fonts/Phosphor/regular.css"> -->
     <!-- <link rel="stylesheet" href="./assets/fonts/ls-icons/style.css"> -->
 
-    <!-- LS (development/hosted): -->
-    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,i18n,node,resize,tree,tabs,timeline,toast,tooltips,gl,range,multipane/ls.js"></script>
-    <link rel=stylesheet href="https://cdn-origin.extragon.localhost/ls/beta/flat,knob,timeline/ls.css">
-
-    <!-- Build: -->
-    <!-- <script src="./assets/ls/ls.js"></script>
-    <link rel=stylesheet href="./assets/ls/ls.css"> -->
-
     <!-- CSS -->
     <link rel=stylesheet href="./assets/css/main.css?mtime=mopwic6q.65">
     <link rel=stylesheet href="./assets/css/settings.css">
@@ -96,21 +96,63 @@
     <!-- Browser libraries -->
     <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 
+
+    <!-- Fuck ESM, fuck bundlers, and fuck CodeMirror -->
+    <!-- CodeMirror imports -->
+
+    <!-- For electron: -->
+    <script type="importmap">
+        {
+            "imports": {
+                "@codemirror/commands": "./node_modules/@codemirror/commands/dist/index.js",
+                "@codemirror/autocomplete": "./node_modules/@codemirror/autocomplete/dist/index.js",
+                "@codemirror/language": "./node_modules/@codemirror/language/dist/index.js",
+                "@codemirror/lang-javascript": "./node_modules/@codemirror/lang-javascript/dist/index.js",
+                "@codemirror/view": "./node_modules/@codemirror/view/dist/index.js",
+                "@codemirror/state": "./node_modules/@codemirror/state/dist/index.js",
+                "@codemirror/search": "./node_modules/@codemirror/search/dist/index.js",
+                "@codemirror/lint": "./node_modules/@codemirror/lint/dist/index.js",
+                "@lezer/common": "./node_modules/@lezer/common/dist/index.js",
+                "@lezer/highlight": "./node_modules/@lezer/highlight/dist/index.js",
+                "@lezer/javascript": "./node_modules/@lezer/javascript/dist/index.js",
+                "@lezer/lr": "./node_modules/@lezer/lr/dist/index.js",
+                "@marijn/find-cluster-break": "./node_modules/@marijn/find-cluster-break/src/index.js",
+                "style-mod": "./node_modules/style-mod/src/style-mod.js",
+                "crelt": "./node_modules/crelt/index.js",
+                "w3c-keyname": "./node_modules/w3c-keyname/index.js"
+            }
+        }
+    </script>
+
+    <!-- For web: -->
+    <!-- <script type="importmap">
+        {
+            "imports": {
+                "@codemirror/commands": "https://unpkg.com/@codemirror/commands@6.10.3/dist/index.js",
+                "@codemirror/autocomplete": "https://unpkg.com/@codemirror/autocomplete@6.20.1/dist/index.js",
+                "@codemirror/language": "https://unpkg.com/@codemirror/language@6.12.3/dist/index.js",
+                "@codemirror/lang-javascript": "https://unpkg.com/@codemirror/lang-javascript@6.2.5/dist/index.js",
+                "@codemirror/view": "https://unpkg.com/@codemirror/view@6.41.0/dist/index.js",
+                "@codemirror/state": "https://unpkg.com/@codemirror/state@6.6.0/dist/index.js",
+                "@codemirror/search": "https://unpkg.com/@codemirror/search@6.6.0/dist/index.js",
+                "@codemirror/lint": "https://unpkg.com/@codemirror/lint@6.9.5/dist/index.js",
+                "@lezer/common": "https://unpkg.com/@lezer/common@1.5.2/dist/index.js",
+                "@lezer/highlight": "https://unpkg.com/@lezer/highlight@1.2.3/dist/index.js",
+                "@lezer/javascript": "https://unpkg.com/@lezer/javascript@1.5.4/dist/index.js",
+                "@lezer/lr": "https://unpkg.com/@lezer/lr@1.4.8/dist/index.js",
+                "@marijn/find-cluster-break": "https://unpkg.com/@marijn/find-cluster-break@1.0.2/src/index.js",
+                "style-mod": "https://unpkg.com/style-mod@4.1.3/src/style-mod.js",
+                "crelt": "https://unpkg.com/crelt@1.0.6/index.js",
+                "w3c-keyname": "https://unpkg.com/w3c-keyname@2.2.8/index.js"
+            }
+        }
+    </script> -->
+
     <script type="module">
         // Main application
         // Sadly due to the scale of this project I had to use ESM, so now there is like a billion imports
         import "./assets/src/main.mjs";
-
-        // Check for LS library and version
-        // FIXME: this has to be before importing main, but ESM is ESM, not sure how to handle it without dynamic imports
-        // So for now we have to rely that it's all good
-        // if(!globalThis.LS) {
-        //     alert("Fatal error: LS library is missing or failed to load. This software cannot run without it.");
-        //     throw new Error("LS library is missing");
-        // } else if(LS.v < 6) {
-        //     alert("Fatal error: LS library version is too old. This software requires LS version 6 or higher.");
-        //     throw new Error("LS library is outdated");
-        // }
+        // LS Version should be checked before this is loaded
     </script>
 
 </head>

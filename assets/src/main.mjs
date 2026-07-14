@@ -166,7 +166,7 @@ window.addEventListener('load', async () => {
         // Flavor could be determined by project file.
         // A project file could contain multiple flavors in which case the user decides which one to load.
 
-        app.setFlavor(VideoEditor);
+        app.setFlavor(GlitterPlayground);
 
         function getLayouts() {
             // const layouts = app.layoutManager.getAvailableLayouts().filter(layout => layout.name !== "empty").map(layout => ({

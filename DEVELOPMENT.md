@@ -14,7 +14,7 @@ The advantage of this is that you can easily create custom workflows and share r
   - `assets/src/core/`: Directory for core modules.
   - `assets/src/views/`: Directory for UI views
   <!-- - `assets/src/libraries/`: Directory for external library files. -->
-  - `assets/src/backends/`: Directory for different backends that are commonly used by flavors
+  - `assets/src/components/`: Directory for different components that are commonly used by flavors
 - `assets/css/`: Directory for CSS stylesheets.
 - `assets/audio/`: Contains sound files the application uses.
 - `assets/images/`: Contains images.
@@ -118,13 +118,13 @@ Extra utilities and base classes, including HistoryManager, etc.
 
 ---
 
-## Backends:
+## components:
 
-Backends are modules that provide an interface to a specific API or technology.
+components are modules that provide an interface to a specific API or technology.
 
 For example, they provide an unified interface for a rendering library, and then flavors use that interface to determine how they get rendered. This way flavors can all understand the same object item and API, while handling them howevery they want.
 
-Included backends:
+Included components:
 
 - `video/`: Video encoding and decoding; this module handles video data processing.
 - `audio/`: Basic audio encoding and decoding, as well as DSP processing.

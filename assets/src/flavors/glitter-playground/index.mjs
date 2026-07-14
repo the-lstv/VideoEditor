@@ -11,29 +11,20 @@ import Project from "../../core/project.mjs";
 import AcceleratedTextGridRenderer from "../../components/graphics/text-engine.mjs";
 import { CodeEditor, EditorState } from "../../components/code-editor/index.mjs";
 
+// I hate how fragmented CM is for no reason
+import * as cmCommands from "@codemirror/commands";
+import * as cmAutocompletion from "@codemirror/autocomplete";
+import * as cmLanguage from "@codemirror/language";
+import * as cmJavascript from "@codemirror/lang-javascript";
+import * as cmView from "@codemirror/view";
+import * as cmState from '@codemirror/state';
+import * as cmSearch from '@codemirror/search';
+import * as cmLint from '@codemirror/lint';
+
 const CATEGORY_NAME = "Glitter Playground";
 
 // TEMPORARY
 const events = new LS.EventEmitter();
-
-// import * as cmCommands from "@codemirror/commands";
-// import * as cmAutocompletion from "@codemirror/autocomplete";
-// import * as cmLanguage from "@codemirror/language";
-// import * as cmJavascript from "@codemirror/lang-javascript";
-// import * as cmView from "@codemirror/view";
-// import * as cmState from '@codemirror/state';
-// import * as cmSearch from '@codemirror/search';
-// import * as cmLint from '@codemirror/lint';
-
-// I hate how fragmented CM is
-const cmCommands = require("@codemirror/commands");
-const cmAutocompletion = require("@codemirror/autocomplete");
-const cmLanguage = require("@codemirror/language");
-const cmJavascript = require("@codemirror/lang-javascript");
-const cmView = require("@codemirror/view");
-const cmState = require('@codemirror/state');
-const cmSearch = require('@codemirror/search');
-const cmLint = require('@codemirror/lint');
 
 // Taken from the codemirror example setup thing
 const basicSetup = [
