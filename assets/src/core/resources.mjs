@@ -13,7 +13,7 @@
 import Project from "./project.mjs";
 import { VideoDecoder } from "../components/video/index.mjs";
 
-// import * as THREE from "three";
+import * as THREE from "three";
 
 const MAX_EMBED_RESOURCE_SIZE = 50 * 1024 * 1024; // 50 MB
 

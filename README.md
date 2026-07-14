@@ -28,6 +28,43 @@ You can map anything: <br>
 <img src=https://cdn.extragon.cloud/file/babda96913e5a577.webp> <br>
 
 <br>
+
+## How to install (from source):
+I will try to make this as simple as possible, as there aren't any pre-built releases yet.<br>
+It should work on Linux, Windows and MacOS, but I have only tested it on Linux.
+
+### First steps
+To run this, you first need to, well, download all dependencies.<br>
+You will need to have the following installed on your system:
+- Install [Node.js](https://nodejs.org/en/download/current) (v26 or higher recommended, v22 or higher needed) if you don't have it already
+- `npm` (comes with Node.js) or optionally `pnpm` (install with `npm install -g pnpm`)
+- Optional but recommended: Electron (`npm install -g electron`)
+
+Then:
+- Clone this repo (either with `git clone` or download the zip and extract it (On GitHub, click "Code" -> "Download ZIP")), or with whatever's your favorite git client.
+- Open a terminal in the directory where you cloned/extracted the files and run `npm i` (or `pnpm i` if you have pnpm) to install dependencies (this is done only once).
+
+After that you should be ready to run the app, see below.
+
+### With Electron (recommended)
+Run `electron .` (or maybe try `npm run start` if you don't have it installed globally) in the project directory, and it should launch the app.
+
+Done!
+
+### Without Electron/web version (not recommended)
+Technically the UI should now be able to run in a plain browser without further special setup or backend, so you can run `npx http-server` in the project directory and open the URL it gives you in a modern browser.<br><br>
+However, this is **not** recommended as some features won't work properly (such as filesystem access, accelerated processing, audio DSP (or any other native audio processing engine), certain encoding features, proxy files, etc.). You will probably get a limited experience and as it's not the intended way to run the app as of now, it may not work at all in some cases.
+<br>
+
+### The proper way to install the app later
+Soon I will provide pre-packaged releases for Linux and possibly Windows or MacOS, but I first need to decide how to split the engine from the flavors and how to package them which is a bit complex due to how the architecture is structured.<br><br>
+If it fails to load or complains about missing LS, it's because I didn't add a copy of the library. You can switch it to a CDN version in the index.html file until I add it (swap out the commented lines).
+
+Since this is a work in progress, there are no pre-built releases for now, but you can run it from source code as described above.
+<br>
+
+<br>
+
 <details>
 <summary>See old version (1.x)</summary>
 

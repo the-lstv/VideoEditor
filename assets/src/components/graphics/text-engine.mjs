@@ -5,7 +5,8 @@
  */
 
 // This is set later and guarantees THREE is available. Or not if not used. Do not blindly replace this with imports, this is correct.
-let THREE = window.THREE || null;
+// let THREE = window.THREE || null;
+import * as THREE from "three";
 
 /*
 TODO:

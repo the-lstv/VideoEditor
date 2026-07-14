@@ -973,4 +973,7 @@ class VideoEditor extends FlavorBase {
     }
 }
 
+// --- Debug
+window.VideoEditor = VideoEditor;
+
 export default VideoEditor;

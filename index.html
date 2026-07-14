@@ -17,7 +17,7 @@
 
     <title>Editor</title>
 
-    <!-- Important styles (to avoid flicker) -->
+    <!-- Important immediate styles (to avoid flicker & render loading as soon as possible) -->
     <style>
         :root, body {
             overflow: hidden;
@@ -36,7 +36,8 @@
             offset-path: path('M8.24713 23.3995C8.24713 23.3995 42.001 -13.0019 104.001 40.9985C166.001 94.9989 238 404 238 404');
             offset-distance: 0%;
             offset-rotate: 0deg;
-            z-index: 90000000005; /* Above everything */
+            /* Above everything */
+            z-index: 90000000005;
             pointer-events: none;
         }
 
@@ -61,26 +62,20 @@
         @keyframes l1 { to { transform: rotate(.5turn) } }
     </style>
 
-    <!-- Build: -->
+    <!-- LS (included copy): -->
     <!-- <script src="./assets/ls/ls.js"></script>
     <link rel=stylesheet href="./assets/ls/ls.css"> -->
 
     <!-- Development/Hosted/Akeno: -->
-    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,i18n,node,resize,tree,tabs,timeline,toast,tooltips,gl,range,multipane/ls.js"></script>
+    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,i18n,node,resize,tree,tabs,timeline,toast,tooltips,range,multipane/ls.js"></script>
     <link rel=stylesheet href="https://cdn-origin.extragon.localhost/ls/beta/flat,knob,timeline/ls.css">
 
     <script>
+        // LS initialization options
         window.LS_INIT_OPTIONS = {
             autoScheme: true,
             autoAccent: true,
         };
-
-        // ! Temporary hack
-        if(typeof require !== "undefined") {
-            window.THREE = require("three");
-        } else {
-            // tba
-        }
     </script>
 
     <!-- Fonts -->
@@ -90,17 +85,13 @@
     <!-- <link rel="stylesheet" href="./assets/fonts/ls-icons/style.css"> -->
 
     <!-- CSS -->
-    <link rel=stylesheet href="./assets/css/main.css?mtime=mopwic6q.65">
+    <link rel=stylesheet href="./assets/css/main.css">
     <link rel=stylesheet href="./assets/css/settings.css">
 
     <!-- Browser libraries -->
     <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 
-
-    <!-- Fuck ESM, fuck bundlers, and fuck CodeMirror -->
-    <!-- CodeMirror imports -->
-
-    <!-- For electron: -->
+    <!-- For Electron (Node.js or local): -->
     <script type="importmap">
         {
             "imports": {
@@ -119,12 +110,15 @@
                 "@marijn/find-cluster-break": "./node_modules/@marijn/find-cluster-break/src/index.js",
                 "style-mod": "./node_modules/style-mod/src/style-mod.js",
                 "crelt": "./node_modules/crelt/index.js",
-                "w3c-keyname": "./node_modules/w3c-keyname/index.js"
+                "w3c-keyname": "./node_modules/w3c-keyname/index.js",
+                "three": "./node_modules/three/build/three.module.js",
+                "mediabunny": "./node_modules/mediabunny/dist/modules/src/index.js",
+                "node:fs/promises": "./assets/src/misc/esm-to-require-node-fs.mjs"
             }
         }
     </script>
 
-    <!-- For web: -->
+    <!-- For web (hosted): -->
     <!-- <script type="importmap">
         {
             "imports": {
@@ -143,7 +137,10 @@
                 "@marijn/find-cluster-break": "https://unpkg.com/@marijn/find-cluster-break@1.0.2/src/index.js",
                 "style-mod": "https://unpkg.com/style-mod@4.1.3/src/style-mod.js",
                 "crelt": "https://unpkg.com/crelt@1.0.6/index.js",
-                "w3c-keyname": "https://unpkg.com/w3c-keyname@2.2.8/index.js"
+                "w3c-keyname": "https://unpkg.com/w3c-keyname@2.2.8/index.js",
+                "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+                "mediabunny": "https://unpkg.com/mediabunny@1.50.8/dist/modules/src/index.js",
+                "node:fs/promises": "./assets/src/misc/esm-to-require-node-fs.mjs"
             }
         }
     </script> -->
@@ -151,8 +148,15 @@
     <script type="module">
         // Main application
         // Sadly due to the scale of this project I had to use ESM, so now there is like a billion imports
-        import "./assets/src/main.mjs";
+        import app from "./assets/src/main.mjs";
         // LS Version should be checked before this is loaded
+
+        // --- Preloading some flavors
+        // import GlitterPlayground from "./assets/src/flavors/glitter-playground/index.mjs";
+        // import MetaDAW from "./assets/src/flavors/metadaw/main.mjs";
+        import VideoEditor from "./assets/src/flavors/video-editor/main.mjs";
+
+        app.setFlavor(VideoEditor);
     </script>
 
 </head>

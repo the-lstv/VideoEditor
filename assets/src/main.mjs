@@ -1,5 +1,7 @@
 /**
  * Main entry point.
+ * This is an independent launcher.
+ * It doesn't care if you are loading which flavors and how; they can be setup as needed.
  */
 
 // Check if we're running in Electron
@@ -15,19 +17,19 @@ import Version from "./utils/version.mjs";
 
 import WelcomeView from "./views/welcome.mjs";
 
-// --- Preloading some flavors
-import GlitterPlayground from "./flavors/glitter-playground/index.mjs";
-import MetaDAW from "./flavors/metadaw/main.mjs";
-import VideoEditor from "./flavors/video-editor/main.mjs";
+if(!globalThis.LS) {
+    alert("Fatal error: LS library is missing or failed to load. This software cannot run without it.");
+    throw new Error("LS library is missing");
+} else if(LS.v < 6) {
+    alert("Fatal error: LS library version is too old. This software requires LS version 6 or higher.");
+    throw new Error("LS library is outdated");
+}
 
 const SHOW_WELCOME_SCREEN = true;
 
-// --- QuickSand flavor
-// import QuickSand from "./flavors/quicksand/main.mjs";
-
 // Small miscellaneous helpers
-function createIfNotExists(selector, parent = document.body) { return document.querySelector(selector) || LS.Create({ emmet: selector, parent }) }
-function selfInvoke(method) { method(); return method }
+function selectOrCreate(selector, parent = document.body) { return document.querySelector(selector) || LS.Create({ emmet: selector, parent }) }
+function invokeAndReturn(method) { method(); return method }
 
 const config = new ConfigStore();
 
@@ -35,25 +37,26 @@ const config = new ConfigStore();
 /**
  * Entry UI elements
  */
-const appContainer       = createIfNotExists("#editor-container", document.body);
-const layoutContainer    = createIfNotExists("#layout-container", appContainer);
-const settingsContent    = createIfNotExists("#preferences-modal");
-const headerContainer    = createIfNotExists("#editor-header");
-const statusBarContainer = createIfNotExists("#editor-footer");
-const undoButton         = createIfNotExists("#undoButton");
-const redoButton         = createIfNotExists("#redoButton");
+const appContainer       = selectOrCreate("#editor-container", document.body);
+const layoutContainer    = selectOrCreate("#layout-container", appContainer);
+const settingsContent    = selectOrCreate("#preferences-modal");
+const headerContainer    = selectOrCreate("#editor-header");
+const statusBarContainer = selectOrCreate("#editor-footer");
+const undoButton         = selectOrCreate("#undoButton");
+const redoButton         = selectOrCreate("#redoButton");
 
 /**
  * Global persistent application state
+ * Should be the only source of persistent state, everything else should follow a lifecycle pattern
  */
 const app = globalThis.app = {
     container: appContainer,
     config,
 
     // Layout & shortcuts
-    layoutManager: new LS.Multipane(layoutContainer),
+    layoutManager:   new LS.Multipane(layoutContainer),
     shortcutManager: new LS.ShortcutManager(),
-    statusBar: new StatusBar(statusBarContainer),
+    statusBar:       new StatusBar(statusBarContainer),
 
     GITHUB_REPO: "https://github.com/the-lstv/videoeditor",
     VERSION: new Version("2.3.0-alpha"),
@@ -131,11 +134,11 @@ const app = globalThis.app = {
         app.leaveShade();
     },
 
-    registeredFlavors: [
-        GlitterPlayground,
-        MetaDAW,
-        VideoEditor
-    ]
+    // registeredFlavors: [
+    //     GlitterPlayground,
+    //     MetaDAW,
+    //     VideoEditor
+    // ]
 }
 
 // --- Setup welcome screen if enabled
@@ -157,26 +160,13 @@ LS.i18n.loadLocale({ code: "en", translations: {} });
 LS.i18n.changeLocale(app.config.get("language") || "en");
 
 // --- Workspace initialization
-
-window.addEventListener('load', async () => {
+window.addEventListener('load', () => {
     try {
-        // Setup the video editor flavor (prepares views, rendering, etc. for video editing)
-        // This is now the only thing workflow specific in this file
-
+        // This is the place where the flavor could be set up.
         // Flavor could be determined by project file.
         // A project file could contain multiple flavors in which case the user decides which one to load.
 
-        app.setFlavor(GlitterPlayground);
-
         function getLayouts() {
-            // const layouts = app.layoutManager.getAvailableLayouts().filter(layout => layout.name !== "empty").map(layout => ({
-            //         text: layout.title,
-            //         action() {
-            //             app.layoutManager.setSchema(layout.schema);
-            //             app.config.set("default-layout", layout.name);
-            //         }
-            //     }))
-
             // TODO: Show layouts from flavors
             const result = [];
             return result;
@@ -336,7 +326,8 @@ window.addEventListener('load', async () => {
         });
 
 
-        // --- Setup menus
+        // --- Setup top menus
+        // TODO: Load menus based on flavor
 
         const menus = {
             file: [
@@ -364,7 +355,7 @@ window.addEventListener('load', async () => {
                 }, icon: "bi-sliders" },
 
                 { type: "separator" },
-                
+
                 { text: "Set editor theme", items: [
                     { icon: "bi-sun", text: "Light", action() { LS.Color.setTheme('light'); localStorage.setItem("ls-theme", "light"); } },
                     { icon: "bi-moon", text: "Dark", action() { LS.Color.setTheme('dark'); localStorage.setItem("ls-theme", "dark"); } },
@@ -490,17 +481,16 @@ window.addEventListener('load', async () => {
     }
 });
 
+// --- Warn about unsaved changes on exit
 window.addEventListener("beforeunload", (e) => {
-    if(app.currentProject.unsavedChanges) {
+    if(app?.currentProject?.unsavedChanges) {
         e.preventDefault();
         e.returnValue = '';
         return '';
     }
 });
 
-
 // --- Mobile screen warning (temporary until mobile support is implemented)
-
 const MIN_EDITOR_WIDTH = 600;
 const mobileWarningSwitch = new LS.Util.Switch(value => {
     if(value) {
@@ -508,9 +498,9 @@ const mobileWarningSwitch = new LS.Util.Switch(value => {
         document.body.appendChild(app.mobileDisclaimer || (app.mobileDisclaimer = LS.Create({
             class: 'disclaimer',
             inner: [
-                { tag: 'i', class: 'bi-aspect-ratio' },
-                { tag: 'h1', inner: 'Your screen is too small' },
-                { tag: 'p', innerHTML: `You need at least ${MIN_EDITOR_WIDTH} pixels of screen width to use the editor. There is no mobile support at this time (if there is interest however, I am not opposed for adding it - <a href="${app.GITHUB_REPO}/issues?q=state%3Aopen%20label%3Aenhancement" target="_blank" rel="noopener noreferrer">let me know</a>).` }
+                { emmet: 'i.bi-aspect-ratio' },
+                { emmet: 'h1{Your screen is too small}' },
+                { emmet: 'p', html: `You need at least ${MIN_EDITOR_WIDTH} pixels of screen width to use the editor. There is no full mobile support at this time (But I am not opposed to adding it - <a href="${app.GITHUB_REPO}/issues?q=state%3Aopen%20label%3Aenhancement" target="_blank" rel="noopener noreferrer">let me know</a>).` }
             ]
         })));
 
@@ -521,11 +511,11 @@ const mobileWarningSwitch = new LS.Util.Switch(value => {
     }
 });
 
-window.addEventListener('resize', selfInvoke(() => {
+window.addEventListener('resize', invokeAndReturn(() => {
     mobileWarningSwitch.set(window.innerWidth < MIN_EDITOR_WIDTH);
 }));
 
 // --- Debug
 window.Project = Project;
-window.VideoEditor = VideoEditor;
-// window.QuickSand = QuickSand;
+
+export default app;

@@ -4,13 +4,11 @@
  * @license GPL-3.0
  */
 
-// import * as THREE from 'three';
-
 // I usually despise 3rd party libraries but I love this library
 // It covers and does everything and just works
 // Nevermind, I just read some of it's code... oh god :'(
 // Either way pretty neat. Let's hope it won't turn into slop.
-const { 
+import { 
     Input, Output, UrlSource, FilePathSource,
 
     OutputFormat,
@@ -28,7 +26,7 @@ const {
     
     // QUALITY_HIGH, ...
     Quality
-} = require("mediabunny");
+} from "mediabunny";
 
 // We can just set ._factor to get anything i guess, no need to overcomplicate it
 // The getters seem to recalculate it every time anyway
@@ -699,76 +697,6 @@ class VideoEncoder {
         resultVideo.controls = true;
         return resultVideo;
     }
-
-    // /**
-    //  * Extracts pixel data from the renderer
-    //  * @param {*} renderer The renderer to extract from
-    //  * @param {*} pixels The array to store pixel data in (optional)
-    //  * @returns The pixel data array (RGBA or RGB depending on options)
-    //  * 
-    //  * Todo: should not be three.js specific
-    //  */
-    // extractFrame(renderer, pixels) {
-    //     renderer = renderer?.isWebGLRenderer? renderer: renderer?.renderer;
-    //     if(!renderer?.getContext) return;
-
-    //     const gl = renderer.getContext();
-    //     const width = renderer.width || renderer.domElement.width;
-    //     const height = renderer.height || renderer.domElement.height;
-
-    //     if(this.options.alpha) {
-    //         gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
-    //         return;
-    //     }
-
-    //     const rgba = new Uint8Array(width * height * 4);
-    //     gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, rgba);
-
-    //     // What was the thing below even for
-    //     // for(let i = 0, j = 0; i < rgba.length; i += 4, j += 3) {
-    //     //     pixels[j] = rgba[i];
-    //     //     pixels[j + 1] = rgba[i + 1];
-    //     //     pixels[j + 2] = rgba[i + 2];
-    //     // }
-
-    //     return pixels? pixels.set(rgba): rgba;
-    // }
-
-    // /**
-    //  * Renders video frames between the specified start and end times
-    //  * @param {*} startTime The start time
-    //  * @param {*} endTime The end time
-    //  */
-    // async renderFrames(startTime, endTime) {
-    //     const frameDuration = 1 / (this.options.fps || 30);
-    //     const totalFrames = Math.ceil((endTime - startTime) / frameDuration);
-
-    //     const wasPlaying = this.project.playing;
-    //     if(wasPlaying) this.project.pause();
-
-    //     for(let i = 0; i < totalFrames; i++) {
-    //         const currentTime = startTime + i * frameDuration;
-    //         await this.project.renderFrameAtTime(currentTime);
-
-    //         // Extract frame pixels and feed to an encoder
-    //         const width = this.project.renderer.renderer.width || this.project.renderer.width;
-    //         const height = this.project.renderer.renderer.height || this.project.renderer.height;
-    //         const pixelSize = this.options.alpha? 4: 3;
-    //         const pixels = new Uint8Array(width * height * pixelSize);
-    //         this.extractFrame(this.project.renderer, pixels);
-    //         await this.digest({ time: currentTime, pixels, width, height });
-    //     }
-
-    //     if(wasPlaying) this.project.play();
-    // }
-
-    // /**
-    //  * Processes a video frame to be encoded
-    //  * @param {*} frame The frame to process
-    //  */
-    // async digest(frame) {
-    //     // ...
-    // }
 }
 
 window._VideoDecoder = VideoDecoder;
