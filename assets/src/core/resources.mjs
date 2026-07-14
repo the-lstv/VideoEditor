@@ -583,7 +583,7 @@ class ResourceManager extends LS.EventEmitter {
             buttons: [
                 { label: "OK" }
             ]
-        }).show();
+        });
     }
 
     /**

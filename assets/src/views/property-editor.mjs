@@ -529,7 +529,7 @@ function cleanup() {
                 title: "Hint",
                 content: "After closing this message, tweak any animatable property on any object that you wish to automate. This will link it as a target in the automation clip.",
                 buttons: [{ label: "Got it!" }]
-            }).open();
+            });
 
             localStorage.setItem("show-automation-target-hint", "false");
         }

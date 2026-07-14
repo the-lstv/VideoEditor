@@ -1,12 +1,10 @@
 {
-    "// The version isn't really defined here and varies depending on what are we talking about (the engine, flavors, etc.), so this is more of just a placeholder so electron can shut up" :0,
+    "// The version isn't really defined here and varies depending on what are we talking about (the engine, flavors, etc.), so this is more of just a placeholder so electron can shut up": 0,
     "version": "1.0.0",
-
-    "// This is also more of a placeholder since this package is more of an abstract umbrella" :0,
+    "// This is also more of a placeholder since this package is more of an abstract umbrella": 0,
     "name": "ls-creative-suite",
     "description": "A creative suite engine for audio, video, software development, graphics and other.",
     "author": "lstv.space",
-
     "dependencies": {
         "@codemirror/autocomplete": "^6.20.3",
         "@codemirror/commands": "^6.10.4",
@@ -21,36 +19,32 @@
         "@lezer/javascript": "^1.5.4",
         "@lezer/lr": "^1.4.10",
         "@marijn/find-cluster-break": "^1.0.3",
-        "@mediabunny/flac-encoder": "^1.45.2",
-        "@mediabunny/mp3-encoder": "^1.45.2",
+        "@mediabunny/flac-encoder": "^1.50.8",
+        "@mediabunny/mp3-encoder": "^1.50.8",
         "crelt": "^1.0.7",
         "electron-remote": "^1.3.0",
         "image-size": "^2.0.2",
-        "mediabunny": "^1.45.2",
+        "mediabunny": "^1.50.8",
         "style-mod": "^4.1.3",
         "three": "^0.184.0",
         "uWebSockets.js": "github:uNetworking/uWebSockets.js#v20.67.0",
         "w3c-keyname": "^2.2.8"
     },
-
     "devDependencies": {
         "@electron-forge/maker-deb": "^7.11.2",
         "@electron-forge/maker-rpm": "^7.11.2",
         "@electron-forge/maker-squirrel": "^7.11.2",
         "@electron-forge/maker-zip": "^7.11.2",
         "electron": "^43.1.1",
-        "vite": "^8.0.10"
+        "vite": "^8.1.4"
     },
-
     "scripts": {
         "start": "electron-forge start",
         "test": "echo \"Error: no test specified\" && exit 1",
         "package": "electron-forge package",
         "make": "electron-forge make"
     },
-
     "main": "index.js",
-
     "config": {
         "forge": {
             "packagerConfig": {},

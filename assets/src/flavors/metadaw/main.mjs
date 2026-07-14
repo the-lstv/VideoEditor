@@ -92,7 +92,7 @@ class MetaDaw extends FlavorBase {
                 buttons: [
                     { label: "OK" }
                 ]
-            }).show();
+            });
             throw new Error(e);
         }
 

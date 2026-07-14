@@ -42,12 +42,12 @@ You will need to have the following installed on your system:
 
 Then:
 - Clone this repo (either with `git clone` or download the zip and extract it (On GitHub, click "Code" -> "Download ZIP")), or with whatever's your favorite git client.
-- Open a terminal in the directory where you cloned/extracted the files and run `npm i` (or `pnpm i` if you have pnpm) to install dependencies (this is done only once).
+- Open a terminal in the directory where you cloned/extracted the files and run `npm i --omit=dev` (or `pnpm i` if you have pnpm) to install dependencies (this is done only once).
 
 After that you should be ready to run the app, see below.
 
 ### With Electron (recommended)
-Run `electron .` (or maybe try `npm run start` if you don't have it installed globally) in the project directory, and it should launch the app.
+Run `electron .` (or maybe try `npm run start` if you don't have it globally) in the project directory, and it should launch the app.
 
 Done!
 
