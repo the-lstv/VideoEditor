@@ -32,15 +32,15 @@ You can map anything: <br>
 <summary>See old version (1.x)</summary>
 
 ### Old screenshots
+This is how the software looked before the rewrite and migration to a whole new architecture.
+
 ![Screenshot from 2024-06-08 15-24-09](https://github.com/the-lstv/VideoEditor/assets/62482747/8ed7e3fe-a054-453d-804a-3be2f4465c77)
 ![Screenshot from 2024-06-11 02-12-21](https://github.com/the-lstv/VideoEditor/assets/62482747/7c68d73a-f1a8-4028-a13f-95f6eb063b97)
-
-This old version sadly cannot be easily run anymore since it relied on an extremely old version of both LS and Akeno that used very poor design practices. It would take a lot of work to get the conditions just right to run it. Luckily, the new version is much more robust and maintainable, so it won't happen again :)
 </details>
 
 ---
 
 <img src=https://cdn.extragon.cloud/file/a771e02dfb37f618.svg> <br>
-This software is made by a human, not by AI.<br>
-This project is almost 99% programmed solely by Lukas @ lstv.space; including all UI libraries, components, etc. with only a very few external dependencies. Please consider supporting me if you find the software useful! Many, many hours of work have gone into this project.<br>
+This software is made by a real human, not by AI. This project does not contain AI generated content or code.<br>
+This project is fully programmed solely by Lukas @ lstv.space; including all UI libraries, components, etc. with only a very few external dependencies. Please consider supporting me if you find the software useful! Many, many hours of work have gone into this project.<br>
 Licensed under the GPL-3.0 License.

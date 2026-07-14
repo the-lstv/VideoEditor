@@ -11,8 +11,16 @@ import StatusBar from "./core/statusbar.mjs";
 import ConfigStore from "./core/configstore.mjs";
 import Project from "./core/project.mjs";
 
-// --- Video editor flavor
+import Version from "./utils/version.mjs";
+
+import WelcomeView from "./views/welcome.mjs";
+
+// --- Preloading some flavors
+import GlitterPlayground from "./flavors/glitter-playground/index.mjs";
+import MetaDAW from "./flavors/metadaw/main.mjs";
 import VideoEditor from "./flavors/video-editor/main.mjs";
+
+const SHOW_WELCOME_SCREEN = true;
 
 // --- QuickSand flavor
 // import QuickSand from "./flavors/quicksand/main.mjs";
@@ -43,12 +51,12 @@ const app = globalThis.app = {
     config,
 
     // Layout & shortcuts
-    layoutManager: new LS.Multipane(layoutContainer, { layout: config.get("default-layout") || "empty" }),
+    layoutManager: new LS.Multipane(layoutContainer),
     shortcutManager: new LS.ShortcutManager(),
     statusBar: new StatusBar(statusBarContainer),
 
     GITHUB_REPO: "https://github.com/the-lstv/videoeditor",
-    VERSION: "2.2.1-alpha",
+    VERSION: new Version("2.3.0-alpha"),
 
     /**
      * Enters the loading/transition shade
@@ -57,7 +65,7 @@ const app = globalThis.app = {
         app.container.classList.remove('loaded');
         document.querySelector("#logo").classList.remove("jump");
     },
-    
+
     /**
      * Leaves the loading/transition shade & plays the logo animation
      */
@@ -79,7 +87,69 @@ const app = globalThis.app = {
 
         app.iconSet = iconSet;
         LS.Select(".flavor-icon, #logo").forEach(el => el.src = el.id === "logo" ? iconSet.icon: iconSet.small || iconSet.favicon || iconSet.icon);
-    }
+    },
+
+    /**
+     * @experimental
+     */
+    async setFlavor(flavorClass, options = {}) {
+        app.enterShade();
+
+        if(app.flavorInstance) {
+            console.warn("Destroying previous flavor instance");
+            app.flavorInstance.destroy();
+            app.flavorInstance = null;
+        }
+
+        const requiredVersion = flavorClass?.meta?.engine_version;
+        if(requiredVersion && !app.VERSION.compare(requiredVersion)) {
+            LS.Modal.buildEphemeral({
+                title: "Flavor engine version mismatch",
+                content: { html: `The selected flavor <code>${flavorClass.name}</code> requires engine version <code>${requiredVersion}</code>, but the current engine version is <code>${app.VERSION}</code>. Please update the LS engine to use this flavor.` },
+                buttons: [ { label: "Close" } ]
+            }, { closeable: false });
+
+            throw new Error(`Flavor ${flavorClass.name} requires engine version ${requiredVersion}, but current version is ${app.VERSION}`);
+        }
+
+        const flavorId = flavorClass.name;
+
+        app.flavor = flavorClass;
+
+        if(flavorClass.layoutPresets?.default) {
+            app.layoutManager.setSchema(flavorClass.layoutPresets.default);
+        }
+
+        app.currentProject = new Project();
+
+        if(app.currentProject && app.currentProject.loaded) {
+            throw new Error("The current project is already loaded. The flavor must be set up while loading a project.");
+        }
+
+        await new Promise(resolve => setTimeout(resolve, 250));
+        app.setIcon(flavorClass.iconSet);
+        app.leaveShade();
+    },
+
+    registeredFlavors: [
+        GlitterPlayground,
+        MetaDAW,
+        VideoEditor
+    ]
+}
+
+// --- Setup welcome screen if enabled
+if(SHOW_WELCOME_SCREEN) {
+    const welcomeScreen = new WelcomeView();
+
+    LS.Multipane.PRESETS.default.welcome = {
+        title: "Default",
+        direction: 'column',
+        inner: [{ type: 'slot', view: 'WelcomeView' }]
+    };
+
+    app.layoutManager.add(welcomeScreen);
+    app.layoutManager.setSchema(LS.Multipane.PRESETS.default.welcome);
 }
 
 // Currently this is just the defaults
@@ -93,12 +163,23 @@ window.addEventListener('load', async () => {
         // Setup the video editor flavor (prepares views, rendering, etc. for video editing)
         // This is now the only thing workflow specific in this file
 
-        VideoEditor.setupIn(app);
-        // QuickSand.setupIn(app);
+        // Flavor could be determined by project file.
+        // A project file could contain multiple flavors in which case the user decides which one to load.
 
-        // Switch to default layout
-        if(app.layoutManager.options.layout === "empty" && LS.Multipane.PRESETS.default) {
-            app.layoutManager.setSchema("default");
+        app.setFlavor(VideoEditor);
+
+        function getLayouts() {
+            // const layouts = app.layoutManager.getAvailableLayouts().filter(layout => layout.name !== "empty").map(layout => ({
+            //         text: layout.title,
+            //         action() {
+            //             app.layoutManager.setSchema(layout.schema);
+            //             app.config.set("default-layout", layout.name);
+            //         }
+            //     }))
+
+            // TODO: Show layouts from flavors
+            const result = [];
+            return result;
         }
 
         // Global shortcuts
@@ -222,13 +303,13 @@ window.addEventListener('load', async () => {
             settingsModal.open();
         });
 
-        app.shortcutManager.assign("TIMELINE_TOOL_SELECT", () =>  { app.flavorInstance.timelineInstance.tool = "select"  });
-        app.shortcutManager.assign("TIMELINE_TOOL_SLICE", () =>   { app.flavorInstance.timelineInstance.tool = "slice"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_SELECT",  () => { app.flavorInstance.timelineInstance.tool = "select"  });
+        app.shortcutManager.assign("TIMELINE_TOOL_SLICE",   () => { app.flavorInstance.timelineInstance.tool = "slice"   });
         app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { app.flavorInstance.timelineInstance.tool = "preview" });
-        app.shortcutManager.assign("TIMELINE_TOOL_GROUP", () =>   { app.flavorInstance.timelineInstance.tool = "group"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_ERASE", () =>   { app.flavorInstance.timelineInstance.tool = "erase"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_PAINT", () =>   { app.flavorInstance.timelineInstance.tool = "paint"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_SLIDE", () =>   { app.flavorInstance.timelineInstance.tool = "slide"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_GROUP",   () => { app.flavorInstance.timelineInstance.tool = "group"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_ERASE",   () => { app.flavorInstance.timelineInstance.tool = "erase"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_PAINT",   () => { app.flavorInstance.timelineInstance.tool = "paint"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_SLIDE",   () => { app.flavorInstance.timelineInstance.tool = "slide"   });
 
         undoButton.addEventListener('click', () => {
             app.currentProject.historyManager.undo();
@@ -326,14 +407,9 @@ window.addEventListener('load', async () => {
             ],
 
             layout: [
-                { text: "Change Layout", items: app.layoutManager.getAvailableLayouts().filter(layout => layout.name !== "empty").map(layout => ({
-                    text: layout.title,
-                    action() {
-                        app.layoutManager.setSchema(layout.schema);
-                        app.config.set("default-layout", layout.name);
-                    }
-                })) },
-                
+                { text: "Layout presets", items: getLayouts() },
+                { text: "Saved layouts", items: [] },
+
                 { type: "separator" },
 
                 { text: "Save Current Layout", action() {} },

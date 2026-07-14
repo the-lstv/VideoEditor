@@ -5,7 +5,7 @@
 
 <!--
     Warning: This file used to be automatically generated,
-    now it is not, so cache busting is necessary for the web version
+    now it is not, so cache busting is necessary when hosted.
 -->
 
 <!DOCTYPE html>
@@ -14,9 +14,10 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="shortcut icon" href="./assets/images/favicon.svg" type="image/svg+xml">
+
     <title>Editor</title>
 
-    <!-- Preload styles -->
+    <!-- Important styles (to avoid flicker) -->
     <style>
         :root, body {
             overflow: hidden;
@@ -57,7 +58,7 @@
             animation: l1 1s infinite;
         }
 
-        @keyframes l1 {to{transform: rotate(.5turn)}}
+        @keyframes l1 { to { transform: rotate(.5turn) } }
     </style>
 
     <script>
@@ -75,16 +76,18 @@
     </script>
 
     <!-- Fonts -->
-    <link rel="preload" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css" as="style" onload="this.onload=null;this.rel='stylesheet'"><noscript><link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.13.1/font/bootstrap-icons.min.css"></noscript>
-    <link rel=preconnect href="https://fonts.googleapis.com">
-    <link rel=preconnect href="https://fonts.gstatic.com" crossorigin>
-    <link rel=stylesheet href="https://fonts.googleapis.com/css2?family=Ubuntu+Mono&family=use&display=swap">
+    <link rel="stylesheet" href="./assets/fonts/Ubuntu_Mono/UbuntuMono.css">
+    <link rel="stylesheet" href="./assets/fonts/bootstrap-icons/index.css">
+    <!-- <link rel="stylesheet" href="./assets/fonts/Phosphor/regular.css"> -->
+    <!-- <link rel="stylesheet" href="./assets/fonts/ls-icons/style.css"> -->
 
-    <!-- LS -->
-    <!-- <script src="https://cdn-origin.extragon.cloud/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,i18n,node,resize,tree,tabs,timeline,toast,tooltips,gl,range,multipane/ls.js"></script>
-    <link rel=stylesheet href="https://cdn-origin.extragon.cloud/ls/beta/flat,knob,timeline/ls.css"> -->
+    <!-- LS (development/hosted): -->
     <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,i18n,node,resize,tree,tabs,timeline,toast,tooltips,gl,range,multipane/ls.js"></script>
     <link rel=stylesheet href="https://cdn-origin.extragon.localhost/ls/beta/flat,knob,timeline/ls.css">
+
+    <!-- Build: -->
+    <!-- <script src="./assets/ls/ls.js"></script>
+    <link rel=stylesheet href="./assets/ls/ls.css"> -->
 
     <!-- CSS -->
     <link rel=stylesheet href="./assets/css/main.css?mtime=mopwic6q.65">
@@ -93,34 +96,21 @@
     <!-- Browser libraries -->
     <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script>
 
-    <script>
-        // Check for LS library and version
-        if(!globalThis.LS) {
-            alert("Fatal error: LS library is missing or failed to load. This software cannot run without it.");
-            throw new Error("LS library is missing");
-        } else if(LS.v < 6) {
-            alert("Fatal error: LS library version is too old. This software requires LS version 6 or higher.");
-            throw new Error("LS library is outdated");
-        }
-
-        // Clear default layout presets (flavors will populate them)
-        // It has to be here because it needs to be done before ESM
-        LS.Multipane.PRESETS = {
-            'empty': {
-                title: "Empty",
-                direction: 'row',
-                inner: []
-            }
-        };
-
+    <script type="module">
         // Main application
-        // I hate ESM so much
-        const main = document.createElement("script");
-        main.type = "module";
-        main.src = "./assets/src/main.mjs";
-        main.id = "main-script";
-        main.defer = true;
-        document.head.appendChild(main);
+        // Sadly due to the scale of this project I had to use ESM, so now there is like a billion imports
+        import "./assets/src/main.mjs";
+
+        // Check for LS library and version
+        // FIXME: this has to be before importing main, but ESM is ESM, not sure how to handle it without dynamic imports
+        // So for now we have to rely that it's all good
+        // if(!globalThis.LS) {
+        //     alert("Fatal error: LS library is missing or failed to load. This software cannot run without it.");
+        //     throw new Error("LS library is missing");
+        // } else if(LS.v < 6) {
+        //     alert("Fatal error: LS library version is too old. This software requires LS version 6 or higher.");
+        //     throw new Error("LS library is outdated");
+        // }
     </script>
 
 </head>

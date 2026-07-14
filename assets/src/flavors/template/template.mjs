@@ -45,14 +45,16 @@ class TemplateFlavor extends FlavorBase {
         });
     }
 
-    /**
-     * The default setup for this flavor.
-     * Here you can setup views
-     * @param {*} app 
-     */
-    static setupIn(app) {
-        app.setIcon(this.iconSet);
-        app.flavorInstance = new this(app.currentProject || (app.currentProject = new Project()));
+    static layoutPresets = {
+        default: {
+            title: "Classic",
+            direction: 'column',
+            inner: []
+        }
+    };
+
+    static {
+        LS.Multipane.registerPresets(this.name, this.layoutPresets);
     }
 }
 

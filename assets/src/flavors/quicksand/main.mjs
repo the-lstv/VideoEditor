@@ -15,6 +15,8 @@ import Project from "../../core/project.mjs";
 
 import { Variable, mappingCompiler } from "../../core/variable.mjs";
 
+const CATEGORY_NAME = "Video Editing";
+
 // --- Video editor flavor
 class QuickSand extends FlavorBase {
     static name = "quicksand";
@@ -65,221 +67,210 @@ class QuickSand extends FlavorBase {
         });
     }
 
-    /**
-     * The default setup for the video editor flavor.
-     * @param {*} app 
-     */
-    static setupIn(app) {
-        app.setIcon(this.iconSet);
-        app.flavorInstance = new QuickSand(app.currentProject || (app.currentProject = new Project()));
+    static layoutPresets = {
+        /**
+         * |   |   |
+         * |-------|
+         * |   |   |
+         */
+        'default': {
+            title: "Classic",
+            direction: 'column',
+            category: CATEGORY_NAME,
+            inner: [
+                // Two horizontal rows
+                { inner: [{ type: 'slot', view: 'PropertyEditorView', resize: { width: 600 } }, { type: 'slot', view: 'PreviewView' }], resize: { height: "60%" } },
+                { type: "tabs", tabs: [ [{ type: 'slot', view: 'AssetManagerView', resize: { width: 420 } }, { type: 'slot', view: 'TimelineView' }], [{ type: 'slot' }] ] },
+            ]
+        },
+
+        /**
+         * |   | | |
+         * |   |---|
+         * |   |   |
+         */
+        'vertical-split': {
+            title: "Timeline Focused",
+            direction: 'row',
+            category: CATEGORY_NAME,
+            inner: [
+                { type: 'slot', view: 'TimelineView' },
+                {
+                    inner: {
+                        direction: 'column',
+                        inner: [{ direction: "row", inner: [{ type: 'slot', view: 'PreviewView' }, { type: 'slot', view: 'PropertyEditorView' }] }, { type: 'slot', view: 'AssetManagerView' }]
+                    }
+                }
+            ]
+        },
+
+        // /**
+        // * |       |
+        // * |-------|
+        // * |       |
+        // */
+        // 'simple-horizontal': {
+        //     title: "Simple Horizontal",
+        //     direction: 'column',
+        //     category: CATEGORY_NAME,
+        //     inner: [
+        //         { type: 'slot', view: 'PreviewView', resize: { height: "50%" } },
+        //         { type: 'slot', view: 'TimelineView' }
+        //     ]
+        // },
+
+        // /**
+        // * |   |   |
+        // * |   |   |
+        // * |   |   |
+        // */
+        // 'simple-vertical': {
+        //     title: "Simple Vertical",
+        //     category: CATEGORY_NAME,
+        //     direction: 'row',
+        //     inner: [
+        //         { type: 'slot', view: 'PreviewView', resize: { width: "50%" } },
+        //         { type: 'slot', view: 'TimelineView' }
+        //     ]
+        // },
+
+        /**
+        * |       |
+        * |-------|
+        * | | | | |
+        */
+        'preview-focused': {
+            title: "Preview Focused",
+            direction: 'column',
+            category: CATEGORY_NAME,
+            inner: [
+                { type: 'slot', view: 'PreviewView', resize: { height: "70%" } },
+                {
+                    direction: 'row',
+                    inner: [
+                        { type: 'slot', view: 'AssetManagerView', resize: { width: "20%" } },
+                        { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
+                        { type: 'slot', view: 'PropertyEditorView' }
+                    ]
+                }
+            ]
+        },
+
+        /**
+        * | |     |
+        * | |-----|
+        * | |     |
+        */
+        'sidebar-left': {
+            title: "Sidebar Left",
+            direction: 'row',
+            category: CATEGORY_NAME,
+            inner: [
+                { type: 'slot', view: 'AssetManagerView', resize: { width: 250 } },
+                {
+                    direction: 'column',
+                    inner: [
+                        { type: 'slot', view: 'PreviewView', resize: { height: "60%" } },
+                        {
+                            direction: 'row',
+                            inner: [
+                                { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
+                                { type: 'slot', view: 'PropertyEditorView' }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        },
+
+        /**
+        * |     |  |
+        * |-----|--|
+        * |     |  |
+        */
+        'sidebar-right': {
+            title: "Property Editor Focused",
+            direction: 'row',
+            category: CATEGORY_NAME,
+            inner: [
+                {
+                    direction: 'column',
+                    inner: [
+                        { type: 'slot', view: 'PreviewView', resize: { height: "60%" } },
+                        { 
+                            direction: 'row',
+                            inner: [
+                                { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
+                                { type: 'slot', view: 'AssetManagerView' }
+                            ]
+                        }
+                    ]
+                },
+                { type: 'slot', view: 'PropertyEditorView', resize: { width: 300 } }
+            ]
+        },
+
+        /**
+        * | |   | |
+        * | |   | |
+        * | |   | |
+        */
+        'three-column': {
+            title: "Three Columns (vertical video)",
+            direction: 'row',
+            category: CATEGORY_NAME,
+            inner: [
+                { type: 'slot', view: 'PropertyEditorView', resize: { width: "30%" } },
+                { type: 'slot', view: 'PreviewView', resize: { width: "30%" } },
+                {
+                    direction: 'column',
+                    inner: [
+                        { type: 'slot', view: 'TimelineView' },
+                        { type: 'slot', view: 'AssetManagerView', resize: { height: "25%" } },
+                    ], resize: { width: "40%" }
+                }
+            ]
+        },
+
+        /**
+        * |   |   |
+        * |-------|
+        * |   |   |
+        * |-------|
+        * |   |   |
+        */
+        'grid-2x3': {
+            title: "Grid 2x3",
+            direction: 'column',
+            category: CATEGORY_NAME,
+            inner: [
+                { inner: [{ type: 'slot', view: 'PreviewView', resize: { width: "50%" } }, { type: 'slot', view: 'PropertyEditorView' }], resize: { height: "33%" } },
+                { inner: [{ type: 'slot', resize: { width: "50%" } }, { type: 'slot' }], resize: { height: "34%" } },
+                { inner: [{ type: 'slot', view: 'AssetManagerView', resize: { width: "50%" } }, { type: 'slot', view: 'TimelineView' }] }
+            ]
+        },
+
+        /**
+         * |   |   |
+         * |-------|
+         * |   |   |
+         */
+        'default-but-better': {
+            title: "Secret",
+            direction: 'column',
+            category: CATEGORY_NAME,
+            tilt: Math.floor(Math.random() * 17 + 28),
+            inner: [
+                // Two horizontal rows
+                { inner: [{ type: 'slot', view: 'PreviewView', resize: { width: 600 } }, { type: 'slot', view: 'PropertyEditorView' }], resize: { height: "65%" } },
+                { inner: [{ type: 'slot', view: 'TimelineView', resize: { width: 420 } }, { type: 'slot', view: 'AssetManagerView' }] },
+            ]
+        },
+    }
+
+    static {
+        LS.Multipane.registerPresets(this.name, this.layoutPresets);
     }
 }
-
-
-// TODO: separate layouts
-
-// --- Layout presets for the video editor
-
-const CATEGORY_NAME = "Video Editing";
-Object.assign(LS.Multipane.PRESETS,  {
-    /**
-     * |   |   |
-     * |-------|
-     * |   |   |
-     */
-    'default': {
-        title: "Classic",
-        direction: 'column',
-        category: CATEGORY_NAME,
-        inner: [
-            // Two horizontal rows
-            { inner: [{ type: 'slot', view: 'PropertyEditorView', resize: { width: 600 } }, { type: 'slot', view: 'PreviewView' }], resize: { height: "60%" } },
-            { type: "tabs", tabs: [ [{ type: 'slot', view: 'AssetManagerView', resize: { width: 420 } }, { type: 'slot', view: 'TimelineView' }], [{ type: 'slot' }] ] },
-        ]
-    },
-
-    /**
-     * |   | | |
-     * |   |---|
-     * |   |   |
-     */
-    'vertical-split': {
-        title: "Timeline Focused",
-        direction: 'row',
-        category: CATEGORY_NAME,
-        inner: [
-            { type: 'slot', view: 'TimelineView' },
-            {
-                inner: {
-                    direction: 'column',
-                    inner: [{ direction: "row", inner: [{ type: 'slot', view: 'PreviewView' }, { type: 'slot', view: 'PropertyEditorView' }] }, { type: 'slot', view: 'AssetManagerView' }]
-                }
-            }
-        ]
-    },
-
-    // /**
-    // * |       |
-    // * |-------|
-    // * |       |
-    // */
-    // 'simple-horizontal': {
-    //     title: "Simple Horizontal",
-    //     direction: 'column',
-    //     category: CATEGORY_NAME,
-    //     inner: [
-    //         { type: 'slot', view: 'PreviewView', resize: { height: "50%" } },
-    //         { type: 'slot', view: 'TimelineView' }
-    //     ]
-    // },
-
-    // /**
-    // * |   |   |
-    // * |   |   |
-    // * |   |   |
-    // */
-    // 'simple-vertical': {
-    //     title: "Simple Vertical",
-    //     category: CATEGORY_NAME,
-    //     direction: 'row',
-    //     inner: [
-    //         { type: 'slot', view: 'PreviewView', resize: { width: "50%" } },
-    //         { type: 'slot', view: 'TimelineView' }
-    //     ]
-    // },
-
-    /**
-    * |       |
-    * |-------|
-    * | | | | |
-    */
-    'preview-focused': {
-        title: "Preview Focused",
-        direction: 'column',
-        category: CATEGORY_NAME,
-        inner: [
-            { type: 'slot', view: 'PreviewView', resize: { height: "70%" } },
-            {
-                direction: 'row',
-                inner: [
-                    { type: 'slot', view: 'AssetManagerView', resize: { width: "20%" } },
-                    { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
-                    { type: 'slot', view: 'PropertyEditorView' }
-                ]
-            }
-        ]
-    },
-
-    /**
-    * | |     |
-    * | |-----|
-    * | |     |
-    */
-    'sidebar-left': {
-        title: "Sidebar Left",
-        direction: 'row',
-        category: CATEGORY_NAME,
-        inner: [
-            { type: 'slot', view: 'AssetManagerView', resize: { width: 250 } },
-            {
-                direction: 'column',
-                inner: [
-                    { type: 'slot', view: 'PreviewView', resize: { height: "60%" } },
-                    {
-                        direction: 'row',
-                        inner: [
-                            { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
-                            { type: 'slot', view: 'PropertyEditorView' }
-                        ]
-                    }
-                ]
-            }
-        ]
-    },
-
-    /**
-    * |     |  |
-    * |-----|--|
-    * |     |  |
-    */
-    'sidebar-right': {
-        title: "Property Editor Focused",
-        direction: 'row',
-        category: CATEGORY_NAME,
-        inner: [
-            {
-                direction: 'column',
-                inner: [
-                    { type: 'slot', view: 'PreviewView', resize: { height: "60%" } },
-                    { 
-                        direction: 'row',
-                        inner: [
-                            { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
-                            { type: 'slot', view: 'AssetManagerView' }
-                        ]
-                    }
-                ]
-            },
-            { type: 'slot', view: 'PropertyEditorView', resize: { width: 300 } }
-        ]
-    },
-
-    /**
-    * | |   | |
-    * | |   | |
-    * | |   | |
-    */
-    'three-column': {
-        title: "Three Columns (vertical video)",
-        direction: 'row',
-        category: CATEGORY_NAME,
-        inner: [
-            { type: 'slot', view: 'PropertyEditorView', resize: { width: "30%" } },
-            { type: 'slot', view: 'PreviewView', resize: { width: "30%" } },
-            {
-                direction: 'column',
-                inner: [
-                    { type: 'slot', view: 'TimelineView' },
-                    { type: 'slot', view: 'AssetManagerView', resize: { height: "25%" } },
-                ], resize: { width: "40%" }
-            }
-        ]
-    },
-
-    /**
-    * |   |   |
-    * |-------|
-    * |   |   |
-    * |-------|
-    * |   |   |
-    */
-    'grid-2x3': {
-        title: "Grid 2x3",
-        direction: 'column',
-        category: CATEGORY_NAME,
-        inner: [
-            { inner: [{ type: 'slot', view: 'PreviewView', resize: { width: "50%" } }, { type: 'slot', view: 'PropertyEditorView' }], resize: { height: "33%" } },
-            { inner: [{ type: 'slot', resize: { width: "50%" } }, { type: 'slot' }], resize: { height: "34%" } },
-            { inner: [{ type: 'slot', view: 'AssetManagerView', resize: { width: "50%" } }, { type: 'slot', view: 'TimelineView' }] }
-        ]
-    },
-
-    /**
-     * |   |   |
-     * |-------|
-     * |   |   |
-     */
-    'default-but-better': {
-        title: "Secret",
-        direction: 'column',
-        category: CATEGORY_NAME,
-        tilt: Math.floor(Math.random() * 17 + 28),
-        inner: [
-            // Two horizontal rows
-            { inner: [{ type: 'slot', view: 'PreviewView', resize: { width: 600 } }, { type: 'slot', view: 'PropertyEditorView' }], resize: { height: "65%" } },
-            { inner: [{ type: 'slot', view: 'TimelineView', resize: { width: 420 } }, { type: 'slot', view: 'AssetManagerView' }] },
-        ]
-    },
-});
 
 export default QuickSand;

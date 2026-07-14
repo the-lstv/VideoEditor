@@ -1,4 +1,4 @@
-class StringView extends Uint8Array {
+export default class StringView extends Uint8Array {
     isView = true;
 
     constructor(buf, byteOffset = 0, length) {
@@ -47,5 +47,3 @@ class StringView extends Uint8Array {
         return new StringView(buffer instanceof ArrayBuffer ? buffer : buffer.buffer, buffer.byteOffset, buffer.byteLength);
     }
 }
-
-export default StringView;

@@ -11,7 +11,7 @@
  */
 
 import Project from "./project.mjs";
-import { VideoDecoder } from "../backends/video/index.mjs";
+import { VideoDecoder } from "../components/video/index.mjs";
 
 // import * as THREE from "three";
 

@@ -1,21 +1,19 @@
 /**
- * Video Editor flavor
- */
-
-/**
- * Rough schema:
+ * MetaDAW flavor
  * 
- * [Project]
- * - ResourceManager; holds all resources
- * - timelines
- * - config
  * 
- * [TimelineItem]
- * - Represents an item in the scene. Such as a video clip, an image, a text block, a sound, etc.
- * - Mostly static data (exportable) + the attached runtime node/etc. and a reference to a resource if any.
+ * Planned features:
+ * - Cross-platform processing engine (can be sourced from the original MetaDaw VST)
+ * - Native plugins & DSP
+ * - Programmable and scriptable interface & JS integrations
+ * - Builtin optimized plugins (generators, effects, samplers, parametric EQ, modular synthesis) & workflow
+ * - Patch anything anywhere across the whole workflow
+ * - ...
  * 
- * [Renderer]
- * - Responsible providing rendering help.
+ * More crazy ideas:
+ * - Using Windows plugins on Linux via a Wine wrapper
+ * - Mobile support (though probably no native plugins)
+ * - Integration with the VideoEditor flavor allowing to both edit visuals and a track in one project
  */
 
 import FlavorBase from "../../core/flavor.mjs";
@@ -36,29 +34,35 @@ import { ResourceManager, Resource } from "../../core/resources.mjs";
 
 const { webUtils } = typeof require !== "undefined" ? require("electron") : {};
 
-const CATEGORY_NAME = "Video Editing";
+const CATEGORY_NAME = "MetaDaw";
+
+function scanPlugins(params) {
+    // C:\Program Files\Common Files\VST3
+    // C:\Program Files\VSTPlugins
+
+    // /Library/Audio/Plug-Ins/VST3
+    // /Library/Audio/Plug-Ins/Components
+
+    // ~/.vst3
+    // /usr/lib/vst3
+    // ~/.clap
+}
+
 
 const TRACK_STRIDE = 1000; // The distance in renderOrder between each track
 
 // --- Video editor flavor
-class VideoEditor extends FlavorBase {
-    static name = "video-editor";
+class MetaDaw extends FlavorBase {
+    static name = "metadaw";
 
     static iconSet = {
-        icon: 'assets/src/flavors/video-editor/images/icon.svg',
-        small: 'assets/src/flavors/video-editor/images/icon-flat.svg',
-        favicon: 'assets/src/flavors/video-editor/images/favicon.svg',
-        desktopIcon: 'assets/src/flavors/video-editor/images/favicon.png'
+        icon: 'assets/src/flavors/metadaw/images/icon.svg',
+        small: 'assets/src/flavors/metadaw/images/favicon.svg',
+        favicon: 'assets/src/flavors/metadaw/images/favicon.svg',
+        desktopIcon: 'assets/src/flavors/metadaw/images/favicon.png'
     };
 
-    static version = "2.2.1-alpha";
-
-    static meta = {
-        name: "Video Editor",
-        description: "A professional video editor built on the universal LS creative engine with web technologies and the LS framework.",
-        category: CATEGORY_NAME,
-        engine_version: ">=2.3.0-alpha",
-    }
+    static version = "0.0.1-alpha";
 
     async #init() {
         this.renderingCanvas = this.addDestroyable(document.createElement('canvas'));
@@ -349,11 +353,11 @@ class VideoEditor extends FlavorBase {
         LS.Modal.buildEphemeral({
             content: [
                 { tag: 'img', src: this.constructor.iconSet.icon, style: 'height: 5em; width: 100%; margin: auto' },
-                { tag: 'h2', inner: 'Video Editor', style: 'text-align: center' },
+                { tag: 'h2', inner: 'MetaDaw', style: 'text-align: center' },
                 { tag: 'p', html: `Version <code>${this.constructor.version}</code><br>Editor version <code>${app.VERSION}</code><br>LS version <code>${LS.version}</code>` },
-                { tag: 'p', inner: 'A professional video editor built on the universal LS creative engine with web technologies and the LS framework.' },
+                { tag: 'p', inner: 'A work-in progress open and hackable digital audio workstation from the future.' },
                 { tag: 'p', inner: ['Created with love and hard work by Lukas (', { tag: 'a', href: 'https://lstv.space', target: '_blank', inner: 'https://lstv.space' }, ')'] },
-                { tag: 'p', inner: ['Source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }] },
+                { tag: 'p', inner: ['Engine source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }, ".\nActivated license: Preview"] },
             ],
             buttons: [ { label: "Close" } ]
         });
@@ -424,7 +428,7 @@ class VideoEditor extends FlavorBase {
 
 
     /**
-     * * THE MAIN VIDEO FRAME RENDERING LOGIC
+     * * THE MAIN PLAYBACK LOGIC
      * Must be kept well optimized
      * 
      * Also, the whole setup here is quite temporary and has a lot to be worked on
@@ -768,11 +772,6 @@ class VideoEditor extends FlavorBase {
     }
 
     static layoutPresets = {
-        /**
-         * |   |   |
-         * |-------|
-         * |   |   |
-         */
         'default': {
             title: "Classic",
             direction: 'column',
@@ -782,190 +781,7 @@ class VideoEditor extends FlavorBase {
                 { inner: [{ type: 'slot', view: 'PropertyEditorView', resize: { width: 600 } }, { type: 'slot', view: 'PreviewView' }], resize: { height: "60%" } },
                 { type: "tabs", tabs: [ [{ type: 'slot', view: 'AssetManagerView', resize: { width: 420 } }, { type: 'slot', view: 'TimelineView' }], [{ type: 'slot' }] ] },
             ]
-        },
-
-        /**
-         * |   | | |
-         * |   |---|
-         * |   |   |
-         */
-        'vertical-split': {
-            title: "Timeline Focused",
-            direction: 'row',
-            category: CATEGORY_NAME,
-            inner: [
-                { type: 'slot', view: 'TimelineView' },
-                {
-                    inner: {
-                        direction: 'column',
-                        inner: [{ direction: "row", inner: [{ type: 'slot', view: 'PreviewView' }, { type: 'slot', view: 'PropertyEditorView' }] }, { type: 'slot', view: 'AssetManagerView' }]
-                    }
-                }
-            ]
-        },
-
-        // /**
-        // * |       |
-        // * |-------|
-        // * |       |
-        // */
-        // 'simple-horizontal': {
-        //     title: "Simple Horizontal",
-        //     direction: 'column',
-        //     category: CATEGORY_NAME,
-        //     inner: [
-        //         { type: 'slot', view: 'PreviewView', resize: { height: "50%" } },
-        //         { type: 'slot', view: 'TimelineView' }
-        //     ]
-        // },
-
-        // /**
-        // * |   |   |
-        // * |   |   |
-        // * |   |   |
-        // */
-        // 'simple-vertical': {
-        //     title: "Simple Vertical",
-        //     category: CATEGORY_NAME,
-        //     direction: 'row',
-        //     inner: [
-        //         { type: 'slot', view: 'PreviewView', resize: { width: "50%" } },
-        //         { type: 'slot', view: 'TimelineView' }
-        //     ]
-        // },
-
-        /**
-        * |       |
-        * |-------|
-        * | | | | |
-        */
-        'preview-focused': {
-            title: "Preview Focused",
-            direction: 'column',
-            category: CATEGORY_NAME,
-            inner: [
-                { type: 'slot', view: 'PreviewView', resize: { height: "70%" } },
-                {
-                    direction: 'row',
-                    inner: [
-                        { type: 'slot', view: 'AssetManagerView', resize: { width: "20%" } },
-                        { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
-                        { type: 'slot', view: 'PropertyEditorView' }
-                    ]
-                }
-            ]
-        },
-
-        /**
-        * | |     |
-        * | |-----|
-        * | |     |
-        */
-        'sidebar-left': {
-            title: "Sidebar Left",
-            direction: 'row',
-            category: CATEGORY_NAME,
-            inner: [
-                { type: 'slot', view: 'AssetManagerView', resize: { width: 250 } },
-                {
-                    direction: 'column',
-                    inner: [
-                        { type: 'slot', view: 'PreviewView', resize: { height: "60%" } },
-                        {
-                            direction: 'row',
-                            inner: [
-                                { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
-                                { type: 'slot', view: 'PropertyEditorView' }
-                            ]
-                        }
-                    ]
-                }
-            ]
-        },
-
-        /**
-        * |     |  |
-        * |-----|--|
-        * |     |  |
-        */
-        'sidebar-right': {
-            title: "Property Editor Focused",
-            direction: 'row',
-            category: CATEGORY_NAME,
-            inner: [
-                {
-                    direction: 'column',
-                    inner: [
-                        { type: 'slot', view: 'PreviewView', resize: { height: "60%" } },
-                        { 
-                            direction: 'row',
-                            inner: [
-                                { type: 'slot', view: 'TimelineView', resize: { width: "60%" } },
-                                { type: 'slot', view: 'AssetManagerView' }
-                            ]
-                        }
-                    ]
-                },
-                { type: 'slot', view: 'PropertyEditorView', resize: { width: 300 } }
-            ]
-        },
-
-        /**
-        * | |   | |
-        * | |   | |
-        * | |   | |
-        */
-        'three-column': {
-            title: "Three Columns (vertical video)",
-            direction: 'row',
-            category: CATEGORY_NAME,
-            inner: [
-                { type: 'slot', view: 'PropertyEditorView', resize: { width: "30%" } },
-                { type: 'slot', view: 'PreviewView', resize: { width: "30%" } },
-                {
-                    direction: 'column',
-                    inner: [
-                        { type: 'slot', view: 'TimelineView' },
-                        { type: 'slot', view: 'AssetManagerView', resize: { height: "25%" } },
-                    ], resize: { width: "40%" }
-                }
-            ]
-        },
-
-        /**
-        * |   |   |
-        * |-------|
-        * |   |   |
-        * |-------|
-        * |   |   |
-        */
-        'grid-2x3': {
-            title: "Grid 2x3",
-            direction: 'column',
-            category: CATEGORY_NAME,
-            inner: [
-                { inner: [{ type: 'slot', view: 'PreviewView', resize: { width: "50%" } }, { type: 'slot', view: 'PropertyEditorView' }], resize: { height: "33%" } },
-                { inner: [{ type: 'slot', resize: { width: "50%" } }, { type: 'slot' }], resize: { height: "34%" } },
-                { inner: [{ type: 'slot', view: 'AssetManagerView', resize: { width: "50%" } }, { type: 'slot', view: 'TimelineView' }] }
-            ]
-        },
-
-        /**
-         * |   |   |
-         * |-------|
-         * |   |   |
-         */
-        'default-but-better': {
-            title: "Secret",
-            direction: 'column',
-            category: CATEGORY_NAME,
-            tilt: Math.floor(Math.random() * 17 + 28),
-            inner: [
-                // Two horizontal rows
-                { inner: [{ type: 'slot', view: 'PreviewView', resize: { width: 600 } }, { type: 'slot', view: 'PropertyEditorView' }], resize: { height: "65%" } },
-                { inner: [{ type: 'slot', view: 'TimelineView', resize: { width: 420 } }, { type: 'slot', view: 'AssetManagerView' }] },
-            ]
-        },
+        }
     }
 
     static {
@@ -973,4 +789,4 @@ class VideoEditor extends FlavorBase {
     }
 }
 
-export default VideoEditor;
+export default MetaDaw;
