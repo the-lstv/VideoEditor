@@ -354,7 +354,7 @@ class ASTView extends LS.Multipane.View {
         this.astTree = astTree;
 
         this.handleUpdate = (data) => {
-            if(!this.isVisible) return;
+            if(!this.isConnected) return;
 
             const { ast, tokensCount } = data;
             if(!ast) {
@@ -502,7 +502,7 @@ class OutputView extends LS.Multipane.View {
         this.output = this.container.querySelector("#output");
 
         this.handleUpdate = async (data) => {
-            if(!this.isVisible) return;
+            if(!this.isConnected) return;
 
             if (window.prettier && window.prettierPlugins) {
                 try {

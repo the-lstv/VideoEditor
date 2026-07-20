@@ -217,7 +217,7 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
     pointer-events: none;
 }
 
-.layout-slot-drag-preview {
+.dragging-item-card-preview {
     position: fixed;
     top: 0;
     left: 0;
@@ -231,7 +231,7 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
     gap: 8px;
 }
 
-.layout-slot-drag-preview > span {
+.dragging-item-card-preview > span {
     min-width: 0;
     text-overflow: ellipsis;
     overflow: hidden;

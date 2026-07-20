@@ -17,15 +17,16 @@
  */
 
 import FlavorBase from "../../core/flavor.mjs";
-import ThreeRendererAdapter from "../../components/graphics/ThreeJS/index.mjs";
 
 import AudioRenderer from "../../components/audio/index.mjs";
 
 // --- Views
 import { AssetManagerView } from "../../views/asset-manager.mjs";
-import PreviewView          from "../../views/preview.mjs";
 import PropertyEditorView   from "../../views/property-editor.mjs";
 import TimelineView         from "../../views/timeline.mjs";
+import MixerView            from "../../views/mixer.mjs";
+import LogsView             from "../../views/logs.mjs";
+import PianoRollView        from "../../views/pianoroll.mjs";
 
 import Project from "../../core/project.mjs";
 
@@ -37,21 +38,27 @@ const { webUtils } = typeof require !== "undefined" ? require("electron") : {};
 const CATEGORY_NAME = "MetaDaw";
 
 function scanPlugins(params) {
-    // C:\Program Files\Common Files\VST3
-    // C:\Program Files\VSTPlugins
+    const paths = [
+        // Windows
+        "C:/Program Files/Common Files/VST3",
+        "C:/Program Files/VSTPlugins",
 
-    // /Library/Audio/Plug-Ins/VST3
-    // /Library/Audio/Plug-Ins/Components
+        // MacOS
+        "/Library/Audio/Plug-Ins/VST3",
+        "/Library/Audio/Plug-Ins/Components",
 
-    // ~/.vst3
-    // /usr/lib/vst3
-    // ~/.clap
+        // Linux
+        "~/.vst3",
+        "~/.clap",
+        "/usr/lib/vst3",
+
+        // User-defined
+        "./plugins"
+    ];
 }
 
 
-const TRACK_STRIDE = 1000; // The distance in renderOrder between each track
-
-// --- Video editor flavor
+// --- Digital Audio Workstation flavor
 class MetaDaw extends FlavorBase {
     static name = "metadaw";
 
@@ -65,38 +72,6 @@ class MetaDaw extends FlavorBase {
     static version = "0.0.1-alpha";
 
     async #init() {
-        this.renderingCanvas = this.addDestroyable(document.createElement('canvas'));
-
-        const rendererOptions = this.flavorConfig.rendererOptions || {};
-
-        try {
-            this.renderer = new ThreeRendererAdapter({
-                canvas: this.renderingCanvas,
-                width: rendererOptions.width || 1280,
-                height: rendererOptions.height || 720,
-                backgroundColor: rendererOptions.backgroundColor ?? 0x000000,
-                backgroundAlpha: rendererOptions.backgroundAlpha ?? 1,
-                antialias: rendererOptions.antialias !== false,
-                alpha: rendererOptions.alpha !== false,
-                powerPreference: rendererOptions.powerPreference || "high-performance",
-                preserveDrawingBuffer: !!rendererOptions.preserveDrawingBuffer,
-                ambientLightIntensity: rendererOptions.ambientLightIntensity,
-                directionalLightIntensity: rendererOptions.directionalLightIntensity,
-                toneMapping: rendererOptions.toneMapping,
-                toneMappingExposure: rendererOptions.toneMappingExposure
-            }, this.project);
-        } catch (e) {
-            LS.Modal.buildEphemeral({
-                title: "Renderer Initialization Failed",
-                content: { html: "Failed to initialize the video renderer. This may be due to an unsupported or outdated graphics card or driver. Video editing features will be unavailable.<br><br>Error details: <pre class=\"log-message\">" + e.message + "</pre>" },
-                buttons: [
-                    { label: "OK" }
-                ]
-            });
-            throw new Error(e);
-        }
-
-        console.log("Video editor initialized with renderer options:", rendererOptions);
         
     }
 
@@ -125,9 +100,6 @@ class MetaDaw extends FlavorBase {
 
         this.editingItem = null;
 
-        this.renderingMode = 0; // 0 = editing mode, 1 = export mode
-        this.rerenderCallback = this.#maybeRerender.bind(this);
-
         // Cache event references that are emitted frequently (small benefit but skips event lookup)
         // In general this doesn't do much BUT in high-perf scenarios any detail matters so why not do it
         this.__seekEventRef = this.prepareEvent('seek');
@@ -147,21 +119,33 @@ class MetaDaw extends FlavorBase {
         this.frameScheduler.limitFPS(60);
 
         // ! ---- todo: move elsewhere
-        // Initialize editor GUI with views for video editing
-        const previewView = new PreviewView();
+        // Initialize editor GUI with views for audio editing
         const timelineView = new TimelineView();
-        const assetManagerView = new AssetManagerView();
         const propertyEditorView = new PropertyEditorView();
+        const mixerView = new MixerView();
+        const pianoRollView = new PianoRollView();
+        const assetManagerView = new AssetManagerView(null, {
+            library: {
+                objects: [
+                    { i18n: "assets.base.automation_clip", icon: "bi-bezier2", label: "Automation clip", type: "automation", item: { type: "automation", label: "Automation clip" } },
+                    { i18n: "assets.base.sound", icon: "bi-music-note-beamed", label: "Sound", type: "audio", item: { type: "audio", label: "Sound", tileColor: "purple" } },
+                    { i18n: "assets.base.timeline_script", icon: "bi-braces-asterisk", label: "Timeline script", type: "script", item: { type: "script", label: "Timeline script", tileColor: "pastel-indigo" } },
+                    { i18n: "assets.base.anotherTimeline", icon: "bi-bar-chart-steps", label: "Another timeline (combine arrangement)", type: "timeline", item: { type: "timeline", label: "Timeline" } },
+                    { i18n: "assets.base.pattern", icon: "bi-music-note-list", label: "Pattern", type: "notes", item: { type: "notes", label: "Pattern", tileColor: "yellow" } },
+                    // { i18n: "assets.base.events", icon: "bi-toggles", label: "Events", type: "events", item: { type: "events", label: "Events" } },
+                    { i18n: "assets.base.empty_item", icon: "bi-file-earmark", label: "Empty item", type: "empty", item: { type: "empty", label: "Empty item" } },
+                ]
+            }
+        });
 
-        app.layoutManager.add(previewView, timelineView, assetManagerView, propertyEditorView);
-
-        app.focusedPreview = previewView;
+        app.layoutManager.add(timelineView, assetManagerView, propertyEditorView, mixerView, pianoRollView);
 
         this.project.on("ready", () => {
-            this.project.connect(previewView);
             this.project.connect(timelineView);
             this.project.connect(assetManagerView);
             this.project.connect(propertyEditorView);
+            this.project.connect(mixerView);
+            this.project.connect(pianoRollView);
         });
 
         // Expose some globals for debugging
@@ -258,30 +242,6 @@ class MetaDaw extends FlavorBase {
                     });
 
                     this.addExternalEventListener(this.timelineInstance, "item-cleanup", (item) => {
-                        if(this.editingItem === item) {
-                            this.editingItem = null;
-
-                            const itemEditor = this.project.connectedViews.get('propertyEditor');
-                            if(itemEditor) {
-                                itemEditor.setTarget(null);
-                            }
-                        }
-
-                        if(item.node) {
-                            ThreeRendererAdapter.disposeObject(item.node);
-                            item.node = null;
-                        }
-
-                        if(item.data.resource) {
-                            const used = this.currentTimeline.some(item => item.data.resource === item.data.resource);
-                            if(!used) {
-                                const resource = this.project.resources.getResource(item.data.resource);
-                                if(resource) {
-                                    resource.unload();
-                                }
-                            }
-                        }
-                        this.render();
                     });
 
                     if(!this.firstFrameRendered) {
@@ -291,10 +251,6 @@ class MetaDaw extends FlavorBase {
 
                     this.quickEmit(this.__seekEventRef, this.timelineInstance.seek);
                     this.emit('duration-changed', [this.timelineInstance.duration]);
-                    break;
-
-                case "videoPreview":
-                    view.setSource(this.renderer);
                     break;
 
                 case "assetManager":
@@ -311,10 +267,6 @@ class MetaDaw extends FlavorBase {
                     view.timeline.reset(true);
                     this.timelineInstance.events.clear();
                     this.timelineInstance = null;
-                    break;
-
-                case "videoPreview":
-                    view.setSource(null);
                     break;
 
                 case "propertyEditor":
@@ -337,7 +289,7 @@ class MetaDaw extends FlavorBase {
     }
 
     #exportTo(data) {
-        if(!data.savedFlavorId) data.savedFlavorId = "video-editor";
+        if(!data.savedFlavorId) data.savedFlavorId = "metadaw";
 
         const exportedTimelines = {};
         for(const [id, timeline] of this.timelines) {
@@ -353,10 +305,9 @@ class MetaDaw extends FlavorBase {
         LS.Modal.buildEphemeral({
             content: [
                 { tag: 'img', src: this.constructor.iconSet.icon, style: 'height: 5em; width: 100%; margin: auto' },
-                { tag: 'h2', inner: 'MetaDaw', style: 'text-align: center' },
                 { tag: 'p', html: `Version <code>${this.constructor.version}</code><br>Editor version <code>${app.VERSION}</code><br>LS version <code>${LS.version}</code>` },
-                { tag: 'p', inner: 'A work-in progress open and hackable digital audio workstation from the future.' },
-                { tag: 'p', inner: ['Created with love and hard work by Lukas (', { tag: 'a', href: 'https://lstv.space', target: '_blank', inner: 'https://lstv.space' }, ')'] },
+                { tag: 'p', inner: 'A work-in progress intuitive, open and hackable digital audio workstation.' },
+                { tag: 'p', html: `Created with love and hard work by Lukas (<a href='https://lstv.space' target='_blank'>https://lstv.space</a>)<br><br><strong>Credits:</strong><br>Lukas - <span style=color:var(--surface-10)>Programming, engine (platform, audio engine, UI framework), components, design, libraries, artwork</span><br>Chrome and Node.JS authors - <span style=color:var(--surface-10)>Browser APIs & runtime</span>` },
                 { tag: 'p', inner: ['Engine source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }, ".\nActivated license: Preview"] },
             ],
             buttons: [ { label: "Close" } ]
@@ -366,54 +317,27 @@ class MetaDaw extends FlavorBase {
     // --- General setters/getters
 
     get playing() {
-        return this.frameScheduler.running;
     }
 
     set playing(value) {
-        value = !!value;
-        if(this.frameScheduler.running === value) return;
-
-        this.emit('playing-changed', [value]);
-        this.emit(value? 'play': 'pause');
-
-        if(value) {
-            this.frameScheduler.start();
-        } else {
-            this.frameScheduler.stop();
-        }
     }
 
     get duration() {
-        return this.timelineInstance? this.timelineInstance.duration: 0;
     }
 
     get time() {
-        return this.timelineInstance? this.timelineInstance.seek: 0;
     }
 
     togglePlay() {
-        this.playing = !this.playing;
     }
 
     play() {
-        this.playing = true;
     }
 
     pause() {
-        this.playing = false;
     }
 
     seek(time, moveTimelineView = false) {
-        if(this.timelineInstance) {
-            this.timelineInstance.setSeek(time);
-            if(moveTimelineView) {
-                this.timelineInstance.offset = time * this.timelineInstance.zoom;
-            }
-        }
-    }
-
-    render() {
-        this.frameScheduler.schedule();
     }
 
     setTimeline(timelineId) {
@@ -426,132 +350,12 @@ class MetaDaw extends FlavorBase {
         }
     }
 
-
-    /**
-     * * THE MAIN PLAYBACK LOGIC
-     * Must be kept well optimized
-     * 
-     * Also, the whole setup here is quite temporary and has a lot to be worked on
-     * 
-     * @param {Number} time Time in seconds of the frame to render. If not provided, it will render the current time of the timeline.
-     */
     async renderAtTime(time) {
-        if(!this.timelineInstance || !this.renderer) return;
-        if(time === undefined) time = this.timelineInstance.seek;
-
-        // Hide items that are currently rendered
-        for(const item of this.activeRenderItems) {
-            if(item.node) item.node.visible = false;
-        }
-        this.activeRenderItems.length = 0;
-
-        // Clear screen
-        // this.renderer.clear();
-
-        // First loop to process automation items and values
-        // We find intersecting items at the current time via a binary search
-        const items = this.timelineInstance.getIntersectingAt(time);
-
-        if(this.editingItem && !items.includes(this.editingItem)) {
-            items.push(this.editingItem);
-        }
-
-        let activeCamera = this.renderer.defaultCamera;
-
-        for(const item of items) {
-            if(item.type === "automation") {
-                // Process automation & event & timeline data input items
-                mappingCompiler.processTimelinedAutomation(item, time, this.timelineInstance, this.renderer);
-                continue;
-            }
-
-            if(item.type === "audio") {
-                console.log("TODO: implement audio rendering");
-                continue;
-            }
-
-            // Ensure we have a visual node/rendering object
-            if(!item.node) this.renderer.createObject(item);
-            const node = item.node;
-
-            if(!node || item.data.visible === false) continue;
-
-            if(item.__dirtyPosition) {
-                ThreeRendererAdapter.updateItemPosition(item);
-            }
-
-            if(item.type === "camera") {
-                activeCamera = node;
-                continue;
-            }
-
-            if(item.data.resource) {
-                // Check for material resource updates
-                if(item.resourceUpdated !== false) {
-                    this.renderer.updateNodeResource(item);
-                }
-
-                const resource = this.project.resources.getResource(item.data.resource);
-                if(resource && resource.type === "video") {
-                    // Seek and update the video texture using the video decoder, which is assumed to have been created by the above renderer.updateNodeResource call
-                    const decoder = resource.assets.videoDecoder;
-                    if(decoder) {
-                        // ! todo: rerender callback doesnt seem to work right
-                        const seekPromise = decoder.seek(time - item.start, item.data, node.userData.canvasTexture, item.offset || 0);
-
-                        if(this.renderingMode === 1) {
-                            // Exporting, so we must wait for the frame to be ready
-                            await seekPromise;
-                        } else {
-                            // Editing, so we can render later
-                            seekPromise.then(this.rerenderCallback);
-                        }
-                    }
-                }
-            }
-
-            // Apply local animations
-            if(item.data.animations) {
-                for(const anim of item.data.animations) {
-                    mappingCompiler.processTimelinedAutomation(anim, time, this.timelineInstance, this.renderer);
-                }
-            }
-
-            // Basic linear fadeIn/fadeOut
-            if(item.data.fadeIn || item.data.fadeOut) {
-                const progress = Math.min(
-                    item.data.fadeIn? (time - item.start) / item.data.fadeIn: 1,
-                    item.data.fadeOut? ((item.start + item.duration) - time) / item.data.fadeOut: 1
-                );
-
-                this.renderer.constructor.setMaterialOpacity(item, progress * (item.data.opacity ?? 1));
-            } else {
-                this.renderer.constructor.setMaterialOpacity(item, item.data.opacity ?? 1);
-            }
-
-            if(!node.visible) node.visible = true;
-            const renderOrder = (item.row * TRACK_STRIDE) + (item.data.zIndex || 0);
-
-            // Temporary
-            if(renderOrder !== node._renderOrder) {
-                node.renderOrder = renderOrder;
-                node._renderOrder = renderOrder;
-                node.traverse((child) => child.renderOrder = renderOrder);
-            }
-
-            // Mark as active
-            this.activeRenderItems.push(item);
-        }
-
-        this.renderer.render(activeCamera);
-        // this.frameRerender = false;
+        // ...
     }
 
-    #maybeRerender(frameChanged) {
-        if(this.destroyed) return;
-        if(frameChanged) {
-            this.render();
-        }
+    render() {
+        // ...
     }
 
     /**
@@ -778,8 +582,23 @@ class MetaDaw extends FlavorBase {
             category: CATEGORY_NAME,
             inner: [
                 // Two horizontal rows
-                { inner: [{ type: 'slot', view: 'PropertyEditorView', resize: { width: 600 } }, { type: 'slot', view: 'PreviewView' }], resize: { height: "60%" } },
-                { type: "tabs", tabs: [ [{ type: 'slot', view: 'AssetManagerView', resize: { width: 420 } }, { type: 'slot', view: 'TimelineView' }], [{ type: 'slot' }] ] },
+                { type: "tabs", tabs: [
+                    [
+                        { type: 'slot', view: 'AssetManagerView', resize: { width: 350 } },
+                        {
+                            direction: 'column',
+                            inner: [
+                                { type: 'slot', view: 'TimelineView', resize: { height: "75%" } },
+                                { type: 'slot', view: 'MixerView' }
+                            ]
+                        }
+                    ],
+
+                    [
+                        { type: 'slot', view: 'PianoRollView', resize: { height: "75%" } },
+                        { type: 'slot', view: 'PropertyEditorView' }
+                    ]
+                ] },
             ]
         }
     }

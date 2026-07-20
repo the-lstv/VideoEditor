@@ -2,9 +2,9 @@
 - [ ] Multiple render backends
 
 - [ ] Resize modes/behavior
-- [ ] Layout system
+- [ ] Layout system (in renderer)
 
-- [ ] Video encoding
+- [x] Video encoding
 - [x] Video decoding
 - [ ] Proxy file management and proxies in resource system
 - [ ] Handle symlinks in the file browser
@@ -31,6 +31,7 @@
 - [ ] Audio editing
 - [ ] Audio mixer
 - [ ] Split audio track from video
+- [ ] (core) Audio DSP engine
 
 - [ ] Keyframe animation
 - [ ] Data pipelines
@@ -38,11 +39,10 @@
 - [ ] Plugin system
 
 - [ ] Revamp property editor
-- [ ] Layout editor
 
-- [ ] 3D objects and compositing
+- [x] 3D objects and compositing
 - [ ] 3D tools & viewport
-- [ ] 3D roataion & positioning
+- [x] 3D roataion & positioning
 - [ ] VR editing
 
 - [ ] Color grading, correction, color curves tools
@@ -92,6 +92,11 @@
 - [ ] Project management
 
 - [ ] Event recording
+
+### Core:
+- [ ] Project management
+- [ ] Recents
+- [ ] Layout editor
 
 ## Bugs
 

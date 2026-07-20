@@ -132,13 +132,7 @@ const app = globalThis.app = {
         await new Promise(resolve => setTimeout(resolve, 250));
         app.setIcon(flavorClass.iconSet);
         app.leaveShade();
-    },
-
-    // registeredFlavors: [
-    //     GlitterPlayground,
-    //     MetaDAW,
-    //     VideoEditor
-    // ]
+    }
 }
 
 // --- Setup welcome screen if enabled
@@ -401,14 +395,14 @@ window.addEventListener('load', () => {
                 { text: "Layout presets", items: getLayouts() },
                 { text: "Saved layouts", items: [] },
 
-                { type: "separator" },
+                // { type: "separator" },
 
-                { text: "Save Current Layout", action() {} },
+                // { text: "Save Current Layout", action() {} },
 
-                { type: "separator" },
+                // { type: "separator" },
                 
-                { text: "Save Current Layout To File", action() {} },
-                { text: "Load Layout From File", action() {} },
+                // { text: "Save Current Layout To File", action() {} },
+                // { text: "Load Layout From File", action() {} },
             ],
 
             help: [
@@ -427,7 +421,7 @@ window.addEventListener('load', () => {
                 //     window.open();
                 // } },
 
-                { type: "separator" },
+                // { type: "separator" },
 
                 { text: "About", icon: "bi-stars", action() {
                     if(app.flavorInstance && app.flavorInstance.onAboutDialog) {

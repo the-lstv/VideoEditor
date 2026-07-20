@@ -123,9 +123,9 @@ class HistoryManager {
 const dragState = new class DragState extends LS.Util.FrameScheduler {
     constructor() {
         super((deltaTime, ts) => this.#render(deltaTime, ts), { deltaTime: true });
-        this.labelElement = LS.Create("span", { inner: "" });
+        this.labelElement = LS.Create("span");
         this.iconElement = LS.Create("i");
-        this.previewContainer = LS.Create("ls-box", { class: 'layout-slot-drag-preview', inner: [ this.iconElement, this.labelElement ] });
+        this.previewContainer = LS.Create("ls-box.dragging-item-card-preview", { inner: [ this.iconElement, this.labelElement ] });
         this.reset();
     }
 
