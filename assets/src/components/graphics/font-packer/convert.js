@@ -203,6 +203,8 @@ async function main() {
         "--format", "png",
         "--imageout", path.join(outputDir, "atlas.png"),
         "--json", path.join(outputDir, "font.json"),
+        "--type", args.type || "msdf",
+        "-pxrange", args.pxrange || "8",
     ];
 
     const atlasGen = spawn(atlasGenPath, atlasGenArgs);

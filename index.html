@@ -69,7 +69,7 @@
     <link rel=stylesheet href="./assets/ls/ls.css"> -->
 
     <!-- Development/Hosted/Akeno: -->
-    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,i18n,node,resize,tree,tabs,timeline,toast,tooltips,range,multipane/ls.js"></script>
+    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,i18n,node,gl,resize,tree,tabs,timeline,timeline-gl,toast,tooltips,range,multipane/ls.js"></script>
     <link rel=stylesheet href="https://cdn-origin.extragon.localhost/ls/beta/flat,knob,timeline/ls.css">
 
     <script>
@@ -81,7 +81,7 @@
     </script>
 
     <!-- Fonts -->
-    <link rel="stylesheet" href="./assets/fonts/Ubuntu_Mono/UbuntuMono.css">
+    <link rel="stylesheet" href="./assets/fonts/UbuntuMono/UbuntuMono.css">
     <link rel="stylesheet" href="./assets/fonts/bootstrap-icons/index.css">
     <!-- <link rel="stylesheet" href="./assets/fonts/Phosphor/regular.css"> -->
     <!-- <link rel="stylesheet" href="./assets/fonts/ls-icons/style.css"> -->
@@ -89,6 +89,7 @@
     <!-- CSS -->
     <link rel=stylesheet href="./assets/css/main.css">
     <link rel=stylesheet href="./assets/css/settings.css">
+    <link rel=stylesheet href="./assets/css/pallete.css">
 
     <!-- Browser libraries -->
     <!-- <script src="https://cdn.jsdelivr.net/npm/fflate@0.8.2/umd/index.js"></script> -->
@@ -147,22 +148,7 @@
         }
     </script> -->
 
-    <script type="module">
-        // Main application
-        // Sadly due to the scale of this project I had to use ESM, so now there is like a billion imports
-        import app from "./assets/src/main.mjs";
-        // LS Version should be checked before this is loaded
-
-        // --- Preloading some flavors
-        // import GlitterPlayground from "./assets/src/flavors/glitter-playground/index.mjs";
-        // app.setFlavor(GlitterPlayground);
-
-        import MetaDAW from "./assets/src/flavors/metadaw/main.mjs";
-        app.setFlavor(MetaDAW);
-
-        // import VideoEditor from "./assets/src/flavors/video-editor/main.mjs";
-        // app.setFlavor(VideoEditor);
-    </script>
+    <script type="module" src="./assets/src/main.mjs"></script>
 
 </head>
 <body ls ls-theme="dark" ls-accent="white" ls-style="flat" style="--font:Ubuntu Mono, monospace" class="level-0">
@@ -218,6 +204,31 @@
                 </div>
             </div>
             <div class="sidebar-content"></div>
+        </div>
+
+        <div id="topOverlay" style="display: none">
+            <div id="commandTerminal" class="level-n3" style="display: none">
+                <div class="terminal-output"></div>
+            </div>
+
+            <div id="commandPaletteBar" class="level-n3">
+                <div id="commandPalette" onclick="this.querySelector('.command-input').focus()">
+                    <div class="completion-menu"></div>
+    
+                    <i class="bi-terminal command-icon"></i>
+    
+                    <div class="textContainer">
+                        <span class="command-selection"></span>
+                        <span class="command-caret"></span>
+                        <span class="command-text"></span><span class="command-hint"></span>
+                        <input type="text" class="command-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Command palette input">
+                    </div>
+                </div>
+    
+                <div class="command-palette-buttons">
+                    <button ls-tooltip="Close" class="square clear" aria-label="Close command palette"><i class="bi-x-lg"></i></button>
+                </div>
+            </div>
         </div>
     </main>
 </body>

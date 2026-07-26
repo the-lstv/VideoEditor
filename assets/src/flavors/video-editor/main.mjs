@@ -173,11 +173,10 @@ class VideoEditor extends FlavorBase {
             }
         });
 
-        app.layoutManager.add(previewView, timelineView, assetManagerView, propertyEditorView);
-
         app.focusedPreview = previewView;
 
         this.project.on("ready", () => {
+        app.layoutManager.add(previewView, timelineView, assetManagerView, propertyEditorView);
             this.project.connect(previewView);
             this.project.connect(timelineView);
             this.project.connect(assetManagerView);
@@ -329,7 +328,9 @@ class VideoEditor extends FlavorBase {
             switch(view.constructor.name) {
                 case "timeline":
                     view.timeline.reset(true);
-                    this.timelineInstance.events.clear();
+                    if(this.timelineInstance) {
+                        this.timelineInstance.events.clear();
+                    }
                     this.timelineInstance = null;
                     break;
 

@@ -1,4 +1,4 @@
-export default class MixerView extends LS.Multipane.View {
+export default class MixerView extends LS.View {
     constructor() {
         super({
             name: "MixerView",

@@ -192,6 +192,8 @@ class ThreeRendererAdapter extends RendererAdapter {
                 return null;
         }
 
+        if(!item.node) return null;
+
         item.node.visible = false;
         item.node.matrixAutoUpdate = true;
 

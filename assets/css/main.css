@@ -183,6 +183,8 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
     background: var(--surface-n2);
     padding: 0 10px;
     justify-content: space-between;
+    overflow: hidden;
+    white-space: nowrap;
 }
 
 .layout-slot-header > div {
@@ -890,4 +892,16 @@ pre.log-message {
     .ͼj {
         color: #1696af;
     }
+}
+
+.floating-view {
+    position: absolute;
+    inset: 40px;
+    top: 75px;
+    background: var(--elevate);
+    overflow: hidden;
+    z-index: 50000;
+    outline: 4px solid var(--accent-mix-40);
+    border-radius: var(--border-radius);
+    box-shadow: 0 10px 20px #00000085, 0 0 0 200px #00000061;
 }

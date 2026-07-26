@@ -599,11 +599,14 @@ class AcceleratedTextRenderer extends LS.EventEmitter {
         if (updatedDimensions) {
             gl.uniformMatrix4fv(locations.projection, false, this.projMatrix);
         }
+
         gl.uniform2f(locations.offset, this.gridOffsetX, this.gridOffsetY);
         gl.uniform1f(locations.pxRange, this.pxRange || 4.0);
+
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, this.texture);
         gl.uniform1i(locations.texture, 0);
+
         gl.bindVertexArray(this.vao);
         gl.drawArraysInstanced(gl.TRIANGLE_STRIP, 0, 4, this.instanceCount);
         gl.bindVertexArray(null);

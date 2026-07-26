@@ -5,7 +5,7 @@ import { Resource } from "../core/resources.mjs";
  * Asset manager view class (standalone)
  * Not proud of the state of this code
  */
-class AssetManagerView extends LS.Multipane.View {
+class AssetManagerView extends LS.View {
     static name = "assetManager";
 
     libraryTemplate = {
@@ -45,7 +45,8 @@ class AssetManagerView extends LS.Multipane.View {
         if (parent) {
             // When used standalone by other views, otherwise parent is provided by the project multipane
             this.parent = parent;
-            this.addExternalEventListener(parent, "destroy", () => this.destroy());
+            // this.addExternalEventListener(this.parent, "destroy", () => this.destroy());
+            this.parent.on("destroy", this.__parentDestroyHandler = () => this.destroy());
         }
 
         // Element shown when there is no content to show
@@ -293,6 +294,9 @@ class AssetManagerView extends LS.Multipane.View {
     }
 
     onDetached() {
+        // if(this.destroyed) throw new Error("AssetManagerView is already destroyed");
+        console.log("AssetManagerView detached from DOM", this);
+
         if (this.parent?.resources) {
             this.parent.resources.off('folder-added', this._boundRefreshFolders);
             this.parent.resources.off('folder-removed', this._boundRefreshFolders);
@@ -440,6 +444,14 @@ class AssetManagerView extends LS.Multipane.View {
         this.previewElement = null;
         this.libraryTemplate = null;
         this.emptyStateElement = null;
+
+        this.__sidebar.remove();
+        this.__sidebar = null;
+        this.__contentContainer.remove();
+        this.__contentContainer = null;
+
+        this.parent?.off("destroy", this.__parentDestroyHandler);
+        this.__parentDestroyHandler = null;
 
         if(this.tree) {
             this.tree.destroy();

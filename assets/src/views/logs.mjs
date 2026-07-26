@@ -1,4 +1,4 @@
-export default class LogsView extends LS.Multipane.View {
+export default class LogsView extends LS.View {
     static name = "LogsView";
 
     constructor() {

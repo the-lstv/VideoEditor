@@ -1,0 +1,203 @@
+/*
+    Part: Command Palette
+*/
+
+#topOverlay {
+    position: absolute;
+    left: 0;
+    right: 0;
+    max-width: 650px;
+    padding: 0 10px;
+    margin: 0 auto;
+    z-index: 100000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+    /* top: var(--topOffset); */
+    top: 25%;
+
+    --command-text-size: 1.2rem;
+}
+
+#commandTerminal, #commandPaletteBar {
+    width: 100%;
+    border-radius: var(--border-radius);
+    outline: 1px solid var(--surface-2);
+    box-shadow: 0 10px 20px 0 rgba(0, 0, 0, .1333333333);
+}
+
+#commandTerminal {
+    overflow: auto;
+    max-height: min(calc(100vh - 130px), 400px);
+    padding: 8px;
+}
+
+.terminal-line {
+    white-space: pre-wrap;
+}
+
+.terminal-line:hover {
+    background: var(--elevate-1);
+}
+
+#commandPaletteBar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    user-select: none;
+    box-shadow: 0 10px 100px 30px rgba(0, 0, 0, .4);
+}
+
+.command-palette-buttons {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 8px;
+}
+
+#commandPalette {
+    position: relative;
+    padding: 8px 16px;
+    display: flex;
+    gap: .8em;
+    flex: 1;
+    cursor: text;
+    width: 100%;
+    align-items: center;
+}
+
+#commandPalette, .command-input, #commandPalette .textContainer, #commandTerminal {
+    /* font-family: "JetBrains Mono", "IBM Plex Mono", monospace !important; */
+    font-family: "Ubuntu Mono", monospace !important;
+}
+
+.command-input, #commandPalette .textContainer {
+    font-size: var(--command-text-size);
+    line-height: var(--command-text-size);
+}
+
+#commandPalette .textContainer {
+    min-height: var(--command-text-size);
+}
+
+.command-input {
+    opacity: 0;
+    position: absolute !important;
+    inset: 0;
+    margin: 0 !important;
+    border: none !important;
+    padding: 0 !important;
+    z-index: 10;
+    top: -8px;
+}
+
+.command-caret, .command-selection {
+    position: absolute;
+    top: 0;
+    height: var(--command-text-size);
+    width: 9.6px;
+}
+
+.textContainer {
+    position: relative;
+    width: 100%;
+}
+
+#commandPalette:not(.focused) .command-caret {
+    outline: 1px solid var(--accent-50);
+}
+
+#commandPalette:not(.focused) .command-selection {
+    display: none;
+}
+
+.focused .command-caret {
+    background: var(--accent-50);
+}
+
+.focused .command-caret.blink {
+    background: var(--accent-mix-80);
+}
+
+#commandPalette.selection .command-selection {
+    display: block;
+}
+
+#commandPalette.selection .command-caret {
+    display: none;
+}
+
+.completion-menu {
+    background: var(--surface-1);
+    border: 1px solid var(--surface-0);
+    position: absolute;
+    top: 90%;
+    display: flex;
+    flex-direction: column;
+    max-height: 300px;
+    overflow: auto;
+    padding: 5px;
+    border-radius: var(--border-radius);
+    outline: 1px solid var(--surface-2);
+    box-shadow: 0 10px 20px 0 rgba(0, 0, 0, .1333333333);
+}
+
+[ls-theme=light] .completion-menu {
+    background: var(--surface-n2);
+}
+
+.completion-item {
+    padding: 2px 8px;
+    cursor: pointer;
+    border: 1px solid transparent;
+    display: flex;
+    gap: 8px;
+    border-radius: var(--border-radius-small);
+    align-items: center;
+    white-space: nowrap;
+}
+
+.completion-item.has-accent {
+    color: var(--accent-60);
+}
+
+[ls-theme=light] .completion-item.has-accent {
+    color: var(--accent-40);
+}
+
+.completion-description {
+    color: gray;
+}
+
+.completion-item:hover {
+    background: var(--surface-3);
+}
+
+[ls-theme=light] .completion-item:hover {
+    background: var(--surface-1);
+}
+
+.completion-item.selected {
+    background: var(--surface-4);
+    border: 1px solid var(--accent);
+}
+
+[ls-theme=light] .completion-item.selected {
+    background: var(--surface-0);
+    border: 1px solid var(--accent-80);
+}
+
+.command-hint {
+    opacity: .5;
+}
+
+.command-text {
+    white-space: pre;
+    position: relative;
+    z-index: 1;
+}
+
+.command-selection {
+    background: var(--accent-mix-80);
+}

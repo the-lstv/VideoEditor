@@ -131,16 +131,15 @@ class MetaDaw extends FlavorBase {
                     { i18n: "assets.base.sound", icon: "bi-music-note-beamed", label: "Sound", type: "audio", item: { type: "audio", label: "Sound", tileColor: "purple" } },
                     { i18n: "assets.base.timeline_script", icon: "bi-braces-asterisk", label: "Timeline script", type: "script", item: { type: "script", label: "Timeline script", tileColor: "pastel-indigo" } },
                     { i18n: "assets.base.anotherTimeline", icon: "bi-bar-chart-steps", label: "Another timeline (combine arrangement)", type: "timeline", item: { type: "timeline", label: "Timeline" } },
-                    { i18n: "assets.base.pattern", icon: "bi-music-note-list", label: "Pattern", type: "notes", item: { type: "notes", label: "Pattern", tileColor: "yellow" } },
+                    { i18n: "assets.base.pattern", icon: "bi-music-note-list", label: "Pattern", type: "pattern", item: { type: "pattern", label: "Pattern", tileColor: "yellow" } },
                     // { i18n: "assets.base.events", icon: "bi-toggles", label: "Events", type: "events", item: { type: "events", label: "Events" } },
                     { i18n: "assets.base.empty_item", icon: "bi-file-earmark", label: "Empty item", type: "empty", item: { type: "empty", label: "Empty item" } },
                 ]
             }
         });
-
-        app.layoutManager.add(timelineView, assetManagerView, propertyEditorView, mixerView, pianoRollView);
-
+        
         this.project.on("ready", () => {
+            app.layoutManager.add(timelineView, assetManagerView, propertyEditorView, mixerView, pianoRollView);
             this.project.connect(timelineView);
             this.project.connect(assetManagerView);
             this.project.connect(propertyEditorView);
@@ -180,6 +179,18 @@ class MetaDaw extends FlavorBase {
             await this.#init();
         });
 
+        this.floatingView = this.addDestroyable(LS.Create(".floating-view"));
+        this.floatingView.style.display = "none";
+
+        const floatingViewStackItem = {
+            close: () => {
+                LS.Animation.fadeOut(this.floatingView, 500, "down").then(() => {
+                    if(this.floatingView.__adding) return;
+                    this.floatingView.replaceChildren();
+                });
+            }
+        }
+
         // When a view connects to the project
         this.project.on("view-connected", async (view) => {
             if(view.attachedTo == null) {
@@ -198,6 +209,8 @@ class MetaDaw extends FlavorBase {
                         this.render();
                     });
 
+                    view.container.appendChild(this.floatingView);
+
                     this.addExternalEventListener(this.timelineInstance, 'duration-changed', (duration) => {
                         this.emit('duration-changed', [duration]);
                     });
@@ -209,6 +222,21 @@ class MetaDaw extends FlavorBase {
                             this.editingItem = item;
                             this.render();
                         }
+
+                        console.log("Timeline item selected:", item);
+                        if(item.type === "notes" || item.type === "pattern") {
+                            const pianoRoll = this.project.connectedViews.get('PianoRollView');
+                            if(pianoRoll) {
+                                // pianoRoll.setNotes((item.data.notes ??= []));
+
+                                this.floatingView.appendChild(pianoRoll.container);
+                                LS.Stack.push(floatingViewStackItem);
+                                this.floatingView.__adding = true;
+                                LS.Animation.fadeIn(this.floatingView, 500, "up").then(() => {
+                                    delete this.floatingView.__adding;
+                                });
+                            }
+                        }
                     });
 
                     this.addExternalEventListener(this.timelineInstance, 'item-deselect', () => {
@@ -216,8 +244,11 @@ class MetaDaw extends FlavorBase {
                         if(itemEditor) {
                             itemEditor.setTarget(null);
                         }
+
                         this.editingItem = null;
                         this.render();
+
+                        floatingViewStackItem.close();
                     });
 
                     this.addExternalEventListener(this.timelineInstance, "drag-start", (type) => {
@@ -265,7 +296,9 @@ class MetaDaw extends FlavorBase {
             switch(view.constructor.name) {
                 case "timeline":
                     view.timeline.reset(true);
-                    this.timelineInstance.events.clear();
+                    if(this.timelineInstance) {
+                        this.timelineInstance.events.clear();
+                    }
                     this.timelineInstance = null;
                     break;
 
@@ -308,7 +341,7 @@ class MetaDaw extends FlavorBase {
                 { tag: 'p', html: `Version <code>${this.constructor.version}</code><br>Editor version <code>${app.VERSION}</code><br>LS version <code>${LS.version}</code>` },
                 { tag: 'p', inner: 'A work-in progress intuitive, open and hackable digital audio workstation.' },
                 { tag: 'p', html: `Created with love and hard work by Lukas (<a href='https://lstv.space' target='_blank'>https://lstv.space</a>)<br><br><strong>Credits:</strong><br>Lukas - <span style=color:var(--surface-10)>Programming, engine (platform, audio engine, UI framework), components, design, libraries, artwork</span><br>Chrome and Node.JS authors - <span style=color:var(--surface-10)>Browser APIs & runtime</span>` },
-                { tag: 'p', inner: ['Engine source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }, ".\nActivated license: Preview"] },
+                { tag: 'p', inner: ['Engine source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }] },
             ],
             buttons: [ { label: "Close" } ]
         });
@@ -569,36 +602,56 @@ class MetaDaw extends FlavorBase {
 
         if(this.timelines) this.timelines.clear();
 
-        this.renderingCanvas.remove();
         this.frameScheduler.destroy();
         this.frameScheduler = null;
         super.destroy();
     }
 
     static layoutPresets = {
+        // 'default': {
+        //     title: "Classic",
+        //     direction: 'column',
+        //     category: CATEGORY_NAME,
+        //     inner: [
+        //         // Two horizontal rows
+        //         { type: "tabs", tabs: [
+        //             [
+        //                 { type: 'slot', view: 'AssetManagerView', resize: { width: 350 } },
+        //                 // { type: 'slot', view: 'PianoRollView', resize: { width: 350 } },
+        //                 {
+        //                     direction: 'column',
+        //                     inner: [
+        //                         {
+        //                             direction: 'row',
+        //                             inner: [
+        //                                 { type: 'slot', view: 'TimelineView', resize: { width: "75%" } },
+        //                                 { type: 'slot', view: 'PropertyEditorView' }
+        //                                 // { type: 'slot', view: 'TimelineView' },
+        //                                 // { type: 'slot', view: 'LogsView', resize: { height: 200 } }
+        //                             ], resize: { height: "75%" }
+        //                         },
+        //                         { type: 'slot', view: 'MixerView' }
+        //                     ]
+        //                 }
+        //             ],
+
+        //             [
+        //                 {
+        //                     direction: 'column',
+        //                     inner: [
+        //                         // { type: 'slot', view: 'PropertyEditorView' }
+        //                     ]
+        //                 }
+        //             ]
+        //         ] },
+        //     ]
+        // },
         'default': {
             title: "Classic",
             direction: 'column',
             category: CATEGORY_NAME,
             inner: [
-                // Two horizontal rows
-                { type: "tabs", tabs: [
-                    [
-                        { type: 'slot', view: 'AssetManagerView', resize: { width: 350 } },
-                        {
-                            direction: 'column',
-                            inner: [
-                                { type: 'slot', view: 'TimelineView', resize: { height: "75%" } },
-                                { type: 'slot', view: 'MixerView' }
-                            ]
-                        }
-                    ],
-
-                    [
-                        { type: 'slot', view: 'PianoRollView', resize: { height: "75%" } },
-                        { type: 'slot', view: 'PropertyEditorView' }
-                    ]
-                ] },
+                { type: 'slot', view: 'TimelineView' }
             ]
         }
     }

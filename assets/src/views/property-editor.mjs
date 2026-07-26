@@ -4,7 +4,7 @@ import * as EditorBaseClasses from "../core/base.mjs";
  * Property editor view class
  * A bit of a monolith at the moment
  */
-class PropertyEditorView extends LS.Multipane.View {
+class PropertyEditorView extends LS.View {
     static name = "propertyEditor";
 
     constructor() {

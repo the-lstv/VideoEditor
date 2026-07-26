@@ -58,7 +58,7 @@ const basicSetup = [
 
 LS.completed("codemirror-loaded", [Object.assign(window, { cmBasicSetup: basicSetup, cmState, cmCommands, cmAutocompletion, cmLanguage, cmJavascript, cmView })]);
 
-class EditorView extends LS.Multipane.View {
+class EditorView extends LS.View {
     constructor() {
         super({
             name: "EditorView",
@@ -184,6 +184,7 @@ class EditorView extends LS.Multipane.View {
 
             this.editor.resize(this.container.clientWidth, this.container.clientHeight);
             this.editor.render();
+            this.resizeObserver = resizeObserver;
         });
 
         this.container.append(
@@ -282,12 +283,16 @@ class EditorView extends LS.Multipane.View {
         this.compileBtn.removeEventListener("click", this.handleCompile);
         this.runBtn.removeEventListener("click", this.handleRun);
         events.off("glitter:set-code", this.handleSetCode);
+        if(this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
         this.editor.destroy();
         super.destroy();
     }
 }
 
-class LogsView extends LS.Multipane.View {
+class LogsView extends LS.View {
     constructor() {
         super({
             name: "LogsView",
@@ -337,7 +342,7 @@ class LogsView extends LS.Multipane.View {
     }
 }
 
-class ASTView extends LS.Multipane.View {
+class ASTView extends LS.View {
     constructor() {
         let astTree;
         super({
@@ -486,7 +491,7 @@ class ASTView extends LS.Multipane.View {
     }
 }
 
-class OutputView extends LS.Multipane.View {
+class OutputView extends LS.View {
     constructor() {
         super({
             name: "OutputView",
@@ -535,7 +540,7 @@ class OutputView extends LS.Multipane.View {
     }
 }
 
-class TerminalView extends LS.Multipane.View {
+class TerminalView extends LS.View {
     constructor() {
         super({
             name: "TerminalView",
@@ -561,7 +566,17 @@ class TerminalView extends LS.Multipane.View {
     
             resizeObserver.observe(this.container);
             this.terminal.resize(this.container.clientWidth, this.container.clientHeight);
+            this.resizeObserver = resizeObserver;
         });
+    }
+
+    destroy() {
+        this.terminal.destroy();
+        if(this.resizeObserver) {
+            this.resizeObserver.disconnect();
+            this.resizeObserver = null;
+        }
+        super.destroy();
     }
 }
 

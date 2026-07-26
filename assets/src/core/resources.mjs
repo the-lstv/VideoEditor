@@ -666,7 +666,8 @@ class ResourceManager extends LS.EventEmitter {
      */
     static normalizePath(path, isAbsolute = null) {
         console.log("Normalizing path", path);
-        const isMicroslopShitdows = path.match(/^([a-zA-Z]:)(\/?)/);
+        if(isAbsolute === null) isAbsolute = path.startsWith("/");
+        const isMicroslopShitdows = !!path.match(/^([a-zA-Z]:)(\/?)/);
 
         path = String(path || "").replace(/\\/g, "/").trim();
 
@@ -683,9 +684,8 @@ class ResourceManager extends LS.EventEmitter {
 
         const normalizedPath = normalizedParts.join("/");
 
-        if(isAbsolute === null) isAbsolute = path.startsWith("/");
-        console.log("Normalized path:", (isAbsolute ? (isMicroslopShitdows? "/": "") : "") + normalizedPath, "isAbsolute:", isAbsolute, "isMicroslopShitdows:", isMicroslopShitdows);
-        return (isAbsolute ? (isMicroslopShitdows? "/": "") : "") + normalizedPath;
+        console.log("Normalized path:", (isAbsolute ? (isMicroslopShitdows? "": "/") : "") + normalizedPath, "isAbsolute:", isAbsolute, "isMicroslopShitdows:", isMicroslopShitdows);
+        return (isAbsolute ? (isMicroslopShitdows? "": "/") : "") + normalizedPath;
     }
 }
 

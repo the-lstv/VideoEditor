@@ -3,7 +3,7 @@ import RendererAdapter from "../components/graphics/adapter-base.mjs";
 /**
  * Visual preview view class
  */
-class PreviewView extends LS.Multipane.View {
+class PreviewView extends LS.View {
     static name = "videoPreview";
 
     constructor() {

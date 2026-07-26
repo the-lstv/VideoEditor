@@ -69,7 +69,7 @@ class Project extends LS.Context {
 
     connect(view) {
         if(view.parent) {
-            view.parent?.disconnect(view);
+            view.parent?.disconnect?.(view);
         }
 
         view.parent = this;
@@ -81,13 +81,13 @@ class Project extends LS.Context {
         if(view.onAttached) view.onAttached(this);
 
         view.once("destroy", view.__parentDestroyHandler = () => {
-            this.disconnect(view);
+            this.disconnect(view, true);
         });
 
         return this;
     }
 
-    disconnect(view) {
+    disconnect(view, destroyed = false) {
         if(typeof view === "string") {
             view = this.connectedViews.get(view);
         }
@@ -106,7 +106,7 @@ class Project extends LS.Context {
 
         this.connectedViews.delete(view.constructor.name);
 
-        if(view.onDetached) view.onDetached(this);
+        if(!destroyed && view.onDetached) view.onDetached(this);
 
         view.parent = null;
         view.attachedTo = null;

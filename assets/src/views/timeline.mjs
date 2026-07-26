@@ -2,7 +2,7 @@
  * Timeline view class
  * @see LS.Timeline for the timeline implementation itself
  */
-class TimelineView extends LS.Multipane.View {
+class TimelineView extends LS.View {
     static name = "timeline";
 
     constructor() {
@@ -120,7 +120,7 @@ class TimelineView extends LS.Multipane.View {
             })
         });
 
-        this.timeline = new LS.Timeline({
+        this.timeline = new LS.TimelineGL({
             element: this.container,
             allowAutomationClips: true,
             autoCreateAutomationClips: true,

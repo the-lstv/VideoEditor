@@ -1,7 +1,7 @@
 /**
  * Welcome screen view.
  */
-export default class WelcomeView extends LS.Multipane.View {
+export default class WelcomeView extends LS.View {
     static name = "WelcomeView";
 
     constructor() {

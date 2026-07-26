@@ -17,6 +17,9 @@ import Version from "./utils/version.mjs";
 
 import WelcomeView from "./views/welcome.mjs";
 
+// Experimental
+import { CommandPalette } from "./core/pallete.mjs";
+
 if(!globalThis.LS) {
     alert("Fatal error: LS library is missing or failed to load. This software cannot run without it.");
     throw new Error("LS library is missing");
@@ -24,8 +27,6 @@ if(!globalThis.LS) {
     alert("Fatal error: LS library version is too old. This software requires LS version 6 or higher.");
     throw new Error("LS library is outdated");
 }
-
-const SHOW_WELCOME_SCREEN = true;
 
 // Small miscellaneous helpers
 function selectOrCreate(selector, parent = document.body) { return document.querySelector(selector) || LS.Create({ emmet: selector, parent }) }
@@ -42,6 +43,7 @@ const layoutContainer    = selectOrCreate("#layout-container", appContainer);
 const settingsContent    = selectOrCreate("#preferences-modal");
 const headerContainer    = selectOrCreate("#editor-header");
 const statusBarContainer = selectOrCreate("#editor-footer");
+const palleteOverlay     = selectOrCreate("#topOverlay");
 const undoButton         = selectOrCreate("#undoButton");
 const redoButton         = selectOrCreate("#redoButton");
 
@@ -66,7 +68,8 @@ const app = globalThis.app = {
      */
     enterShade() {
         app.container.classList.remove('loaded');
-        document.querySelector("#logo").classList.remove("jump");
+        const logo = document.querySelector("#logo");
+        logo.classList.remove("jump");
     },
 
     /**
@@ -74,14 +77,13 @@ const app = globalThis.app = {
      */
     leaveShade() {
         app.container.style.display = 'flex';
-        document.querySelector("#logo").classList.add("jump");
-        setTimeout(() => app.container.classList.add('loaded'), 0);
+        setTimeout(() => { document.querySelector("#logo").classList.add("jump"); app.container.classList.add('loaded') }, 0);
     },
 
     /**
      * Sets the application icon/iconSet
      */
-    setIcon(iconSet) {
+    setIcon(iconSet, animate = true) {
         if(typeof iconSet === "string") {
             iconSet = {
                 icon: iconSet
@@ -89,7 +91,14 @@ const app = globalThis.app = {
         }
 
         app.iconSet = iconSet;
-        LS.Select(".flavor-icon, #logo").forEach(el => el.src = el.id === "logo" ? iconSet.icon: iconSet.small || iconSet.favicon || iconSet.icon);
+
+        LS.Select(".flavor-icon, #logo").forEach(el => {
+            el.src = el.id === "logo" ? iconSet.icon: iconSet.small || iconSet.favicon || iconSet.icon;
+            if(animate) {
+                LS.Animation.fadeIn(el, "left");
+                console.log("Animating icon change");
+            }
+        });
     },
 
     /**
@@ -115,25 +124,115 @@ const app = globalThis.app = {
             throw new Error(`Flavor ${flavorClass.name} requires engine version ${requiredVersion}, but current version is ${app.VERSION}`);
         }
 
-        const flavorId = flavorClass.name;
-
-        app.flavor = flavorClass;
-
-        if(flavorClass.layoutPresets?.default) {
-            app.layoutManager.setSchema(flavorClass.layoutPresets.default);
+        try {
+            const flavorId = flavorClass.name;
+    
+            app.flavor = flavorClass;
+    
+            if(flavorClass.layoutPresets?.default) {
+                app.layoutManager.setSchema(flavorClass.layoutPresets.default);
+            }
+    
+            app.currentProject = new Project();
+    
+            if(app.currentProject && app.currentProject.loaded) {
+                throw new Error("The current project is already loaded. The flavor must be set up while loading a project.");
+            }
+        } catch(e) {
+            console.error("Error setting flavor:", e);
+            LS.Modal.alert("Error setting flavor: " + e.message);
+            throw e;
+        } finally {
+            if (typeof options.delay === "undefined" || typeof options.delay === "number") await new Promise(resolve => setTimeout(resolve, options.delay || 250));
+            app.setIcon(flavorClass.iconSet, false);
+            document.querySelector("#app-loading")?.remove?.();
+            app.leaveShade();
         }
 
-        app.currentProject = new Project();
+    },
 
-        if(app.currentProject && app.currentProject.loaded) {
-            throw new Error("The current project is already loaded. The flavor must be set up while loading a project.");
+    /**
+     * @experimental
+     */
+    async dynamicLoadFlavor(flavorName, options = {}) {
+        const flavorPath = (isNode ? __dirname : "") + "/assets/src/flavors/" + flavorName + "/main.mjs";
+        console.log("Loading flavor from", flavorPath);
+
+        if(isNode) {
+            const fs = require("fs");
+            if (!fs.existsSync(flavorPath)) {
+                throw new Error(`Flavor module not found: ${flavorPath}`);
+            }
         }
 
-        await new Promise(resolve => setTimeout(resolve, 250));
-        app.setIcon(flavorClass.iconSet);
-        app.leaveShade();
+        const flavorModule = await import(flavorPath);
+        const flavorClass = flavorModule.default;
+
+        if(!flavorClass) {
+            throw new Error(`Flavor module ${flavorPath} does not export a default class`);
+        }
+
+        return app.setFlavor(flavorClass, options);
+    },
+
+    aboutDialog() {
+        if(app.flavorInstance && app.flavorInstance.onAboutDialog) {
+            app.flavorInstance.onAboutDialog();
+            return;
+        }
+
+        LS.Modal.buildEphemeral({
+            content: [
+                { tag: 'img', src: app.flavorInstance ? app.flavorInstance.icon : document.getElementById('logo').src || 'assets/images/icon.svg', style: 'height: 5em; width: 100%; margin: auto' },
+                { tag: 'h2', inner: app.flavorInstance ? app.flavorInstance.constructor.name : 'LS interface', style: 'text-align: center' },
+                { tag: 'p', inner: `Version ${app.VERSION}, running LS ${LS.version}` },
+                { tag: 'p', inner: ['Created with love and hard work by Lukas (', { tag: 'a', href: 'https://lstv.space', target: '_blank', inner: 'https://lstv.space' }, ')'] },
+                { tag: 'p', inner: ['Source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }] },
+            ],
+            buttons: [ { label: "Close" } ]
+        });
+    },
+
+    /**
+     * @experimental
+     */
+    newWindow() {
+        if(isNode) {
+            app.ipc.send("new-window");
+        } else {
+            window.open(window.location.href, "_blank");
+        }
+    },
+
+    openExternal(url) {
+        if(isNode) {
+            app.ipc.send("open-external", url);
+        } else {
+            window.open(url, "_blank");
+        }
     }
 }
+
+window.app_config = {};
+
+if(isNode) {
+    const fs = require("fs");
+    const path = require("path");
+    const electron = require("electron");
+
+    app.ipc = electron.ipcRenderer;
+
+    const configPath = path.join(__dirname, "config.jsonc");
+    if (fs.existsSync(configPath)) {
+        window.app_config = LS.Util.parseJSONC(fs.readFileSync(configPath, "utf-8"));
+    }
+
+    if(window.app_config?.flavor) {
+        app.dynamicLoadFlavor(window.app_config.flavor, { delay: false });
+    }
+}
+
+const SHOW_WELCOME_SCREEN = (!window.app_config?.flavor) && window.app_config?.welcomeScreen !== false;
 
 // --- Setup welcome screen if enabled
 if(SHOW_WELCOME_SCREEN) {
@@ -154,7 +253,13 @@ LS.i18n.loadLocale({ code: "en", translations: {} });
 LS.i18n.changeLocale(app.config.get("language") || "en");
 
 // --- Workspace initialization
-window.addEventListener('load', () => {
+window.addEventListener('DOMContentLoaded', () => {
+    if(window.app_config && window.app_config.flavor) {
+        // TODO: Don't guess
+        const icon = document.querySelector("#logo");
+        icon.src = "./assets/src/flavors/" + window.app_config.flavor + "/images/icon.svg";
+    }
+
     try {
         // This is the place where the flavor could be set up.
         // Flavor could be determined by project file.
@@ -181,6 +286,9 @@ window.addEventListener('load', () => {
             GLOBAL_NEW_PROJECT: 'ctrl+n',
             GLOBAL_FOCUS_HEADER: 'alt',
             GLOBAL_EXPORT_MENU: 'ctrl+e',
+            GLOBAL_NEW_WINDOW: 'ctrl+shift+n',
+            GLOBAL_OPEN_COMMAND_PALETTE: ['ctrl+shift+p', 'ctrl+k'],
+
             OPEN_PREFERENCES: 'ctrl+,',
             UNDO: 'ctrl+z',
             REDO: [ 'ctrl+shift+z', 'ctrl+y' ],
@@ -192,6 +300,10 @@ window.addEventListener('load', () => {
             TIMELINE_TOOL_PAINT: 'b',
             TIMELINE_TOOL_SLIDE: 's',
             TIMELINE_TOOL_RIPPLE: 'r',
+
+            DEBUG_TOGGLE_DEVTOOLS: 'ctrl+shift+i',
+            DEBUG_HARD_RELOAD: 'ctrl+shift+r',
+            DEBUG_RELOAD: 'ctrl+r',
 
             ...app.config.get('shortcuts') || {} // Custom shortcuts
         });
@@ -225,6 +337,10 @@ window.addEventListener('load', () => {
             // app.currentProject.once('ready', () => {
             //     oldProject.replaceWith(app.currentProject);
             // });
+        });
+
+        app.shortcutManager.assign("GLOBAL_NEW_WINDOW", () => {
+            app.newWindow();
         });
 
         app.shortcutManager.assign("GLOBAL_PAUSE", () => {
@@ -275,6 +391,14 @@ window.addEventListener('load', () => {
             document.querySelector("#editor-header .nav-menu-item").focus();
         });
 
+        app.shortcutManager.assign("GLOBAL_OPEN_COMMAND_PALETTE", () => {
+            if(!app.pallette) {
+                LS.Toast.show("Command palette is not available in this flavor or is still loading.");
+                return;
+            }
+            app.pallette.open();
+        });
+
         app.shortcutManager.assign("UNDO", () => {
             app.currentProject.historyManager.undo();
         });
@@ -294,6 +418,23 @@ window.addEventListener('load', () => {
         app.shortcutManager.assign("TIMELINE_TOOL_ERASE",   () => { app.flavorInstance.timelineInstance.tool = "erase"   });
         app.shortcutManager.assign("TIMELINE_TOOL_PAINT",   () => { app.flavorInstance.timelineInstance.tool = "paint"   });
         app.shortcutManager.assign("TIMELINE_TOOL_SLIDE",   () => { app.flavorInstance.timelineInstance.tool = "slide"   });
+        app.shortcutManager.assign("TIMELINE_TOOL_RIPPLE",  () => { app.flavorInstance.timelineInstance.tool = "ripple"  });
+
+        app.shortcutManager.assign("DEBUG_TOGGLE_DEVTOOLS", () => {
+            if(isNode) {
+                app.ipc.send("toggle-devtools");
+            }
+        });
+
+        app.shortcutManager.assign("DEBUG_HARD_RELOAD", () => {
+            if(isNode) {
+                app.ipc.send("hard-reload");
+            }
+        });
+
+        app.shortcutManager.assign("DEBUG_RELOAD", () => {
+            window.location.reload();
+        });
 
         undoButton.addEventListener('click', () => {
             app.currentProject.historyManager.undo();
@@ -350,6 +491,12 @@ window.addEventListener('load', () => {
 
                 { type: "separator" },
 
+                { text: "Open command palette", icon: "bi-command", action() {
+                    app.shortcutManager.triggerMapping("GLOBAL_OPEN_COMMAND_PALETTE");
+                } },
+
+                { type: "separator" },
+
                 { text: "Set editor theme", items: [
                     { icon: "bi-sun", text: "Light", action() { LS.Color.setTheme('light'); localStorage.setItem("ls-theme", "light"); } },
                     { icon: "bi-moon", text: "Dark", action() { LS.Color.setTheme('dark'); localStorage.setItem("ls-theme", "dark"); } },
@@ -388,7 +535,7 @@ window.addEventListener('load', () => {
                             app.config.set("language", lang.code);
                         },
                     }))
-                },
+                }
             ],
 
             layout: [
@@ -407,38 +554,24 @@ window.addEventListener('load', () => {
 
             help: [
                 { text: "Report bug", action() {
-                    window.open(app.GITHUB_REPO + "/issues?q=state%3Aopen%20label%3Abug");
+                    app.openExternal(app.GITHUB_REPO + "/issues?q=state%3Aopen%20label%3Abug");
                 } },
 
                 { text: "Request feature", action() {
-                    window.open(app.GITHUB_REPO + "/issues?q=state%3Aopen%20label%3Aenhancement");
+                    app.openExternal(app.GITHUB_REPO + "/issues?q=state%3Aopen%20label%3Aenhancement");
                 } },
 
                 { type: "separator" },
 
                 // { text: "Tutorials", action() {
                 //     // ! todo
-                //     window.open();
+                //     app.openExternal("https://example.com/tutorials");
                 // } },
 
                 // { type: "separator" },
 
                 { text: "About", icon: "bi-stars", action() {
-                    if(app.flavorInstance && app.flavorInstance.onAboutDialog) {
-                        app.flavorInstance.onAboutDialog();
-                        return;
-                    }
-
-                    LS.Modal.buildEphemeral({
-                        content: [
-                            { tag: 'img', src: app.flavorInstance ? app.flavorInstance.icon : document.getElementById('logo').src || 'assets/images/icon.svg', style: 'height: 5em; width: 100%; margin: auto' },
-                            { tag: 'h2', inner: app.flavorInstance ? app.flavorInstance.constructor.name : 'LS interface', style: 'text-align: center' },
-                            { tag: 'p', inner: `Version ${app.VERSION}, running LS ${LS.version}` },
-                            { tag: 'p', inner: ['Created with love and hard work by Lukas (', { tag: 'a', href: 'https://lstv.space', target: '_blank', inner: 'https://lstv.space' }, ')'] },
-                            { tag: 'p', inner: ['Source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }] },
-                        ],
-                        buttons: [ { label: "Close" } ]
-                    });
+                    app.aboutDialog();
                 } }
             ]
         };
@@ -456,6 +589,271 @@ window.addEventListener('load', () => {
             }
         }
 
+        const paletteBar = palleteOverlay.querySelector("#commandPaletteBar");
+        const paletteContainer = palleteOverlay.querySelector("#commandPalette");
+        const terminalContainer = palleteOverlay.querySelector("#commandTerminal");
+        const terminalOutput = terminalContainer && terminalContainer.querySelector(".terminal-output");
+
+        const paletteLogger = {};
+
+        const palette = new CommandPalette({
+            wrapperElement: paletteContainer,
+            menuElement: paletteContainer.querySelector(".completion-menu"),
+            iconElement: paletteContainer.querySelector(".command-icon"),
+            textDisplayElement: paletteContainer.querySelector(".command-text"),
+            hintElement: paletteContainer.querySelector(".command-hint"),
+            inputElement: paletteContainer.querySelector(".command-input"),
+            terminalOutput: terminalOutput,
+            fontWidth: 9.6,
+            onClose(){
+                LS.Animation.fadeOut(palleteOverlay, 300, "down");
+            },
+            onOpen(){
+                LS.Animation.fadeIn(palleteOverlay, 300, "up");
+            },
+            logger: paletteLogger,
+        });
+
+        let terminalHidden = true;
+        const terminalObserver = new MutationObserver(() => {
+            const hasContent = terminalOutput.children.length > 0;
+            if (hasContent) {
+                if (terminalHidden) {
+                    LS.Animation.fadeIn(terminalContainer, 200, "up");
+                    terminalHidden = false;
+                }
+            } else {
+                if (!terminalHidden) {
+                    LS.Animation.fadeOut(terminalContainer, 200, "down");
+                    terminalHidden = true;
+                }
+            }
+        });
+
+        paletteLogger.log = palette.log.bind(palette);
+        paletteLogger.warn = palette.log.bind(palette);
+        paletteLogger.error = palette.log.bind(palette);
+        paletteLogger.clear = () => terminalOutput.replaceChildren();
+
+        terminalObserver.observe(terminalOutput, { childList: true });
+
+        app.pallette = palette;
+
+        paletteBar.querySelector(".command-palette-buttons button").addEventListener("click", () => {
+            palette.close();
+        });
+
+        palette.register([
+            {
+                name: "about",
+                icon: "bi-info-circle",
+                description: "Open the about modal",
+                onCalled() {
+                    app.aboutDialog();
+                }
+            },
+
+            {
+                name: "set-accent",
+                icon: "bi-palette2",
+                description: "Set an accent color",
+
+                onCalled(color) {
+                    LS.Color.setAccent(color);
+                },
+
+                inputs: [
+                    { name: "preset", type: "list", list: [ { name: "custom", icon: "bi-palette2", type: "color" }, ...["white","blue","pastel-indigo","lapis","pastel-teal","aquamarine","green","lime","neon","yellow","orange","deep-orange","red","rusty-red","pink","hotpink","purple"].map(accent => ({
+                        name: accent,
+                        icon: `bi-circle-fill`,
+                        accentColor: accent,
+                        value: accent
+                    }))] }
+                ]
+            },
+
+            {
+                name: "set-theme",
+                icon: "bi-palette",
+                description: "Set user theme",
+                onCalled(theme) {
+                    if (theme === "system") {
+                        localStorage.removeItem("ls-theme");
+                        LS.Color.setAdaptiveTheme();
+                    }
+
+                    LS.Color.setTheme(theme);
+                    localStorage.setItem("ls-theme", theme);
+                },
+                inputs: [
+                    {
+                        name: "theme",
+                        type: "list",
+                        list: [
+                            { name: "Light", value: "light", icon: "bi-brightness-high" },
+                            { name: "Dark", value: "dark", icon: "bi-moon" },
+                            { name: "System", value: "system", icon: "bi-laptop" }
+                        ]
+                    }
+                ]
+            },
+
+            {
+                name: "set-language",
+                icon: "bi-translate",
+                description: "Set user language",
+                onCalled(lang) {
+                    if(lang === "volunteer") {
+                        app.openExternal(app.GITHUB_REPO + "/issues?q=state%3Aopen%20label%3Atranslation");
+                        return;
+                    }
+
+                    LS.i18n.changeLocale(lang);
+                    app.config.set("language", lang);
+                },
+                inputs: [
+                    {
+                        name: "language",
+                        type: "list",
+                        list: [
+                            { name: "English", value: "en" },
+                            { name: "Čeština (Czech)", value: "cs" },
+                            { name: "Volunteer to translate", value: "volunteer", icon: "bi-people" },
+                            // { name: "Deutsch (German) (Auto-Translated!)", value: "de" },
+                            // { name: "Español (Spanish) (Auto-Translated!)", value: "es" },
+                            // { name: "Français (French) (Auto-Translated!)", value: "fr" },
+                            // { name: "中文 (Mandarin Chinese) (Auto-Translated!)", value: "zh" }
+                        ]
+                    }
+                ]
+            },
+
+            {
+                name: "switch-flavor",
+                icon: "bi-app",
+                description: "Switch the application flavor",
+
+                onCalled(flavor) {
+                    LS.Modal.confirm("Are you sure you want to switch the flavor? This will close the current one and may cause unsaved changes to be lost.<br><br>Warning: This is very experimental and may cause instability!").then(confirmed => {
+                        if(!confirmed) return;
+                        palette.close();
+                        app.dynamicLoadFlavor(flavor, { delay: 250 }).catch(e => {
+                            console.error("Failed to load flavor:", e);
+                            LS.Modal.alert("Failed to load flavor: " + e.message);
+                        });
+                    });
+                },
+
+                inputs: [
+                    { name: "flavor", type: "list", list: [
+                        // { name: "Default", value: "default" },
+                        { name: "Video Editor", value: "video-editor", icon: "bi-camera-reels" },
+                        { name: "MetaDAW", value: "metadaw", icon: "bi-music-note-list" },
+                        { name: "QuickSand", value: "quicksand", icon: "bi-flower1" },
+                        { name: "Glitter Playground", value: "glitter-playground", icon: "bi-code-slash" },
+                    ] }
+                ]
+            },
+
+            {
+                name: "open-project-manager",
+                icon: "bi-folder2-open",
+                description: "Open the project manager",
+                onCalled() {
+                    app.shortcutManager.triggerMapping("GLOBAL_PROJECT_MANAGER");
+                }
+            },
+
+            {
+                name: "open-preferences",
+                icon: "bi-sliders",
+                description: "Open the preferences modal",
+                onCalled() {
+                    app.shortcutManager.triggerMapping("OPEN_PREFERENCES");
+                }
+            },
+
+            {
+                name: "new-project",
+                icon: "bi-file-earmark-plus",
+                description: "Create a new project",
+                onCalled() {
+                    app.shortcutManager.triggerMapping("GLOBAL_NEW_PROJECT");
+                }
+            },
+
+            {
+                name: "open-project",
+                icon: "bi-folder2-open",
+                description: "Open an existing project",
+                onCalled() {
+                    app.shortcutManager.triggerMapping("GLOBAL_OPEN");
+                }
+            },
+
+            {
+                name: "save-project",
+                icon: "bi-save",
+                description: "Save the current project",
+                onCalled() {
+                    app.shortcutManager.triggerMapping("GLOBAL_SAVE");
+                }
+            },
+
+            {
+                name: "export-project",
+                icon: "bi-box-arrow-up",
+                description: "Export the current project",
+                onCalled() {
+                    app.shortcutManager.triggerMapping("GLOBAL_EXPORT_MENU");
+                }
+            },
+
+            {
+                name: "new-window",
+                icon: "bi-window-plus",
+                description: "Open a new window",
+                onCalled() {
+                    app.shortcutManager.triggerMapping("GLOBAL_NEW_WINDOW");
+                }
+            },
+
+            {
+                name: "echo",
+                alias: ["print"],
+                icon: "bi-chat",
+                description: "Echo input",
+                onCalled(text) { paletteLogger.log(text) },
+                inputs: [
+                    { name: "text", type: "string", description: "Text to echo" }
+                ]
+            },
+
+            {
+                name: "clear",
+                icon: "bi-trash",
+                alias: ["clear-terminal", "cls"],
+                description: "Clear output",
+                onCalled() { paletteLogger.clear() }
+            },
+
+            {
+                name: "close",
+                icon: "bi-x-lg",
+                description: "Close the command palette",
+                onCalled() { palette.close() }
+            },
+
+            isNode && {
+                name: "exit",
+                icon: "bi-x-circle",
+                description: "Exit the application",
+                onCalled() {
+                    window.close();
+                }
+            }
+        ]);
+
     } catch(e) {
 
         console.error(e);
@@ -469,8 +867,10 @@ window.addEventListener('load', () => {
     } finally {
 
         // Remove loading screen
-        document.querySelector("#app-loading").remove();
-        app.leaveShade();
+        if(SHOW_WELCOME_SCREEN) {
+            document.querySelector("#app-loading")?.remove();
+            app.leaveShade();
+        }
 
     }
 });
