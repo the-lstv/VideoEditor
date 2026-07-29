@@ -22,3 +22,7 @@ msdf-atlas-gen
 *.exe
 
 video_proxies
+
+vst3sdk
+
+.use-x11

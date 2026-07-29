@@ -45,7 +45,7 @@ async function main() {
                 url = "https://repo.lstv.space/binaries/msdf-atlas-gen-linux-x64";
                 sum = "360a3f9c333683ba1f50de0d4b772162b13c293a4d8526d6f6db92613551e5f0";
             } else if(process.platform === "win32" && process.arch === "x64") {
-                // Identical to the build from github releases, just extracted from the pointless zip wrapper
+                // Identical to the build from github releases, just extracted from the zip
                 url = "https://repo.lstv.space/binaries/msdf-atlas-gen-win-x64.exe";
                 sum = "e790f0f50bb432bfbe0115b419168d4a8ebfa9a6b78a515a198c3115c2a19bbd";
             } else {
@@ -53,7 +53,7 @@ async function main() {
                 return;
             }
 
-            const filePath = path.join(__dirname, "msdf-atlas-gen");
+            const filePath = path.join(__dirname, "msdf-atlas-gen" + (process.platform === "win32" ? ".exe" : ""));
 
             console.log("Downloading msdf-atlas-gen from", url);
             const curl = spawn("curl", ["-L", url, "-o", filePath]);
@@ -96,12 +96,12 @@ async function main() {
 
     // The charset we support
     const sets = {
-        base:         " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ~",
+        base:         " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~ ¡¢£¤¥¦§¨©ª«¬­®¯°±²³´µ¶·¸¹º»¼½¾¿ÀÁÂÃÄÅÆÇÈÉÊËÌÍÎÏÐÑÒÓÔÕÖ×ØÙÚÛÜÝÞßàáâãäåæçèéêëìíîïðñòóôõö÷øùúûüýþÿ~…",
         diacritics:   "ÁĂẮẶẰẲẴǍÂẤẬẦẨẪÄẠÀẢĀĄÅÃÆǼĆČÇĈĊÐĎĐÉĔĚÊẾỆỀỂỄËĖẸÈẺĒĘƐẼǴĞǦĜĢĠĦĤÍĬÎÏİỊÌỈĪĮĨĴĶĹĽĻĿŁŃŇŅŊÑÓŎÔỐỘỒỔỖÖỌÒỎƠỚỢỜỞỠŐŌǪØǾÕŒÞŔŘŖŚŠŞŜȘẞƏŦŤŢȚÚŬÛÜỤÙỦƯỨỰỪỬỮŰŪŲŮŨẂŴẄẀÝŶŸỴỲỶȲỸŹŽŻáăâäàāąåãæǽćčçĉċðďđéĕěêëėèēęəğǧĝġħĥiıíĭîïìīįĩjȷĵĸlĺľŀłmnńŉňŋñóŏôöòơőōøǿõœþŕřsśšşŝßſŧťúŭûüùưűūģķļņŗţǫǵșțạảấầẩẫậắằẳẵặẹẻẽếềểễệỉịọỏốồổỗộớờởỡợụủứừửữựỵỷỹųůũẃŵẅẁýŷÿỳzźžż",
         extras:       "₿¢¤$₫€ƒ₴₽£₮¥≃∵≬⋈∙≔∁≅∐⎪⋎⋄∣∕∤∸⋐⋱∈∊⋮∎⁼≡≍∹∃∇≳∾⥊⟜⎩⎨⎧⋉⎢⎣⎡≲⋯∓≫≪⊸⊎⨀⨅⨆⊼⋂⋃≇⊈⊉⊽⊴≉∌∉≭≯≱≢≮≰⋢⊄⊅+−×÷=≠><≥≤±≈¬~^∞∅∧∨∩∪∫∆∏∑√∂µ∥⎜⎝⎛⎟⎠⎞%‰﹢⁺≺≼∷≟∶⊆⊇⤖⎭⎬⎫⋊⎥⎦⎤⊢≗∘∼⊓⊔⊡⊟⊞⊠⊏⊑⊐⊒⋆≣⊂≻∋⅀⊃⊤⊣∄∴≋∀⋰⊥⊻⊛⊝⊜⊘⊖⊗⊙⊕↑↗→↘↓↙←↖↔↕↝↭↞↠↢↣↥↦↧⇥↩↪↾⇉⇑⇒⇓⇐⇔⇛⇧⇨⌄⌤➔➜➝➞⟵⟶⟷●○◯◔◕◶◌◉◎◦◆◇◈◊■□▪▫◧◨◩◪◫▲▶▼◀△▷▽◁►◄▻◅▴▸▾◂▵▹▿◃⌶⍺⍶⍀⍉⍥⌾⍟⌽⍜⍪⍢⍒⍋⍙⍫⍚⍱⍦⍎⍊⍖⍷⍩⍳⍸⍤⍛⍧⍅⍵⍹⎕⍂⌼⍠⍔⍍⌺⌹⍗⍌⌸⍄⌻⍇⍃⍯⍰⍈⍁⍐⍓⍞⍘⍴⍆⍮⌿⌷⍣⍭⍨⍲⍝⍡⍕⍑⍏⍬⚇⚠⚡✓✕✗✶@&¶§©®™°′″|¦†ℓ‡№℮␣⎋⌃⌞⌟⌝⌜⎊⎉⌂⇪⌫⌦⌨⌥⇟⇞⌘⏎⏻⏼⭘⏽⏾⌅�˳˷",
         blockSymbols: "▁▂▃▄▅▆▇█▀▔▏▎▍▌▋▊▉▐▕▖▗▘▙▚▛▜▝▞▟░▒▓",
         boxSymbols:   "┌└┐┘┼┬┴├┤─│╡╢╖╕╣║╗╝╜╛╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪━┃┄┅┆┇┈┉┊┋┍┎┏┑┒┓┕┖┗┙┚┛┝┞┟┠┡┢┣┥┦┧┨┩┪┫┭┮┯┰┱┲┳┵┶┷┸┹┺┻┽┾┿╀╁╂╃╄╅╆╇╈╉╊╋╌╍╎╏╭╮╯╰╱╲╳╴╵╶╷╸╹╺╻╼╽╾╿",
-        punct:        ".,:;…!¡?¿·•*⁅⁆#․‾/\\‿(){}[]❰❮❱❯⌈⌊⌉⌋⦇⦈-­–—‐_‚„“”‘’«»‹›‴\"'⟨⟪⟦⟩⟫⟧·;",
+        punct:        ".,:;!¡?¿·•*⁅⁆#․‾/\\‿(){}[]❰❮❱❯⌈⌊⌉⌋⦇⦈-­–—‐_‚„“”‘’«»‹›‴\"'⟨⟪⟦⟩⟫⟧·;",
         numbers:      "0123456789₀₁₂₃₄₅₆₇₈₉⁰¹²³⁴⁵⁶⁷⁸⁹½¼¾↋↊૪",
         cyrillic:     "АБВГДЕЁЖЗИЙКЛМНОПРСТУФХЦЧШЩЪЫЬЭЮЯабвгдеёжзийклмнопрстуфхцчшщъыьэюя",
         greek:        "ΑΒΓΔΕΖΗΘΙΚΛΜΝΞΟΠΡΣΤΥΦΧΨΩαβγδεζηθικλμνξοπρστυφχψω"
@@ -195,16 +195,19 @@ async function main() {
 
     // --- Generate the atlas
 
-    const atlasGenPath = path.join(__dirname, "msdf-atlas-gen");
+    const types = args.type? args.type.split(","): ["msdf"];
+
+    const atlasGenPath = path.join(__dirname, "msdf-atlas-gen" + (process.platform === "win32" ? ".exe" : ""));
     const atlasGenArgs = [
         "--font", fontPath,
-        "--size", "64",
-        "--glyphs", [...glyphs.keys()].join(","),
+        "--size", "32",
+        // "--glyphs", [...glyphs.keys()].join(","),
+        "-allglyphs",
         "--format", "png",
         "--imageout", path.join(outputDir, "atlas.png"),
         "--json", path.join(outputDir, "font.json"),
         "--type", args.type || "msdf",
-        "-pxrange", args.pxrange || "8",
+        "-emrange", args.emrange || "0.1",
     ];
 
     const atlasGen = spawn(atlasGenPath, atlasGenArgs);

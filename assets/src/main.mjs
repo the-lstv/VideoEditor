@@ -2,9 +2,18 @@
  * Main entry point.
  * This is an independent launcher.
  * It doesn't care if you are loading which flavors and how; they can be setup as needed.
+ * 
+ * It manages:
+ * - Global state
+ * - Global shortcuts
+ * - Menus
+ * - Command Palette
+ * - Basic main structure and logic
+ * 
+ * It can't contain any flavor-specific code
  */
 
-// Check if we're running in Electron
+// Check if we're running in Electron/Node.js environment
 window.isNode = typeof process !== "undefined" && process.versions != null && process.versions.node != null;
 
 // --- Core imports
@@ -22,9 +31,11 @@ import { CommandPalette } from "./core/pallete.mjs";
 
 if(!globalThis.LS) {
     alert("Fatal error: LS library is missing or failed to load. This software cannot run without it.");
+    if(isNode) process.exit(1);
     throw new Error("LS library is missing");
 } else if(LS.v < 6) {
     alert("Fatal error: LS library version is too old. This software requires LS version 6 or higher.");
+    if(isNode) process.exit(1);
     throw new Error("LS library is outdated");
 }
 
@@ -33,7 +44,7 @@ function selectOrCreate(selector, parent = document.body) { return document.quer
 function invokeAndReturn(method) { method(); return method }
 
 const config = new ConfigStore();
-
+await config.open();
 
 /**
  * Entry UI elements
@@ -134,10 +145,13 @@ const app = globalThis.app = {
             }
     
             app.currentProject = new Project();
-    
             if(app.currentProject && app.currentProject.loaded) {
                 throw new Error("The current project is already loaded. The flavor must be set up while loading a project.");
             }
+
+            await app.currentProject.loadPromise;
+            await app.flavorInstance?.loadPromise;
+    
         } catch(e) {
             console.error("Error setting flavor:", e);
             LS.Modal.alert("Error setting flavor: " + e.message);
@@ -172,7 +186,7 @@ const app = globalThis.app = {
             throw new Error(`Flavor module ${flavorPath} does not export a default class`);
         }
 
-        return app.setFlavor(flavorClass, options);
+        return await app.setFlavor(flavorClass, options);
     },
 
     aboutDialog() {
@@ -253,7 +267,7 @@ LS.i18n.loadLocale({ code: "en", translations: {} });
 LS.i18n.changeLocale(app.config.get("language") || "en");
 
 // --- Workspace initialization
-window.addEventListener('DOMContentLoaded', () => {
+window.addEventListener('DOMContentLoaded', async () => {
     if(window.app_config && window.app_config.flavor) {
         // TODO: Don't guess
         const icon = document.querySelector("#logo");
@@ -853,6 +867,48 @@ window.addEventListener('DOMContentLoaded', () => {
                 }
             }
         ]);
+
+        if(isNode) {
+            if(app.config.get("linuxWaylandSwitchedToX11")) {
+                if(process.argv.includes("--ozone-platform=x11") && process.env.DISPLAY.startsWith(":")) {
+                    LS.Modal.buildEphemeral({
+                        title: "Switched to X11",
+                        content: "The application should now use X11 instead of Wayland. To switch back to Wayland at any time, delete the <code>.use-x11</code> file in the application directory and restart the application.",
+                        buttons: [
+                            { label: "Okay thanks", onclick() { LS.Modal.closeFromElement(this); app.config.set("linuxWaylandSwitchedToX11", false) } }
+                        ]
+                    }, { closeable: false });
+                } else {
+                    LS.Modal.buildEphemeral({
+                        title: "Failed switching to X11",
+                        content: "The application didn't seem to switch correctly or your environment may not be set up correctly for X11 or have an X server running. Try restarting the application.",
+                        buttons: [
+                            { label: "OK", onclick() { LS.Modal.closeFromElement(this); app.config.set("linuxWaylandSwitchedToX11", false) } }
+                        ]
+                    }, { closeable: false });
+                }
+            } else  if (
+                process.platform === "linux" &&
+                process.env.XDG_SESSION_TYPE === "wayland" &&
+                !process.argv.includes("--ozone-platform=x11")
+            ) {
+                if (!app.config.get("linuxWaylandWarningShown")) {
+                    LS.Modal.buildEphemeral({
+                        title: "Wayland detected",
+                        content: "Hello fellow Wayland user!<br><br>The Pointer Lock API used for things like knobs currently has major issues on Wayland.<br><br>You may experience issues/bugs with certain controls that I sadly have no control over. If you encounter problems, please consider switching to X11.<br><br>You can use the button below to try switching to X11 autoamtically for this app <b>(won't affect your system settings)</b>. If this improves in the future, Wayland will be officially supported again.",
+                        buttons: [
+                            { label: "OK", onclick() { LS.Modal.closeFromElement(this); app.config.set("linuxWaylandWarningShown", true) } },
+                            { label: "Try switching to X11", onclick() {
+                                const fs = require("fs");
+                                fs.writeFileSync(".use-x11", `true`);
+                                app.config.set("linuxWaylandSwitchedToX11", true);
+                                app.ipc.send("restart-app");
+                            } },
+                        ]
+                    }, { closeable: false });
+                }
+            }
+        }
 
     } catch(e) {
 

@@ -27,6 +27,7 @@ import TimelineView         from "../../views/timeline.mjs";
 import MixerView            from "../../views/mixer.mjs";
 import LogsView             from "../../views/logs.mjs";
 import PianoRollView        from "../../views/pianoroll.mjs";
+import PlaybackPanelView    from "../../views/playback-panel.mjs";
 
 import Project from "../../core/project.mjs";
 
@@ -104,26 +105,18 @@ class MetaDaw extends FlavorBase {
         // In general this doesn't do much BUT in high-perf scenarios any detail matters so why not do it
         this.__seekEventRef = this.prepareEvent('seek');
 
-        // The frame scheduler is responsible for scheduling frames to be rendered
-        this.frameScheduler = new LS.Util.FrameScheduler((delta) => {
-            if(delta > 0 && this.timelineInstance) {
-                this.timelineInstance.setSeek(this.timelineInstance.seek + (delta / 1000));
-            }
-
-            this.renderAtTime(this.timelineInstance.seek || 0);
-        }, {
-            deltaTime: true
-        });
-
-        // Limit FPS in the editor (exports can have any framerate)
-        this.frameScheduler.limitFPS(60);
-
         // ! ---- todo: move elsewhere
         // Initialize editor GUI with views for audio editing
         const timelineView = new TimelineView();
         const propertyEditorView = new PropertyEditorView();
         const mixerView = new MixerView();
         const pianoRollView = new PianoRollView();
+        const playbackPanelView = new PlaybackPanelView();
+
+        this.loadPromise = Promise.all([
+            timelineView.loadPromise,
+        ]);
+
         const assetManagerView = new AssetManagerView(null, {
             library: {
                 objects: [
@@ -137,19 +130,21 @@ class MetaDaw extends FlavorBase {
                 ]
             }
         });
-        
+
         this.project.on("ready", () => {
-            app.layoutManager.add(timelineView, assetManagerView, propertyEditorView, mixerView, pianoRollView);
+            app.layoutManager.add(timelineView, assetManagerView, propertyEditorView, mixerView, pianoRollView, playbackPanelView);
             this.project.connect(timelineView);
             this.project.connect(assetManagerView);
             this.project.connect(propertyEditorView);
             this.project.connect(mixerView);
             this.project.connect(pianoRollView);
+            this.project.connect(playbackPanelView);
         });
 
         // Expose some globals for debugging
         window.timelineView = timelineView;
         window.timeline = timelineView.timeline;
+        window.metadaw = this;
         // ! ----
 
         // this.masterAudioOut = null;
@@ -212,7 +207,7 @@ class MetaDaw extends FlavorBase {
                     view.container.appendChild(this.floatingView);
 
                     this.addExternalEventListener(this.timelineInstance, 'duration-changed', (duration) => {
-                        this.emit('duration-changed', [duration]);
+                        this.quickEmit('duration-changed', duration);
                     });
 
                     this.addExternalEventListener(this.timelineInstance, 'item-select', (item) => {
@@ -350,27 +345,48 @@ class MetaDaw extends FlavorBase {
     // --- General setters/getters
 
     get playing() {
+        return this._playing;
     }
 
     set playing(value) {
+        value = !!value;
+
+        this.emit('playing-changed', [value]);
+        this.emit(value? 'play': 'pause');
+
+        // todo
+        this._playing = value;
+
+        console.log("MetaDaw: playing state changed to", value);
     }
 
     get duration() {
+        return this.timelineInstance? this.timelineInstance.duration: 0;
     }
 
     get time() {
+        return this.timelineInstance? this.timelineInstance.seek: 0;
     }
 
     togglePlay() {
+        this.playing = !this.playing;
     }
 
     play() {
+        this.playing = true;
     }
 
     pause() {
+        this.playing = false;
     }
 
     seek(time, moveTimelineView = false) {
+        if(this.timelineInstance) {
+            this.timelineInstance.setSeek(time);
+            if(moveTimelineView) {
+                this.timelineInstance.scrollX = time * this.timelineInstance.zoomX;
+            }
+        }
     }
 
     setTimeline(timelineId) {
@@ -459,14 +475,14 @@ class MetaDaw extends FlavorBase {
                     label: resource.label,
                     start: time,
                     row: row + index,
-                    duration: 1
+                    duration: 1000
                 };
 
                 const isVideo = resource.type === "video";
                 if(resource.type === "image" || isVideo) {
                     const meta = isVideo ? await resource.getVideoMetadata() : await resource.getImageDimensions();
 
-                    if(isVideo) newItem.duration = meta.duration;
+                    if(isVideo) newItem.duration = meta.duration * 1000;
 
                     const viewportWidth = this.flavorConfig.rendererOptions.width || 1280;
                     const viewportHeight = this.flavorConfig.rendererOptions.height || 720;
@@ -503,7 +519,7 @@ class MetaDaw extends FlavorBase {
             const newItem = timeline.cloneItem(event.data.item);
             newItem.start = time;
             newItem.row = row;
-            newItem.duration = newItem.duration || 1;
+            newItem.duration = newItem.duration || 1000;
 
             timeline.add(newItem);
         }
@@ -536,14 +552,14 @@ class MetaDaw extends FlavorBase {
                 label: data.label || resource.name,
                 start: time,
                 row,
-                duration: 1
+                duration: 1000
             };
 
             const isVideo = resource.type === "video";
             if(resource.type === "image" || isVideo) {
                 const meta = isVideo? await resource.getVideoMetadata(): await resource.getImageDimensions();
 
-                if(isVideo) newItem.duration = meta.duration;
+                if(isVideo) newItem.duration = meta.duration * 1000;
 
                 // todo: use w/h
                 // newItem.data.scaleX = meta.width;
@@ -577,7 +593,7 @@ class MetaDaw extends FlavorBase {
                 // todo: handle audio resource
 
                 const meta = await resource.getAudioMetadata();
-                newItem.duration = meta.duration;
+                newItem.duration = meta.duration * 1000;
             }
 
             timeline.add(newItem);
@@ -601,59 +617,62 @@ class MetaDaw extends FlavorBase {
         this.currentTimeline = null;
 
         if(this.timelines) this.timelines.clear();
-
-        this.frameScheduler.destroy();
-        this.frameScheduler = null;
         super.destroy();
     }
 
     static layoutPresets = {
-        // 'default': {
-        //     title: "Classic",
-        //     direction: 'column',
-        //     category: CATEGORY_NAME,
-        //     inner: [
-        //         // Two horizontal rows
-        //         { type: "tabs", tabs: [
-        //             [
-        //                 { type: 'slot', view: 'AssetManagerView', resize: { width: 350 } },
-        //                 // { type: 'slot', view: 'PianoRollView', resize: { width: 350 } },
-        //                 {
-        //                     direction: 'column',
-        //                     inner: [
-        //                         {
-        //                             direction: 'row',
-        //                             inner: [
-        //                                 { type: 'slot', view: 'TimelineView', resize: { width: "75%" } },
-        //                                 { type: 'slot', view: 'PropertyEditorView' }
-        //                                 // { type: 'slot', view: 'TimelineView' },
-        //                                 // { type: 'slot', view: 'LogsView', resize: { height: 200 } }
-        //                             ], resize: { height: "75%" }
-        //                         },
-        //                         { type: 'slot', view: 'MixerView' }
-        //                     ]
-        //                 }
-        //             ],
-
-        //             [
-        //                 {
-        //                     direction: 'column',
-        //                     inner: [
-        //                         // { type: 'slot', view: 'PropertyEditorView' }
-        //                     ]
-        //                 }
-        //             ]
-        //         ] },
-        //     ]
-        // },
         'default': {
             title: "Classic",
             direction: 'column',
             category: CATEGORY_NAME,
             inner: [
-                { type: 'slot', view: 'TimelineView' }
+                // Two horizontal rows
+                { type: "tabs", tabs: [
+                    [
+                        {
+                            direction: 'column',
+                            resize: { width: 350 },
+                            inner: [
+                                { type: 'slot', view: 'PlaybackPanelView', minHeight: 110, resize: { height: 200 } },
+                                { type: 'slot', view: 'AssetManagerView' },
+                            ]
+                        },
+                        {
+                            direction: 'column',
+                            inner: [
+                                {
+                                    direction: 'row',
+                                    inner: [
+                                        { type: 'slot', view: 'TimelineView', resize: { width: "75%" } },
+                                        { type: 'slot', view: 'PropertyEditorView', minWidth: 350 }
+                                        // { type: 'slot', view: 'TimelineView' },
+                                        // { type: 'slot', view: 'LogsView', resize: { height: 200 } }
+                                    ], resize: { height: "75%" }
+                                },
+                                { type: 'slot', view: 'MixerView' }
+                            ]
+                        }
+                    ],
+
+                    [
+                        {
+                            direction: 'column',
+                            inner: [
+                                // { type: 'slot', view: 'PropertyEditorView' }
+                            ]
+                        }
+                    ]
+                ] },
             ]
-        }
+        },
+        // 'default': {
+        //     title: "Classic",
+        //     direction: 'column',
+        //     category: CATEGORY_NAME,
+        //     inner: [
+        //         { type: 'slot', view: 'TimelineView' }
+        //     ]
+        // }
     }
 
     static {

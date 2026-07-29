@@ -4,24 +4,6 @@
  * @license GPL-3.0
  */
 
-/**
- * Command interface
- * Represents a command that can be executed, undone, and redone
- */
-class Command {
-    do() {
-        throw new Error("Command.do() must be implemented");
-    }
-
-    undo() {
-        throw new Error("Command.undo() must be implemented");
-    }
-
-    redo() {
-        this.do();
-    }
-}
-
 
 /**
  * HistoryManager class
@@ -119,10 +101,9 @@ class HistoryManager {
  * Dragstate class
  * Just manages the drag animation for various draggable elements
  */
-
 const dragState = new class DragState extends LS.Util.FrameScheduler {
     constructor() {
-        super((deltaTime, ts) => this.#render(deltaTime, ts), { deltaTime: true });
+        super((deltaTime, ts) => this.#render(deltaTime, ts));
         this.labelElement = LS.Create("span");
         this.iconElement = LS.Create("i");
         this.previewContainer = LS.Create("ls-box.dragging-item-card-preview", { inner: [ this.iconElement, this.labelElement ] });
@@ -229,7 +210,6 @@ function createTip(id, text, target = null) {
 
 
 export {
-    Command,
     HistoryManager,
     dragState,
     createTip

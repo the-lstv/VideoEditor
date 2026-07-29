@@ -643,7 +643,7 @@ class VideoEditor extends FlavorBase {
                     label: resource.label,
                     start: time,
                     row: row + index,
-                    duration: 1
+                    duration: 1000
                 };
 
                 const isVideo = resource.type === "video";
@@ -671,7 +671,7 @@ class VideoEditor extends FlavorBase {
 
                 if(resource.type === "audio") {
                     const meta = await resource.getAudioMetadata();
-                    newItem.duration = meta.duration;
+                    newItem.duration = meta.duration * 1000;
                 }
 
                 timeline.add(newItem);
@@ -687,7 +687,7 @@ class VideoEditor extends FlavorBase {
             const newItem = timeline.cloneItem(event.data.item);
             newItem.start = time;
             newItem.row = row;
-            newItem.duration = newItem.duration || 1;
+            newItem.duration = newItem.duration || 1000;
 
             timeline.add(newItem);
         }
@@ -720,14 +720,14 @@ class VideoEditor extends FlavorBase {
                 label: data.label || resource.name,
                 start: time,
                 row,
-                duration: 1
+                duration: 1000
             };
 
             const isVideo = resource.type === "video";
             if(resource.type === "image" || isVideo) {
                 const meta = isVideo? await resource.getVideoMetadata(): await resource.getImageDimensions();
 
-                if(isVideo) newItem.duration = meta.duration;
+                if(isVideo) newItem.duration = meta.duration * 1000;
 
                 // todo: use w/h
                 // newItem.data.scaleX = meta.width;
@@ -761,7 +761,7 @@ class VideoEditor extends FlavorBase {
                 // todo: handle audio resource
 
                 const meta = await resource.getAudioMetadata();
-                newItem.duration = meta.duration;
+                newItem.duration = meta.duration * 1000;
             }
 
             timeline.add(newItem);

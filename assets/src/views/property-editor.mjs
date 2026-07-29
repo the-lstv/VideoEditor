@@ -141,7 +141,7 @@ function cleanup() {
         this.editorContainer.replaceChildren();
         this.editorContainer.appendChild(this.propertyGroups.general);
 
-        this.animationEditorTreeView.loadData(target.data.animations || []);
+        this.animationEditorTreeView.loadData(target.data?.animations || []);
 
         this.currentTarget = target;
 
@@ -306,9 +306,9 @@ function cleanup() {
                         initialRotationZ = attachment?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationZ") ?? 0;
 
                         if(rotateMode === "3d") {
-                            this.__editAidHandle.cursor = "--ls-timeline-cursor-rotate3d";
+                            this.__editAidHandle.cursor = "--ls-cursor-rotate3d";
                         } else {
-                            this.__editAidHandle.cursor = "--ls-timeline-cursor-move";
+                            this.__editAidHandle.cursor = "--ls-cursor-move";
                         }
                     },
 
@@ -377,7 +377,7 @@ function cleanup() {
                         const baseRotation = attachment?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationZ") ?? 0;
                         this.updateProp("rotationZ", (baseRotation + (evt.deltaY < 0 ? 0.1 : -0.1)) % (Math.PI * 2));
                         this.updateAidPosition();
-                        this.__editAidHandle.cursor = "--ls-timeline-cursor-rotate";
+                        this.__editAidHandle.cursor = "--ls-cursor-rotate";
                     }
                 });
             }
@@ -750,7 +750,7 @@ function cleanup() {
                 if(moveTarget) {
                     switch(moveTarget) {
                         case "position":
-                            this.__valueHandle.cursor = "--ls-timeline-cursor-move";
+                            this.__valueHandle.cursor = "--ls-cursor-move";
                             startValue = [
                                 this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionX") ?? 0,
                                 this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "positionY") ?? 0,
@@ -767,7 +767,7 @@ function cleanup() {
                             break;
                         
                         case "rotation":
-                            this.__valueHandle.cursor = "--ls-timeline-cursor-rotate3d";
+                            this.__valueHandle.cursor = "--ls-cursor-rotate3d";
                             startRotationX = this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationX") ?? 0;
                             startRotationY = this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationY") ?? 0;
                             startRotationZ = this.attachedTo?.renderer?.getSavedNodeProperty?.(this.currentTarget, "rotationZ") ?? 0;

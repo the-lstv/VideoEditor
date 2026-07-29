@@ -47,7 +47,7 @@ class Project extends LS.Context {
         this.config = {};
         this.initialized = false;
 
-        this.init(data);
+        this.loadPromise = this.init(data);
     }
 
     async init(data) {
@@ -293,6 +293,8 @@ class Project extends LS.Context {
 
         this.historyManager.destroy();
         this.config = null;
+
+        this.loadPromise = null;
 
         if(app.currentProject === this) {
             app.currentProject = null;

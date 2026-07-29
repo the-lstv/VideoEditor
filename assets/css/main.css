@@ -905,3 +905,47 @@ pre.log-message {
     border-radius: var(--border-radius);
     box-shadow: 0 10px 20px #00000085, 0 0 0 200px #00000061;
 }
+
+/* Temporary until I learn how to hide the disgusting default outline */
+*:focus-visible {
+    outline: none;
+}
+
+
+/* Playback panel */
+.playback-panel.editor-view {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+}
+
+.preview-seeker {
+    padding: 20px;
+}
+
+.playback-panel-header {
+    padding: 15px 20px;
+    background: var(--surface-n2);
+    border-bottom: 1px solid var(--surface-2);
+    display: flex;
+    align-items: center;
+}
+
+ls-knob[preset=numeric] {
+    corner-shape: superellipse(1.5);
+}
+
+ls-knob[preset=numeric] {
+    border-radius: var(--border-radius-xlarge);
+    /* transition: 0.4s background ease; */
+    background: var(--surface-2);
+}
+
+ls-knob[preset=numeric]:active {
+    background: var(--surface-1);
+    box-shadow: none;
+}
+
+.ls-knob-digit {
+    font-size: large;
+}

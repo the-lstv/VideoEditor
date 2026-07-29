@@ -4,11 +4,9 @@
  * @license GPL-3.0
  */
 
-// const sqlite = require("sqlite");
-
 /**
  * Rough polyfill implementation of ConfigStore class
- * Temporarily using localStorage; in the future, this could be swapped
+ * Temporarily using localStorage; in the future, this should be swapped
  */
 class ConfigStore {
     constructor() {
@@ -29,8 +27,7 @@ class ConfigStore {
     }
 
     // The storage class can implement whatever it needs to await when initalizing here
-    async open() {
-    }
+    async open() {}
 
     set(key, value) {
         this.store.set(key, value);

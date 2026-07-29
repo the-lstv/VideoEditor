@@ -963,8 +963,6 @@ class CommandPalette {
 
     #findCompletions(location = {}, prefix = '') {
         const matches = this.#search(Object.keys(location), prefix, location);
-        console.log('findCompletions', prefix, matches);
-        // return matcśhes;
 
         // Filter out aliases if the canonical command is also in the list
         const canonicalsInList = new Set();

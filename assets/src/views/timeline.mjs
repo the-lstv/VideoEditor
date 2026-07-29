@@ -18,8 +18,8 @@ class TimelineView extends LS.View {
                         class: 'timeline-header controls-bar',
                         inner: [
                             [
-                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-plus-lg" }, tooltip: "Add track", onclick: () => {
-                                    this.timeline.addTrack();
+                                { tag: "button", class: "control-button square clear", inner: { tag: "i", class: "bi-plus-lg" }, tooltip: "More options", onclick: () => {
+                                    
                                 } },
 
                                 { emmet: "hr.vertical" },
@@ -120,11 +120,13 @@ class TimelineView extends LS.View {
             })
         });
 
-        this.timeline = new LS.TimelineGL({
-            element: this.container,
-            allowAutomationClips: true,
-            autoCreateAutomationClips: true,
+        this.timeline = new LS.Timeline({
+            container: this.container,
+            // allowAutomationClips: true,
+            // autoCreateAutomationClips: true,
         });
+
+        this.loadPromise = this.timeline.loadPromise;
 
         const seekEventRef = this.prepareEvent("seek");
         this.timeline.on('seek', time => {
