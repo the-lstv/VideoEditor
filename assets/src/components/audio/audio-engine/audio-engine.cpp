@@ -15,23 +15,24 @@
 using namespace v8;
 
 #include <cstdint>
+#include <iostream>
 
 #include "public.sdk/source/vst/hosting/module.h"
 #include "public.sdk/source/vst/hosting/plugprovider.h"
 #include "public.sdk/source/vst/utility/optional.h"
 
-#include "public.sdk/samples/vst-hosting/audiohost/source/audiohost.h"
-#include "public.sdk/samples/vst-hosting/audiohost/source/platform/appinit.h"
-#include "public.sdk/source/vst/hosting/hostclasses.h"
-#include "public.sdk/source/vst/utility/stringconvert.h"
-#include "base/source/fcommandline.h"
-#include "pluginterfaces/base/funknown.h"
-#include "pluginterfaces/base/fstrdefs.h"
-#include "pluginterfaces/gui/iplugview.h"
-#include "pluginterfaces/gui/iplugviewcontentscalesupport.h"
+// #include "public.sdk/samples/vst-hosting/audiohost/source/audiohost.h"
+// #include "public.sdk/samples/vst-hosting/audiohost/source/platform/appinit.h"
+// #include "public.sdk/source/vst/hosting/hostclasses.h"
+// #include "public.sdk/source/vst/utility/stringconvert.h"
+// #include "base/source/fcommandline.h"
+// #include "pluginterfaces/base/funknown.h"
+// #include "pluginterfaces/base/fstrdefs.h"
+// #include "pluginterfaces/gui/iplugview.h"
+// #include "pluginterfaces/gui/iplugviewcontentscalesupport.h"
 #include "pluginterfaces/vst/ivstaudioprocessor.h"
-#include "pluginterfaces/vst/ivsteditcontroller.h"
-#include "pluginterfaces/vst/vsttypes.h"
+// #include "pluginterfaces/vst/ivsteditcontroller.h"
+// #include "pluginterfaces/vst/vsttypes.h"
 
 using namespace Steinberg;
 using namespace Steinberg::Vst;
@@ -98,15 +99,19 @@ int main() {
 
 int test_loadVST() {
     std::string error;
-    std::string path = "/home/lstv/Downloads/test/metadaw.vst3";
+    std::string path = "/www/projects/metadaw/build/metadaw_artefacts/Release/VST3/metadaw.vst3";
 
     VST3::Hosting::Module::Ptr module = 
         VST3::Hosting::Module::create(path, error);
+
+    std::cout << "Error: " << error << std::endl;
+    
     if (! module)
         return -1;
 
     IPtr<PlugProvider> plugProvider;
-    VST3::Optional<VST3::UID> effectID = std::move(VST3::UID());
+    // VST3::Optional<VST3::UID> effectID = std::move(VST3::UID("0x12345678-0x1234-0x1234-0x123456789abc"));
+    VST3::Optional<VST3::UID> effectID;
     for (auto& classInfo : module->
         getFactory().classInfos())
     {
@@ -124,8 +129,30 @@ int test_loadVST() {
         }
     }
 
-    if (! plugProvider)
+    for (auto& info : module->getFactory().classInfos())
+    {
+        std::cout
+            << "Name: " << info.name()
+            << " Category: " << info.category()
+            << " ID: " << info.ID().toString()
+            << "\n";
+    }
+
+    if (!plugProvider)
+    {
+        std::cout << "No plugin class found\n";
         return -1;
+    }
+
+    if (!plugProvider->initialize())
+    {
+        std::cout << "Plugin initialize failed\n";
+        return -1;
+    }
+
+    std::cout << "Plugin initialized\n";
+
+    // ....
 }
 
 
@@ -135,6 +162,8 @@ int test_loadVST() {
 extern "C" NODE_MODULE_EXPORT void
 NODE_MODULE_INITIALIZER(Local<Object> exports, Local<Value> module, Local<Context> context) {
     Isolate *isolate = Isolate::GetCurrent();
+
+    std::cout << "Initializing Node.js addon" << std::endl;
     
     exports->Set(context, String::NewFromUtf8(isolate, "startAudioEngine").ToLocalChecked(),
         FunctionTemplate::New(isolate, [](const FunctionCallbackInfo<Value>& args) {

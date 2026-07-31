@@ -9,18 +9,27 @@
 #include <stdlib.h>
 #include <stdarg.h>
 #include <string.h>
+#ifdef _WIN32
+#include <io.h>
+#include <stdint.h>
+#else
+#include <glob.h>
+#endif
 
 /* List of platform features */
 #ifdef _WIN32
 #define OS "win32"
+#define PLATFORM "win32"
 #define IS_WINDOWS
 #endif
 #if defined(__linux__) || defined(__linux)
 #define OS "linux"
+#define PLATFORM "linux"
 #define IS_LINUX
 #endif
 #ifdef __APPLE__
 #define OS "darwin"
+#define PLATFORM "mac"
 #define IS_MACOS
 #endif
 
@@ -113,11 +122,11 @@ const char *windows_build_dir(const char *arch) {
 /* Downloads node headers, creates folders */
 void prepare(const char *windows_lib_arch) {
 #ifdef IS_WINDOWS
-    if (run("if not exist dist mkdir dist") || run("if not exist targets mkdir targets") || run("if not exist targets\\node mkdir targets\\node") || run("if not exist targets\\electron mkdir targets\\electron")) {
+    if (run("if not exist dist mkdir dist") || run("if not exist fragments mkdir fragments") || run("if not exist targets mkdir targets") || run("if not exist targets\\node mkdir targets\\node") || run("if not exist targets\\electron mkdir targets\\electron")) {
         return;
     }
 #else
-    if (run("mkdir -p dist") || run("mkdir -p targets") || run("mkdir -p targets/node") || run("mkdir -p targets/electron")) {
+    if (run("mkdir -p dist") || run("mkdir -p fragments") || run("mkdir -p targets") || run("mkdir -p targets/node") || run("mkdir -p targets/electron")) {
         return;
     }
 #endif
@@ -152,10 +161,12 @@ void prepare(const char *windows_lib_arch) {
         run("tar xzf %s --strip-components=1 -C targets/%s/%s", path, versions[i].runtime, versions[i].name);
 
         if(!buildingForElectron) {
+#ifdef IS_WINDOWS
             sprintf(path, "targets/%s/%s/node.lib", versions[i].runtime, versions[i].name);
             if (!exists(path)) {
                 run("curl https://nodejs.org/dist/%s/win-%s/node.lib > targets/%s/%s/node.lib", versions[i].name, windows_lib_arch, versions[i].runtime, versions[i].name);
             }
+#endif
 
             /* v8-fast-api-calls.h is missing from the Node.js header distribution; fetch the matching Node version */
             sprintf(path, "targets/%s/%s/include/node/v8-fast-api-calls.h", versions[i].runtime, versions[i].name);
@@ -176,17 +187,184 @@ void prepare(const char *windows_lib_arch) {
     }
 }
 
+
+const char* source_files[] = {
+    "vst3sdk/base/source/*.cpp",
+    "vst3sdk/pluginterfaces/base/*.cpp",
+    "vst3sdk/public.sdk/source/vst/utility/*.cpp",
+    "vst3sdk/public.sdk/source/vst/vstinitiids.cpp",
+    "vst3sdk/public.sdk/source/main/" PLATFORM "main.cpp",
+    "vst3sdk/public.sdk/source/main/pluginfactory.cpp",
+    "vst3sdk/public.sdk/source/common/commoniids.cpp",
+    "vst3sdk/public.sdk/source/common/commonstringconvert.cpp",
+    "vst3sdk/public.sdk/source/common/threadchecker_" PLATFORM ".cpp",
+    "vst3sdk/public.sdk/source/vst/hosting/module_" PLATFORM ".cpp",
+    "vst3sdk/public.sdk/source/vst/hosting/module.cpp",
+    "vst3sdk/public.sdk/source/vst/hosting/parameterchanges.cpp",
+    "vst3sdk/public.sdk/source/vst/hosting/processdata.cpp",
+    "vst3sdk/public.sdk/source/vst/hosting/connectionproxy.cpp",
+    "vst3sdk/public.sdk/source/vst/hosting/eventlist.cpp",
+    "vst3sdk/public.sdk/source/vst/hosting/pluginterfacesupport.cpp",
+    "vst3sdk/public.sdk/source/vst/hosting/plugprovider.cpp",
+    "vst3sdk/public.sdk/source/vst/hosting/hostclasses.cpp",
+    "vst3sdk/public.sdk/source/vst/hosting/hostdataexchangehandler.cpp"
+};
+
+int source_has_wildcard(const char *source) {
+    return strpbrk(source, "*?") != NULL;
+}
+
+void make_object_name(const char *source, char *object_name, size_t object_name_size) {
+    size_t i;
+    size_t j = 0;
+
+    for (i = 0; source[i] != '\0' && j + 1 < object_name_size; i++) {
+        char c = source[i];
+
+        if (c == '/' || c == '\\' || c == '*' || c == '?') {
+            c = '_';
+        }
+
+        object_name[j++] = c;
+    }
+
+    object_name[j] = '\0';
+}
+
+void compile_vst3_source_unix(char *cpp_compiler, char *cpp_shared, const char *source_file) {
+    if (source_has_wildcard(source_file)) {
+        glob_t matches;
+
+        memset(&matches, 0, sizeof(matches));
+        if (glob(source_file, 0, NULL, &matches) != 0) {
+            printf("No sources matched %s\n", source_file);
+            return;
+        }
+
+        for (size_t i = 0; i < matches.gl_pathc; i++) {
+            char object_name[256];
+
+            make_object_name(matches.gl_pathv[i], object_name, sizeof(object_name));
+
+            char path[256];
+            snprintf(path, sizeof(path), "fragments/%s.o", object_name);
+            if (exists(path)) {
+                printf("Skipping %s since it already exists\n", object_name);
+                continue;
+            }
+
+            run("%s %s %s -o %s", cpp_compiler, cpp_shared, matches.gl_pathv[i], path);
+        }
+
+        globfree(&matches);
+        return;
+    }
+
+    char object_name[256];
+
+    make_object_name(source_file, object_name, sizeof(object_name));
+    char path[256];
+    snprintf(path, sizeof(path), "fragments/%s.o", object_name);
+    if(exists(path)) {
+        printf("Skipping %s since it already exists\n", object_name);
+        return;
+    }
+    run("%s %s %s -o %s", cpp_compiler, cpp_shared, source_file, path);
+}
+
+#ifdef IS_WINDOWS
+void compile_vst3_source_windows(char *cpp_compiler, char *cpp_shared, const char *source_file) {
+    if (source_has_wildcard(source_file)) {
+        char search_pattern[256];
+        char source_prefix[256];
+        struct _finddata_t file_info;
+        intptr_t search_handle;
+        const char *wildcard = strpbrk(source_file, "*?");
+        size_t prefix_len = wildcard ? (size_t)(wildcard - source_file) : strlen(source_file);
+
+        if (prefix_len >= sizeof(source_prefix)) {
+            prefix_len = sizeof(source_prefix) - 1;
+        }
+
+        memcpy(source_prefix, source_file, prefix_len);
+        source_prefix[prefix_len] = '\0';
+
+        snprintf(search_pattern, sizeof(search_pattern), "%s", source_file);
+        for (size_t i = 0; search_pattern[i] != '\0'; i++) {
+            if (search_pattern[i] == '/') {
+                search_pattern[i] = '\\';
+            }
+        }
+
+        search_handle = _findfirst(search_pattern, &file_info);
+        if (search_handle == -1L) {
+            printf("No sources matched %s\n", source_file);
+            return;
+        }
+
+        do {
+            char matched_source[512];
+            char object_name[256];
+
+            snprintf(matched_source, sizeof(matched_source), "%s%s", source_prefix, file_info.name);
+            for (size_t i = 0; matched_source[i] != '\0'; i++) {
+                if (matched_source[i] == '/') {
+                    matched_source[i] = '\\';
+                }
+            }
+            make_object_name(matched_source, object_name, sizeof(object_name));
+            run("%s %s %s /Fo:fragments\\%s.obj", cpp_compiler, cpp_shared, matched_source, object_name);
+        } while (_findnext(search_handle, &file_info) == 0);
+
+        _findclose(search_handle);
+        return;
+    }
+
+    char source_path[256];
+    char object_name[256];
+
+    snprintf(source_path, sizeof(source_path), "%s", source_file);
+    for (size_t i = 0; source_path[i] != '\0'; i++) {
+        if (source_path[i] == '/') {
+            source_path[i] = '\\';
+        }
+    }
+
+    make_object_name(source_path, object_name, sizeof(object_name));
+    run("%s %s %s /Fo:fragments\\%s.obj", cpp_compiler, cpp_shared, source_path, object_name);
+}
+#endif
+
+void build_vst3sdk(char *cpp_compiler, char *cpp_shared, int windows_build) {
+    size_t count = sizeof(source_files) / sizeof(source_files[0]);
+
+    for (size_t i = 0; i < count; i++) {
+#ifdef IS_WINDOWS
+        if (windows_build) {
+            compile_vst3_source_windows(cpp_compiler, cpp_shared, source_files[i]);
+        } else {
+            compile_vst3_source_unix(cpp_compiler, cpp_shared, source_files[i]);
+        }
+#else
+        (void)windows_build;
+        compile_vst3_source_unix(cpp_compiler, cpp_shared, source_files[i]);
+#endif
+    }
+}
+
 /* Build for Unix systems */
 void build(char *compiler, char *cpp_compiler, char *cpp_linker, char *os, const char *arch) {
-    char *cpp_shared = "-pthread" OPT_FLAGS " -c -fPIC -std=c++20 audio-engine.cpp -Ivst3sdk -Ivst3sdk/public.sdk -Ivst3sdk/pluginterfaces -Iinclude";
+    char *cpp_shared = "-pthread" OPT_FLAGS " -c -fPIC -std=c++20 -DRELEASE -Ivst3sdk -Ivst3sdk/public.sdk -Ivst3sdk/pluginterfaces -Iinclude";
+
+    build_vst3sdk(cpp_compiler, cpp_shared, 0);
 
     for (unsigned int i = 0; i < sizeof(versions) / sizeof(struct node_version); i++) {
         if (selected_version && strcmp(versions[i].name, selected_version)) {
             continue;
         }
 
-        run("%s %s -I targets/%s/%s/include/node", cpp_compiler, cpp_shared, versions[i].runtime, versions[i].name);
-        run("%s -pthread -flto %s *.o -std=c++20 -shared %s -o dist/%s_%s_%s_%s.node", cpp_compiler, OPT_FLAGS, cpp_linker, os, arch, versions[i].abi, versions[i].runtime);
+        run("%s %s audio-engine.cpp -I targets/%s/%s/include/node", cpp_compiler, cpp_shared, versions[i].runtime, versions[i].name);
+        run("%s -pthread -flto %s *.o fragments/*.o -std=c++20 -shared %s -o dist/%s_%s_%s_%s.node", cpp_compiler, OPT_FLAGS, cpp_linker, os, arch, versions[i].abi, versions[i].runtime);
 
         if(addon_only || latest_only) {
             break; // Only build for one version
@@ -194,9 +372,14 @@ void build(char *compiler, char *cpp_compiler, char *cpp_linker, char *os, const
     }
 }
 
+#ifdef IS_WINDOWS
 /* Special case for windows (Untested, no idea if it works) */
 void build_windows(char *compiler, char *cpp_compiler, char *cpp_linker, char *os, const char *arch) {
-    char *cpp_shared = "-DWIN32_LEAN_AND_MEAN -O3 -c -std=c++20 audio-engine.cpp -Ivst3sdk -Ivst3sdk/public.sdk -Ivst3sdk/pluginterfaces -Iinclude";
+    char *cpp_shared = "-DWIN32_LEAN_AND_MEAN -O3 -c -std=c++20 -DRELEASE -Ivst3sdk -Ivst3sdk/public.sdk -Ivst3sdk/pluginterfaces -Iinclude";
+
+    run("del /Q *.obj >NUL 2>&1");
+
+    build_vst3sdk(cpp_compiler, cpp_shared, 1);
 
     for (unsigned int i = 0; i < sizeof(versions) / sizeof(struct node_version); i++) {
         if (selected_version && strcmp(versions[i].name, selected_version)) {
@@ -205,16 +388,16 @@ void build_windows(char *compiler, char *cpp_compiler, char *cpp_linker, char *o
 
         // if (!addon_only) {
         // }
-        run("del /Q *.obj >NUL 2>&1");
         run("cl %s /I targets/%s/%s/include/node", cpp_shared, versions[i].runtime, versions[i].name);
 
-        run("link /NOLOGO /DLL /OUT:dist\\%s_%s_%s_%s.node *.obj targets\\%s\\%s\\node.lib", os, arch, versions[i].abi, versions[i].runtime, versions[i].runtime, versions[i].name);
+        run("link /NOLOGO /DLL /OUT:dist\\%s_%s_%s_%s.node *.obj fragments\\*.obj targets\\%s\\%s\\node.lib", os, arch, versions[i].abi, versions[i].runtime, versions[i].runtime, versions[i].name);
 
         if (addon_only || latest_only) {
             break;
         }
     }
 }
+#endif
 
 int main(int argc, char **argv) {
 #ifdef IS_WINDOWS
@@ -257,13 +440,29 @@ int main(int argc, char **argv) {
 #endif
 
     if (!addon_only) {
+        const char *windows_lib_arch = X64;
+
         printf("[Preparing]\n");
-        prepare("x64");
+#ifdef IS_WINDOWS
+        windows_lib_arch = windows_arch_name(arch);
+        if (!windows_lib_arch) {
+            windows_lib_arch = X64;
+        }
+#endif
+        prepare(windows_lib_arch);
     }
     printf("\n[Building]\n");
 
 #ifdef IS_WINDOWS
-    build_windows("cl", "cl", "link", OS, windows_arch_name(arch));
+    {
+        const char *windows_build_arch = windows_arch_name(arch);
+
+        if (!windows_build_arch) {
+            windows_build_arch = X64;
+        }
+
+        build_windows("cl", "cl", "link", OS, windows_build_arch);
+    }
 #else
 #ifdef IS_MACOS
 
