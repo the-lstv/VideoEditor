@@ -1,5 +1,3 @@
-import uws from 'uWebSockets.js';
-
 /**
  * @class Server
  * @description Optional WS/HTTP server responsible for remote controllers, external APIs, and possibly collaboration features at some point.

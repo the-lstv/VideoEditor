@@ -6,32 +6,32 @@
 const fs = require('fs');
 const { app, BrowserWindow, ipcMain, dialog, shell } = require('electron');
 
-if(fs.existsSync(".use-x11")) {
-    // Wayland is still quite (a lot) buggy with input (still in 2026 smh), so we provide a way for users to switch back to X11
-    // Still waiting for the day Wayland is half stable... any day now right
+// if(fs.existsSync(".use-x11")) {
+//     // Wayland is still quite (a lot) buggy with input (still in 2026 smh), so we provide a way for users to switch back to X11
+//     // Still waiting for the day Wayland is half stable... any day now right
 
-    if (
-        process.platform === "linux" &&
-        process.env.XDG_SESSION_TYPE === "wayland" &&
-        !process.argv.includes("--ozone-platform=x11")
-    ) {
-        console.log("Wayland detected. Restarting with X11...");
-        const args = process.argv.slice(1).concat(["--ozone-platform=x11"]);
+//     if (
+//         process.platform === "linux" &&
+//         process.env.XDG_SESSION_TYPE === "wayland" &&
+//         !process.argv.includes("--ozone-platform=x11")
+//     ) {
+//         console.log("Wayland detected. Restarting with X11...");
+//         const args = process.argv.slice(1).concat(["--ozone-platform=x11"]);
 
-        // const { spawn } = require("child_process");
-        // spawn(process.argv[0], args, {
-        //     stdio: "inherit",
-        //     env: process.env,
-        // });
+//         // const { spawn } = require("child_process");
+//         // spawn(process.argv[0], args, {
+//         //     stdio: "inherit",
+//         //     env: process.env,
+//         // });
 
-        // spawn seems to leave the process running even after the app is closed
-        // In general be sure to check if there aren't any hanging electron processes after closing the app, something seems to be doing a poor job at cleaning up
+//         // spawn seems to leave the process running even after the app is closed
+//         // In general be sure to check if there aren't any hanging electron processes after closing the app, something seems to be doing a poor job at cleaning up
 
-        app.relaunch({ args });
-        app.exit(0);
-        process.exit(0);
-    }
-}
+//         app.relaunch({ args });
+//         app.exit(0);
+//         process.exit(0);
+//     }
+// }
 
 // For selfsigned certificates (only relevant for development where i use a local LS server)
 app.commandLine.appendSwitch('ignore-certificate-errors');

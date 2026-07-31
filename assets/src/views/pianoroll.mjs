@@ -20,14 +20,25 @@ uniform vec2 timeSignature;
 uniform vec2 gridSize;
 uniform float contrast;
 
+uniform vec2 selectionRange;
+uniform uvec3 accentColor;
+uniform uvec3 backgroundColor;
+
 uniform float sidebarWidth;
 uniform float labelBarHeight;
 
-in vec2 vUV;
+in vec2 uv;
 out vec4 fragColor;
 
-vec3 drawPiano(vec2 uv)
-{
+void applyElevation(vec3 baseColor, float elevation) {
+    if(elevation < 1.0) {
+        fragColor = vec4(mix(baseColor, vec3(0.0), (1.0 - elevation) * contrast), 1.0);
+    } else {
+        fragColor = vec4(mix(baseColor, vec3(1.0), (elevation - 1.0) * contrast), 1.0);
+    }
+}
+
+vec3 drawPiano(vec2 uv) {
     float keyHeight = gridSize.y * zoom.y;
 
     // White key index
@@ -48,7 +59,7 @@ vec3 drawPiano(vec2 uv)
 
     float x = uv.x / sidebarWidth;
 
-    float blackWidth = 0.62;
+    float blackWidth  = 0.62;
     float blackHeight = 0.85;
 
     bool drawBlack = false;
@@ -65,92 +76,96 @@ vec3 drawPiano(vec2 uv)
             drawBlack = true;          // A#
     }
 
-    if (drawBlack)
-        color = vec3(0.2);
-
+    if (drawBlack) color = vec3(0.2);
     return mix(vec3(color), vec3(uv.x / (sidebarWidth - 10.0)), 0.2 * contrast);
 }
 
 void main() {
-    // Here we have the coordinates of the current pixel
-    vec2 uv = vUV * resolution;
+    const float borderWidth = 2.0;
 
-    // Flip the y-axis so that 0,0 is at the top left
-    uv.y = resolution.y - uv.y;
-    
+    float offsetY = uv.y + offset.y;
+    float offsetX = uv.x + offset.x;
+    float rowHeight = gridSize.y * zoom.y;
+    float columnWidth = gridSize.x * zoom.x;
+
+    vec3 backgroundColor = vec3(backgroundColor) / 255.0;
+    vec3 accentColor = mix(vec3(accentColor) / 255.0, backgroundColor, 0.2);
+
+    bool isSelected = uv.x >= selectionRange.x && uv.x <= selectionRange.y;
+
     if(uv.y < labelBarHeight) {
-        if(uv.y > labelBarHeight - 2.0) {
-            fragColor = vec4(vec3(0.2), 0.8 * contrast);
-            return;
-        }
-
-        // Draw the top bar area
-        fragColor = vec4(vec3(0.05), 0.8 * contrast);
+        fragColor = vec4(mix(isSelected? accentColor: backgroundColor, vec3(1.0), ((uv.y > labelBarHeight - borderWidth || (uv.x < sidebarWidth && uv.x > sidebarWidth - borderWidth))? 0.2: 0.0) * contrast), 1.0);
         return;
     }
+
+    float elevation = 1.0;
 
     if(uv.x < sidebarWidth) {
-        if(uv.x > sidebarWidth - 2.0) {
-            fragColor = vec4(vec3(0.0), 0.8 * contrast);
+        if(uv.x > sidebarWidth - borderWidth) {
+            applyElevation(backgroundColor, 1.2);
             return;
         }
 
-        float mixFactor = 1.0;
         if(uv.x > sidebarWidth - 4.0) {
-            mixFactor = 1.0 - (uv.x - (sidebarWidth - 4.0)) * 0.25;
+            elevation = 0.8;
         }
 
-        vec3 pianoColor = drawPiano(uv);
-
-        fragColor = vec4(mix(vec3(0.0), pianoColor, mixFactor), 1.0);
+        fragColor = vec4(drawPiano(uv), 1.0);
         return;
     }
 
+    vec3 baseColor = backgroundColor;
+    if(isSelected) {
+        baseColor = mix(baseColor, accentColor, 0.5);
+    }
+
+    // TODO: account properly
+    float segmentHighlight = 0.0;
+    float segmentWidth = ((1024.0 * 2.0) * timeSignature.x) * zoom.x;
+    if(segmentWidth > 1.0) {
+        float cell = offsetX * 1.0 / (segmentWidth);
+        float factor = segmentWidth > 32.0? 1.0: segmentWidth * (1.0/32.0);
+        segmentHighlight = step(0.5, fract(cell)) * 0.2 * factor;
+    }
+
+    elevation -= segmentHighlight;
+
+    // Rows
+    float row = offsetY * 1.0 / (2.0 * rowHeight);
+    elevation -= step(0.5, fract(row)) * (segmentHighlight > 0.0? 0.1: 0.2);
+
     // Lines
-    if(mod(uv.y + offset.y, gridSize.y * zoom.y) < 1.0 || uv.x < sidebarWidth + 1.0) {
-        float keyHeight = gridSize.y * zoom.y;
-        float posY = (uv.y + offset.y) * (1.0 / keyHeight);
+    if(mod(offsetY, rowHeight) < 1.0 || uv.x < sidebarWidth + 1.0) {
+        float posY = offsetY * (1.0 / rowHeight);
         float gIndexY = floor(posY);
         float note = floor(mod(gIndexY, 12.0));
+
+        elevation = 0.5;
+
         float factor = 0.6;
 
         if(note == 0.0 || note == 7.0) {
             factor = 1.0;
         }
 
-        fragColor = vec4(0.0, 0.0, 0.0, factor * contrast);
-        return;
+        elevation = factor;
     }
 
-    if(mod(uv.x + offset.x, gridSize.x * zoom.x) < 1.0 || uv.x < sidebarWidth + 1.0) {
-        float factor = 0.6;
+    if(mod(offsetX, columnWidth) < 1.0 || uv.x < sidebarWidth + 1.0) {
+        elevation = 0.6;
 
         // if we are on a bar line, make it more visible
-        if(mod(uv.x + offset.x, gridSize.x * zoom.x * timeSignature.x) < 1.0) {
-            factor = 1.0;
+        if(mod(offsetX, columnWidth * timeSignature.x) < 1.0) {
+            elevation = 0.1;
         }
-
-        fragColor = vec4(0.0, 0.0, 0.0, factor * contrast);
-        return;
     }
 
-    // fract = modulo 1
-
-    // Segments
-    float cell = (uv.x + offset.x) * 1.0 / (64.0 * gridSize.x * zoom.x);
-    float segmentHighlight = step(0.5, fract(cell)) * 0.5;
-
-    // Rows
-    float row = (uv.y + offset.y) * 1.0 / (2.0 * gridSize.y * zoom.y);
-    float rowHighlight = step(0.5, fract(row)) * (segmentHighlight > 0.0 ? 0.2 : 0.5);
-
-    fragColor = vec4(0.0, 0.0, 0.0, (segmentHighlight + rowHighlight) * contrast);
-}
-            `,
+    applyElevation(baseColor, elevation);
+}`,
             itemFragment: `#version 300 es
 precision highp float;
 
-in float v_size;
+in vec2 size;
 in vec3 v_color;
 in vec2 v_uv;
 in vec2 v_position;
@@ -167,9 +182,6 @@ float roundedBoxSDF(vec2 CenterPosition, vec2 Size, float Radius) {
 }
 
 void main() {
-    // Apply non-uniform zoom
-    vec2 size = vec2(v_size, rowHeight) * zoom;
-
     float d = roundedBoxSDF((v_uv - 0.5) * size, size * 0.5, 4.0);
 
     float aa = fwidth(d); // Anti-aliasing factor
@@ -226,7 +238,8 @@ void main() {
 }
 
 /**
- * Hardware-accelerated piano roll view class
+ * Piano roll view class (as a standalone view)
+ * Normally it can be integrated into a timeline view to save resources
  * @experimental
  */
 export default class PianoRollView extends LS.View {
@@ -245,11 +258,6 @@ export default class PianoRollView extends LS.View {
         });
     }
 
-    setNotes(notes) {
-        this.items = notes;
-        this.pianoRoll.renderer.render();
-    }
-
     destroy() {
         if (this.destroyed) return;
         this.pianoRoll.destroy();
@@ -257,11 +265,3 @@ export default class PianoRollView extends LS.View {
         super.destroy();
     }
 }
-
-// document.head.appendChild(document.createElement("style")).textContent = `
-// canvas.ls-draggable {
-//     transform: scale(7.5) translate(-50px, -10px);
-//     transform-origin: top left;
-//     image-rendering: pixelated;
-// }
-// `;

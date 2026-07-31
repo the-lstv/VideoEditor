@@ -18,8 +18,6 @@
 
 import FlavorBase from "../../core/flavor.mjs";
 
-import AudioRenderer from "../../components/audio/index.mjs";
-
 // --- Views
 import { AssetManagerView } from "../../views/asset-manager.mjs";
 import PropertyEditorView   from "../../views/property-editor.mjs";
@@ -33,6 +31,8 @@ import Project from "../../core/project.mjs";
 
 import { Variable, mappingCompiler } from "../../core/variable.mjs";
 import { ResourceManager, Resource } from "../../core/resources.mjs";
+
+import * as AudioEngine from "../../components/audio/index.mjs";
 
 const { webUtils } = typeof require !== "undefined" ? require("electron") : {};
 
@@ -62,6 +62,8 @@ function scanPlugins(params) {
 // --- Digital Audio Workstation flavor
 class MetaDaw extends FlavorBase {
     static name = "metadaw";
+
+    AudioEngine = AudioEngine;
 
     static iconSet = {
         icon: 'assets/src/flavors/metadaw/images/icon.svg',

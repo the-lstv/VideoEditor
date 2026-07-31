@@ -1,0 +1,11 @@
+CompileFlags:
+  Add:
+    # - "-xc++"
+    - "-std=c++20"
+    # - "--include-directory=assets/src/components/audio/audio-engine/targets/electron/v43.0.0/include/node"
+    # - "-Iassets/src/components/audio/audio-engine/targets/electron/v43.0.0/include/node"
+    - "--include-directory=/www/projects/VideoEditor/assets/src/components/audio/audio-engine/targets/electron/v43.0.0/include/node"
+    - "--include-directory=/www/projects/VideoEditor/assets/src/components/audio/audio-engine/vst3sdk"
+    - "--include-directory=/www/projects/VideoEditor/assets/src/components/audio/audio-engine/vst3sdk/public.sdk"
+    - "--include-directory=/www/projects/VideoEditor/assets/src/components/audio/audio-engine/vst3sdk/pluginterfaces"
+    - "--include-directory=/www/projects/VideoEditor/assets/src/components/audio/audio-engine/include"

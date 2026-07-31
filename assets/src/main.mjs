@@ -694,6 +694,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                     if (theme === "system") {
                         localStorage.removeItem("ls-theme");
                         LS.Color.setAdaptiveTheme();
+                        return;
                     }
 
                     LS.Color.setTheme(theme);

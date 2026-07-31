@@ -26,3 +26,11 @@ video_proxies
 vst3sdk
 
 .use-x11
+
+# Build artifacts
+*.out
+*.o
+*.gz
+targets
+
+build

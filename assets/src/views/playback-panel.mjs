@@ -140,16 +140,16 @@ export default class PlaybackPanel extends LS.View {
         this.addExternalEventListener(attachment, 'playing-changed', (playing) => this.#updatePlay(playing));
     }
 
-    #formatTime(seconds, decisecond = false) {
-        if(isNaN(seconds) || !isFinite(seconds)) return "0:00";
+    #formatTime(ms, decisecond = false) {
+        if(isNaN(ms) || !isFinite(ms)) return "0:00";
         
-        const totalSeconds = Math.floor(seconds);
+        const totalSeconds = Math.floor(ms / 1000);
         const mins = Math.floor(totalSeconds / 60);
         const secs = totalSeconds % 60;
         let timeString = mins + ":" + (secs < 10 ? "0" : "") + secs;
 
         if(decisecond) {
-            const ds = Math.floor((seconds - totalSeconds) * 10);
+            const ds = Math.floor((ms - totalSeconds * 1000) / 100);
             timeString += "." + ds;
         }
 
