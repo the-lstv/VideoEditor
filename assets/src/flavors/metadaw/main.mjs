@@ -50,7 +50,10 @@ function scanPlugins(params) {
 
         // Linux
         "~/.vst3",
-        "~/.clap",
+        // "~/.clap",
+        // "~/.lv2",
+        // "~/.vst",
+        // "~/.vst2",
         "/usr/lib/vst3",
 
         // User-defined
@@ -75,7 +78,16 @@ class MetaDaw extends FlavorBase {
     static version = "0.0.1-alpha";
 
     async #init() {
-        
+    }
+    
+    static async prepare() {
+        try {
+            await AudioEngine.Engine.userInitializeEngine();
+        } catch(e) {
+            console.error("MetaDaw: Failed to initialize audio engine:", e);
+            return e.message || e.toString() || "Unknown error";
+        }
+        return true;
     }
 
     #getFilePath(file) {
@@ -143,10 +155,17 @@ class MetaDaw extends FlavorBase {
             this.project.connect(playbackPanelView);
         });
 
+        window.AudioEngine = AudioEngine;
+
+        this.engine = new AudioEngine.Engine({
+            start: true,
+        });
+
         // Expose some globals for debugging
         window.timelineView = timelineView;
         window.timeline = timelineView.timeline;
         window.metadaw = this;
+        window.engine = this.engine;
         // ! ----
 
         // this.masterAudioOut = null;
@@ -358,6 +377,12 @@ class MetaDaw extends FlavorBase {
 
         // todo
         this._playing = value;
+
+        if(value) {
+            this.engine.start();
+        } else {
+            this.engine.stop();
+        }
 
         console.log("MetaDaw: playing state changed to", value);
     }

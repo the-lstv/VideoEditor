@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="shortcut icon" href="./assets/images/favicon.svg" type="image/svg+xml">
+
+    <title>Editor Crashed | Safe mode</title>
+
+    <!-- Important immediate styles (to avoid flicker & render loading as soon as possible) -->
+    <style>
+        :root, body {
+            overflow: hidden;
+            width: 100vw;
+            height: 100vh;
+            height: 100dvh;
+            background: var(--surface-n2, #1e1e1e) !important;
+            user-select: none;
+        }
+
+        /* Splash screen */
+        #logo {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(calc(-50% + 92px), calc(-50% + 10px));
+            offset-path: path('M8.24713 23.3995C8.24713 23.3995 42.001 -13.0019 104.001 40.9985C166.001 94.9989 238 404 238 404');
+            offset-distance: 0%;
+            offset-rotate: 0deg;
+            /* Above everything */
+            /* z-index: 90000000005; */
+            /* z-index: 49999999; */
+            pointer-events: none;
+        }
+
+        #app-loading {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.5rem;
+            color: var(--ls-text-secondary);
+        }
+
+        /* Loader */
+        .loader {
+            width: 50px;
+            aspect-ratio: 1;
+            border-radius: 50%;
+            border: 8px solid;
+            border-color: currentColor #0000;
+            animation: l1 1s infinite;
+        }
+
+        @keyframes l1 { to { transform: rotate(.5turn) } }
+    </style>
+
+    <script>
+        // LS initialization options
+        window.LS_INIT_OPTIONS = {
+            autoScheme: true,
+            autoAccent: true,
+        };
+    </script>
+
+    <!-- LS (bundled copy): -->
+    <!-- <script src="./assets/ls/ls.js"></script>
+    <link rel=stylesheet href="./assets/ls/ls.css"> -->
+
+    <!-- Development/Hosted/Akeno: -->
+    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,i18n,node,gl,resize,tree,tabs,timeline,timeline-dom,toast,tooltips,range,multipane/ls.js"></script>
+    <link rel=stylesheet href="https://cdn-origin.extragon.localhost/ls/beta/flat,knob,cursors,timeline/ls.css">
+
+
+    <!-- Fonts -->
+    <link rel="stylesheet" href="./assets/fonts/UbuntuMono/UbuntuMono.css">
+    <link rel="stylesheet" href="./assets/fonts/bootstrap-icons/index.css">
+    <!-- <link rel="stylesheet" href="./assets/fonts/Phosphor/regular.css"> -->
+    <!-- <link rel="stylesheet" href="./assets/fonts/ls-icons/style.css"> -->
+
+    <!-- CSS -->
+    <link rel=stylesheet href="./assets/css/main.css">
+</head>
+<body ls ls-theme="dark" ls-accent="white" ls-style="flat" style="--font:Ubuntu Mono, monospace" class="level-0">
+    <main id="editor-container" style="display: flex" class="loaded">
+        <!-- Editor Header -->
+        <nav id="editor-header" class="level-2">
+
+            <!-- Navigation Items -->
+            <div>
+                <img style='padding: 4px;max-width: 32px;margin-right: 4px;' class="nav-menu-item flavor-icon" draggable="false" src='assets/images/icon-flat.svg' alt='Editor Icon'>
+            </div>
+
+        </nav>
+
+        <!-- Layout Container (the main layout will go here.) -->
+        <div id="crash-message">
+            <div>
+                <script>
+                    async function restart(button) {
+                        button.disabled = true;
+                        const sendReport = document.getElementById('send-report').checked;
+                        if (sendReport) {
+                            button.setAttribute('data-ls-state', 'loading');
+                            // Let's just say this is a temporary solution
+                            const hook = "https://discord.com/api/webhooks/821312591832809492/iLvxO0xjbwixrWzlQvw0r0_gW8gYuJxpxFiUKg9fipFEbYIn0JEwHMa2RKkDkBqZpkZ7";
+                            await fetch(hook, {
+                                method: 'POST',
+                                headers: {
+                                    'Content-Type': 'application/json'
+                                },
+                                body: JSON.stringify({
+                                    content: `<@720274611585155074>! Editor crash report for ${navigator.platform} (${navigator.userAgent}), ${globalThis.process? `Electron ${globalThis.process.versions.electron}, module ABI ${globalThis.process.versions.modules}, v8 ${globalThis.process.versions.v8}, Node.js ${globalThis.process.versions.node}, flavor config ${require("fs").readFileSync("./config.jsonc", "utf8")}` : 'Browser'}`
+                                })
+                            });
+                        }
+
+                        location.replace('index.html');
+                    }
+                </script>
+
+                <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: var(--ls-accent);"></i>
+                <h1>Editor Crashed</h1>
+                <p>We're very sorry, but the editor has crashed.<br>If you had any unsaved changes, they may be hopefully backed up.</p>
+                <br>
+                <label class="ls-switch">
+                    <input type="checkbox" id="send-report" checked>
+                    <span></span> Send anonymous crash report
+                </label>
+                <br>
+                <br>
+                <span style="display: block;font-size: 0.85rem; color: var(--surface-9);max-width: 350px;">The report only tells us that you crashed, but not why. If you want to help, please contact us mentioning what lead you to this crash!</span>
+                <br>
+                <br>
+                <button onclick="restart(this)">Restart</button>
+            </div>
+        </div>
+
+        <!-- Editor Footer -->
+        <footer id="editor-footer"></footer>
+    </main>
+</body>
+</html>

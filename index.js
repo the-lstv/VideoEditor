@@ -68,7 +68,7 @@ function createWindow(options = {}) {
         webPreferences: {
             contextIsolation: false,
             nodeIntegration: true,
-            sandbox: false // I am a trusted developer trust me
+            sandbox: false
         },
 
         icon: options.icon || (process.platform === "win32" ? path.join(__dirname, ICON_BASE + "/favicon.ico") : path.join(__dirname, ICON_BASE + "/favicon.png")),
@@ -80,6 +80,14 @@ function createWindow(options = {}) {
 
     window.loadFile('index.html');
     window.removeMenu(); // We have our own
+
+    window.webContents.on("render-process-gone", (event, details) => {
+        console.error("Renderer crashed:", details);
+
+        if (details.reason === "crashed") {
+            window.loadFile('crash.html');
+        }
+    });
 
     window.once("ready-to-show", () => {
         window.show();

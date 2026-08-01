@@ -25,7 +25,7 @@ class Engine {
             const { path, exists } = Engine.getEnginePath();
             if(!exists) {
                 // We could try to download the prebuilt binary here later
-                throw new Error('AudioEngine supports only Node.js versions 20, 22, 24 and 26 on (glibc) Linux, macOS and Windows, on Tier 1 platforms (https://github.com/nodejs/node/blob/master/BUILDING.md#platform-list).\n\n' + e.toString());
+                throw new Error('AudioEngine supports only Node.js versions 20, 22, 24 and 26 or Electron 43.2.0 on (glibc) Linux, macOS and Windows, on Tier 1 platforms (https://github.com/nodejs/node/blob/master/BUILDING.md#platform-list).');
             }
 
             Engine.audioEngine = require(path);
@@ -47,16 +47,20 @@ class Engine {
             name = process.platform + '_' + process.arch + '_' + process.versions.modules + '_electron.node';
         }
 
-        const exists = fs.existsSync(name);
+        const path = __dirname + 'audio-engine/dist/' + name;
+        const exists = fs.existsSync(path);
 
-        return { path: __dirname + '/audio-engine/dist/' + name, name, exists };
+        return { path, name, exists };
     }
 
     static async userInitializeEngine(skipConfirmation = false) {
         const { path, exists, name } = Engine.getEnginePath();
 
+        // The only official source
+        const SOURCE = "https://repo.lstv.space/";
+
         if(!Engine.audioEngine && !exists) {
-            const downloadAllowed = skipConfirmation || await LS.Modal.confirm('The audio engine needed for this application is not present. Do you want to download it for your system now?', {
+            const downloadAllowed = skipConfirmation || await LS.Modal.confirm('The audio engine needed for this application is not present. Do you want to download it for your system now?<br><br>Debug info:<br><code>' + name + path + '</code>', {
                 title: 'Download AudioEngine?'
             });
 
@@ -75,7 +79,7 @@ class Engine {
                 await new Promise(resolve => {
                     try {
                         const xmlHTTP = new XMLHttpRequest();
-                        xmlHTTP.open('GET', 'https://run.lstv.space/binaries/metadaw-audio-engine/' + name, true);
+                        xmlHTTP.open('GET', SOURCE + 'binaries/metadaw-audio-engine/' + name, true);
                         xmlHTTP.responseType = 'arraybuffer';
     
                         xmlHTTP.onprogress = (event) => {
@@ -100,7 +104,7 @@ class Engine {
                             } else {
                                 LS.Modal.buildEphemeral({
                                     title: 'Download failed',
-                                    content: 'Failed to download AudioEngine binary.<br>HTTP status: ' + xmlHTTP.status + '.<br><br>File needed: <b>' + name + '</b><br><br>Make sure that you are connected to the internet and that your system and environment is supported. A build needs to be available on <a href="https://run.lstv.space/binaries/metadaw-audio-engine/" target="_blank">https://run.lstv.space</a>.<br><br>If contacting support, please provide the above file name.',
+                                    content: 'Failed to download AudioEngine binary.<br>HTTP status: ' + xmlHTTP.status + '.<br><br>File needed: <b>' + name + '</b><br><br>Make sure that you are connected to the internet and that your system and environment is supported. A build needs to be available on <a href="' + SOURCE + '" target="_blank">' + SOURCE + '</a>.<br><br>If contacting support, please provide the above file name.',
                                     buttons: [
                                         { label: 'Retry', class: "elevated", onClick: (e) => { LS.Modal.closeFromElement(e.target); Engine.userInitializeEngine(true).then(() => { resolve(); }); } },
                                         { label: 'OK', onClick: (e) => { LS.Modal.closeFromElement(e.target); resolve(); } }
@@ -122,12 +126,37 @@ class Engine {
     }
 
     constructor(options = {}) {
-        Engine.loadEngine();
+        const AudioEngine = Engine.loadEngine();
+        if(!AudioEngine) {
+            throw new Error('AudioEngine: The native addon could not be loaded. Make sure you are using a supported Node.js version.');
+        }
 
-        this.audioEngine = null;
+        this.runtime = new AudioEngine.EngineRuntime();
 
         this.sampleRate = options.sampleRate || 44100;
         this.bufferSize = options.bufferSize || 512;
+
+        this.createSharedMemory();
+
+        if(options.start) {
+            this.runtime.start(this.sampleRate, this.bufferSize);
+        }
+    }
+
+    start() {
+        this.runtime.start(this.sampleRate, this.bufferSize);
+    }
+
+    stop() {
+        this.runtime.stop();
+    }
+
+    createSharedMemory() {
+        this.sharedBufferSize = this.runtime.getSharedBufferSize();
+        this.sharedBuffer = new ArrayBuffer(this.sharedBufferSize);
+        this.runtime.attachBuffer(this.sharedBuffer);
+        this.byteView = new Uint8Array(this.sharedBuffer);
+        this.floatView = new Float32Array(this.sharedBuffer);
     }
 };
 

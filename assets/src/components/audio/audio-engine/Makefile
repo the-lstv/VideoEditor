@@ -1,9 +1,9 @@
 default:
 	$(CC) build.c -o build$(EXEEXT)
 ifeq ($(OS),Windows_NT)
-	build.exe --electron $(ARGS)
+	build.exe $(ARGS)
 else
-	./build --electron $(ARGS)
+	./build $(ARGS)
 endif
 # upload_host:
 # 	git fetch origin binaries:binaries

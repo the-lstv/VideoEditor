@@ -1111,7 +1111,7 @@ class CommandPalette {
             this.hintElement.textContent = '';
         }
 
-        const parts = this.inputElement.value.split(' ');
+        const parts = this.#splitCommand(this.inputElement.value);
         if (parts.length === 0) parts.push('');
         parts[parts.length - 1] = this.#autoCompletionValue;
 
@@ -1191,7 +1191,7 @@ class CommandPalette {
         const file = event.target.files?.[0];
         if (!file || !this.inputElement) return;
 
-        const parts = this.inputElement.value.split(' ');
+        const parts = this.#splitCommand(this.inputElement.value);
         if (parts.length === 0) parts.push('');
 
         // Replace the last part (which was the file picker placeholder) with the file name
@@ -1211,6 +1211,39 @@ class CommandPalette {
         this.inputElement.focus();
     }
 
+    #splitCommand(inputValue) {
+        const parts = [];
+        let stringChar = null, start = 0;
+
+        for (let i = 0; i < inputValue.length; i++) {
+            const char = inputValue.charCodeAt(i);
+
+            if(stringChar) {
+                if(char === stringChar) {
+                    stringChar = null;
+                    parts.push(inputValue.slice(start, i));
+                    start = i + 1;
+                }
+                continue;
+            }
+
+            if(char === 34 || char === 39) { // " or '
+                parts.push(inputValue.slice(start, i));
+                stringChar = char;
+                start = i + 1;
+                continue;
+            }
+
+            if(char === 32) { // space
+                parts.push(inputValue.slice(start, i));
+                start = i + 1;
+            }
+        }
+
+        parts.push(inputValue.slice(start));
+        return parts.filter(Boolean);
+    }
+
     #openColorPicker() {
         if (!this.#colorInputElement) return;
 
@@ -1222,7 +1255,7 @@ class CommandPalette {
         const color = event.target.value;
         if (!color || !this.inputElement) return;
 
-        const parts = this.inputElement.value.split(' ');
+        const parts = this.#splitCommand(this.inputElement.value);
         if (parts.length === 0) parts.push('');
 
         // Replace the last part with the selected color
@@ -1242,7 +1275,7 @@ class CommandPalette {
 
 
     #parseCommand(commandString) {
-        return commandString.split(' ').filter(Boolean);
+        return this.#splitCommand(commandString.trim());
     }
 
     async #resolveCommand(parts) {

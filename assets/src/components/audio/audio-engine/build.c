@@ -39,9 +39,11 @@
 #define LINUX_LINK_EXTRAS "-fsanitize=address"
 #define MACOS_LINK_EXTRAS " -fsanitize=address"
 #else
-#define OPT_FLAGS " -flto -O3"
-#define LINK_FLAGS " -flto -O3"
-#define LINUX_LINK_EXTRAS "-static-libstdc++ -static-libgcc -s"
+// #define OPT_FLAGS " -flto -O3"
+// #define LINK_FLAGS " -flto -O3"
+#define OPT_FLAGS " -g -O0"
+#define LINK_FLAGS " -g -O0"
+#define LINUX_LINK_EXTRAS "-stdlib=libc++ -lc++ -lc++abi -s" // Electron seems to want libc++
 #define MACOS_LINK_EXTRAS ""
 #endif
 
@@ -84,12 +86,14 @@ struct node_version {
     char *abi;
     char *runtime;
 } versions[] = {
+    {"v20.0.0", "115", "node"},
     {"v22.0.0", "127", "node"},
     {"v24.0.0", "137", "node"},
     {"v25.0.0", "141", "node"},
     {"v26.0.0", "147", "node"},
 
-    {"v43.0.0", "148", "electron"},
+    {"v42.6.1", "146", "electron"},
+    {"v43.2.0", "148", "electron"},
 };
 
 int arch_is(const char *arch, const char *expected) {
@@ -156,9 +160,8 @@ void prepare(const char *windows_lib_arch) {
         sprintf(path, "targets/%s/node-%s-headers.tar.gz", versions[i].runtime, versions[i].name);
         if (!exists(path)) {
             run("cd targets/%s && curl -OJ %s", versions[i].runtime, source);
+            run("tar xzf %s --strip-components=1 -C targets/%s/%s", path, versions[i].runtime, versions[i].name);
         }
-
-        run("tar xzf %s --strip-components=1 -C targets/%s/%s", path, versions[i].runtime, versions[i].name);
 
         if(!buildingForElectron) {
 #ifdef IS_WINDOWS
@@ -183,7 +186,8 @@ void prepare(const char *windows_lib_arch) {
     }
 
     if (j == 0) {
-        printf("No versions were built. Check your --version argument.\n");
+        printf("No versions were downloaded. Check your --version argument.\n");
+        exit(1);
     }
 }
 
@@ -354,17 +358,22 @@ void build_vst3sdk(char *cpp_compiler, char *cpp_shared, int windows_build) {
 
 /* Build for Unix systems */
 void build(char *compiler, char *cpp_compiler, char *cpp_linker, char *os, const char *arch) {
-    char *cpp_shared = "-pthread" OPT_FLAGS " -c -fPIC -std=c++20 -DRELEASE -Ivst3sdk -Ivst3sdk/public.sdk -Ivst3sdk/pluginterfaces -Iinclude";
+    char *cpp_shared = "-pthread" OPT_FLAGS " -stdlib=libc++ -c -fPIC -std=c++20 -DRELEASE -Ivst3sdk -Ivst3sdk/public.sdk -Ivst3sdk/pluginterfaces -Iinclude";
 
     build_vst3sdk(cpp_compiler, cpp_shared, 0);
+
+    char *runtimeExtras = "";
+    if (buildingForElectron) {
+        runtimeExtras = " -DELECTRON";
+    }
 
     for (unsigned int i = 0; i < sizeof(versions) / sizeof(struct node_version); i++) {
         if (selected_version && strcmp(versions[i].name, selected_version)) {
             continue;
         }
 
-        run("%s %s audio-engine.cpp -I targets/%s/%s/include/node", cpp_compiler, cpp_shared, versions[i].runtime, versions[i].name);
-        run("%s -pthread -flto %s *.o fragments/*.o -std=c++20 -shared %s -o dist/%s_%s_%s_%s.node", cpp_compiler, OPT_FLAGS, cpp_linker, os, arch, versions[i].abi, versions[i].runtime);
+        run("%s %s audio-engine.cpp %s -I targets/%s/%s/include/node", cpp_compiler, cpp_shared, runtimeExtras, versions[i].runtime, versions[i].name);
+        run("%s -pthread %s *.o fragments/*.o -std=c++20 -shared %s -o dist/%s_%s_%s_%s.node", cpp_compiler, OPT_FLAGS, cpp_linker, os, arch, versions[i].abi, versions[i].runtime);
 
         if(addon_only || latest_only) {
             break; // Only build for one version
@@ -381,15 +390,17 @@ void build_windows(char *compiler, char *cpp_compiler, char *cpp_linker, char *o
 
     build_vst3sdk(cpp_compiler, cpp_shared, 1);
 
+    char *runtimeExtras = "";
+    if (buildingForElectron) {
+        runtimeExtras = " -DELECTRON";
+    }
+
     for (unsigned int i = 0; i < sizeof(versions) / sizeof(struct node_version); i++) {
         if (selected_version && strcmp(versions[i].name, selected_version)) {
             continue;
         }
 
-        // if (!addon_only) {
-        // }
-        run("cl %s /I targets/%s/%s/include/node", cpp_shared, versions[i].runtime, versions[i].name);
-
+        run("cl %s %s /I targets/%s/%s/include/node", cpp_shared, runtimeExtras, versions[i].runtime, versions[i].name);
         run("link /NOLOGO /DLL /OUT:dist\\%s_%s_%s_%s.node *.obj fragments\\*.obj targets\\%s\\%s\\node.lib", os, arch, versions[i].abi, versions[i].runtime, versions[i].runtime, versions[i].name);
 
         if (addon_only || latest_only) {
@@ -482,8 +493,8 @@ int main(int argc, char **argv) {
 
 #else
     /* Linux does not cross-compile but picks whatever arch the host is on (we run on both x64 and ARM64) */
-    build("clang-18",
-          "clang++-18",
+    build("clang-21",
+          "clang++-21",
           LINUX_LINK_EXTRAS,
           OS,
           arch);

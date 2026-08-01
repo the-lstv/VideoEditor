@@ -139,7 +139,12 @@ const app = globalThis.app = {
             const flavorId = flavorClass.name;
     
             app.flavor = flavorClass;
-    
+
+            const loaded = flavorClass?.prepare? await flavorClass?.prepare?.(): true;
+            if(loaded !== true) {
+                throw new Error(`preparation of ${flavorClass.name} failed because ${loaded}`);
+            }
+
             if(flavorClass.layoutPresets?.default) {
                 app.layoutManager.setSchema(flavorClass.layoutPresets.default);
             }
@@ -834,6 +839,16 @@ window.addEventListener('DOMContentLoaded', async () => {
             },
 
             {
+                name: "restart",
+                icon: "bi-arrow-clockwise",
+                description: "Restart the program",
+                onCalled() {
+                    app.shortcutManager.triggerMapping("GLOBAL_NEW_WINDOW");
+                    window.close();
+                }
+            },
+
+            {
                 name: "echo",
                 alias: ["print"],
                 icon: "bi-chat",
@@ -841,6 +856,25 @@ window.addEventListener('DOMContentLoaded', async () => {
                 onCalled(text) { paletteLogger.log(text) },
                 inputs: [
                     { name: "text", type: "string", description: "Text to echo" }
+                ]
+            },
+
+            {
+                name: "eval",
+                alias: [">"],
+                icon: "bi-terminal",
+                description: "Evaluate JavaScript code",
+                onCalled(code) {
+                    paletteLogger.log(`> ${code}`);
+                    try {
+                        const result = eval(code);
+                        paletteLogger.log(result);
+                    } catch(e) {
+                        paletteLogger.error(e);
+                    }
+                },
+                inputs: [
+                    { name: "code", type: "string", description: "JavaScript code to evaluate" }
                 ]
             },
 
