@@ -1,3 +1,5 @@
+import PianoRoll from "../components/audio/pianoroll.js";
+
 /**
  * Timeline view class
  * @see LS.Timeline for the timeline implementation itself
@@ -125,6 +127,20 @@ class TimelineView extends LS.View {
             // allowAutomationClips: true,
             // autoCreateAutomationClips: true,
         });
+
+        // // We can have nested timelines
+        // this.timeline2 = new PianoRoll({
+        //     renderer: this.timeline.renderer, // Share the same renderer
+        //     container: this.timeline.container,
+
+        //     rect: {
+        //         x: 100,
+        //         y: 100,
+
+        //         width: 800,
+        //         height: 400,
+        //     },
+        // });
 
         this.loadPromise = this.timeline.loadPromise;
 

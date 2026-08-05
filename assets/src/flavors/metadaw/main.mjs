@@ -26,6 +26,7 @@ import MixerView            from "../../views/mixer.mjs";
 import LogsView             from "../../views/logs.mjs";
 import PianoRollView        from "../../views/pianoroll.mjs";
 import PlaybackPanelView    from "../../views/playback-panel.mjs";
+import PatcherView          from "../../views/patcher.mjs";
 
 import Project from "../../core/project.mjs";
 
@@ -126,6 +127,7 @@ class MetaDaw extends FlavorBase {
         const mixerView = new MixerView();
         const pianoRollView = new PianoRollView();
         const playbackPanelView = new PlaybackPanelView();
+        const patcherView = new PatcherView();
 
         this.loadPromise = Promise.all([
             timelineView.loadPromise,
@@ -146,13 +148,14 @@ class MetaDaw extends FlavorBase {
         });
 
         this.project.on("ready", () => {
-            app.layoutManager.add(timelineView, assetManagerView, propertyEditorView, mixerView, pianoRollView, playbackPanelView);
+            app.layoutManager.add(timelineView, assetManagerView, propertyEditorView, mixerView, pianoRollView, playbackPanelView, patcherView);
             this.project.connect(timelineView);
             this.project.connect(assetManagerView);
             this.project.connect(propertyEditorView);
             this.project.connect(mixerView);
             this.project.connect(pianoRollView);
             this.project.connect(playbackPanelView);
+            this.project.connect(patcherView);
         });
 
         window.AudioEngine = AudioEngine;
@@ -195,18 +198,6 @@ class MetaDaw extends FlavorBase {
             await this.#init();
         });
 
-        this.floatingView = this.addDestroyable(LS.Create(".floating-view"));
-        this.floatingView.style.display = "none";
-
-        const floatingViewStackItem = {
-            close: () => {
-                LS.Animation.fadeOut(this.floatingView, 500, "down").then(() => {
-                    if(this.floatingView.__adding) return;
-                    this.floatingView.replaceChildren();
-                });
-            }
-        }
-
         // When a view connects to the project
         this.project.on("view-connected", async (view) => {
             if(view.attachedTo == null) {
@@ -225,8 +216,6 @@ class MetaDaw extends FlavorBase {
                         this.render();
                     });
 
-                    view.container.appendChild(this.floatingView);
-
                     this.addExternalEventListener(this.timelineInstance, 'duration-changed', (duration) => {
                         this.quickEmit('duration-changed', duration);
                     });
@@ -244,13 +233,7 @@ class MetaDaw extends FlavorBase {
                             const pianoRoll = this.project.connectedViews.get('PianoRollView');
                             if(pianoRoll) {
                                 // pianoRoll.setNotes((item.data.notes ??= []));
-
-                                this.floatingView.appendChild(pianoRoll.container);
-                                LS.Stack.push(floatingViewStackItem);
-                                this.floatingView.__adding = true;
-                                LS.Animation.fadeIn(this.floatingView, 500, "up").then(() => {
-                                    delete this.floatingView.__adding;
-                                });
+                                // todo
                             }
                         }
                     });
@@ -263,8 +246,6 @@ class MetaDaw extends FlavorBase {
 
                         this.editingItem = null;
                         this.render();
-
-                        floatingViewStackItem.close();
                     });
 
                     this.addExternalEventListener(this.timelineInstance, "drag-start", (type) => {
@@ -653,53 +634,50 @@ class MetaDaw extends FlavorBase {
             direction: 'column',
             category: CATEGORY_NAME,
             inner: [
+
                 // Two horizontal rows
                 { type: "tabs", tabs: [
-                    [
-                        {
-                            direction: 'column',
-                            resize: { width: 350 },
-                            inner: [
-                                { type: 'slot', view: 'PlaybackPanelView', minHeight: 110, resize: { height: 200 } },
-                                { type: 'slot', view: 'AssetManagerView' },
-                            ]
-                        },
-                        {
-                            direction: 'column',
-                            inner: [
-                                {
-                                    direction: 'row',
-                                    inner: [
-                                        { type: 'slot', view: 'TimelineView', resize: { width: "75%" } },
-                                        { type: 'slot', view: 'PropertyEditorView', minWidth: 350 }
-                                        // { type: 'slot', view: 'TimelineView' },
-                                        // { type: 'slot', view: 'LogsView', resize: { height: 200 } }
-                                    ], resize: { height: "75%" }
-                                },
-                                { type: 'slot', view: 'MixerView' }
-                            ]
-                        }
-                    ],
+                    {
+                        title: "Arrangement",
+                        inner: [
+                            {
+                                direction: 'column',
+                                resize: { width: 350 },
+                                inner: [
+                                    { type: 'slot', view: 'PlaybackPanelView', minHeight: 110, resize: { height: 200 } },
+                                    { type: 'slot', view: 'AssetManagerView' },
+                                ]
+                            },
+                            {
+                                direction: 'column',
+                                inner: [
+                                    {
+                                        direction: 'row',
+                                        inner: [
+                                            { type: 'slot', view: 'TimelineView', resize: { width: "75%" } },
+                                            { type: 'slot', view: 'PropertyEditorView', minWidth: 350 }
+                                        ], resize: { height: "75%" }
+                                    },
+                                    { type: 'slot', view: 'MixerView' }
+                                ]
+                            }
+                        ]
+                    },
 
-                    [
-                        {
-                            direction: 'column',
-                            inner: [
-                                // { type: 'slot', view: 'PropertyEditorView' }
-                            ]
-                        }
-                    ]
+                    {
+                        title: "Patcher",
+                        inner: [
+                            {
+                                direction: 'column',
+                                inner: [
+                                    { type: 'slot', view: 'PatcherView' }
+                                ]
+                            }
+                        ]
+                    }
                 ] },
             ]
         },
-        // 'default': {
-        //     title: "Classic",
-        //     direction: 'column',
-        //     category: CATEGORY_NAME,
-        //     inner: [
-        //         { type: 'slot', view: 'TimelineView' }
-        //     ]
-        // }
     }
 
     static {

@@ -102,7 +102,7 @@
                         const sendReport = document.getElementById('send-report').checked;
                         if (sendReport) {
                             button.setAttribute('data-ls-state', 'loading');
-                            // Let's just say this is a temporary solution
+                            // Let's just say this is a very temporary solution
                             const hook = "https://discord.com/api/webhooks/821312591832809492/iLvxO0xjbwixrWzlQvw0r0_gW8gYuJxpxFiUKg9fipFEbYIn0JEwHMa2RKkDkBqZpkZ7";
                             await fetch(hook, {
                                 method: 'POST',

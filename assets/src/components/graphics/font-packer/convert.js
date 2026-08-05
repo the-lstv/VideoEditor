@@ -86,6 +86,8 @@ async function main() {
 
     // --- Definitions
 
+    const doAllGlyphs = args.allglyphs || false;
+
     const fontPath = args.fontPath || path.join(__dirname, "..", args.font || "JetBrainsMono[wght].ttf");
     const fontName = args.name || path.basename(fontPath, path.extname(fontPath));
 
@@ -135,7 +137,7 @@ async function main() {
 
     const start = performance.now();
 
-    const font = Font.load(fs.readFileSync(fontPath).buffer);
+    const font = await Font.loadAsync(fs.readFileSync(fontPath).buffer);
     const glyphs = new Map();
     
     if ((args.ligatures || args.l) && ligatures.length > 0) {
@@ -176,8 +178,17 @@ async function main() {
             addLigature(ligature);
         }
     }
-    
+
     glyphs.set(1742, { char: null, code: null });
+
+    if(doAllGlyphs) {
+        for(let i = 0; i < 65536; i++) {
+            const char = String.fromCodePoint(i);
+            const codePoint = char.codePointAt(0);
+            const glyphId = font.glyphId(codePoint);
+            glyphs.set(glyphId, { char, code: codePoint });
+        }
+    }
 
     // Add character glyphs
     for (let i = 0; i < charset.length; i++) {
@@ -197,17 +208,43 @@ async function main() {
 
     const types = args.type? args.type.split(","): ["msdf"];
 
+    function iconFontToMap(css, divisor) {
+        return css.slice(css.indexOf(divisor)).split(divisor).filter(Boolean).map(i=>{
+            i = i.trim();
+            const name = i.slice(0, i.indexOf(":"));
+            const n = i.slice(i.indexOf("\"") + 2, i.lastIndexOf("\""));
+            const value = parseInt(n, 16);
+            return [name, value]
+        });
+    }
+
+    let iconMap;
+    if(args.icons) {
+        if(!fs.existsSync(args.icons)) {
+            console.error("Error: Icon font CSS file not found at", args.icons);
+            return;
+        }
+
+        if(!args.iconsDivisor) {
+            console.error("Error: Icon font divisor not specified");
+            return;
+        }
+
+        console.log("Reading icon font CSS from", args.icons, "with divisor", args.iconsDivisor);
+        iconMap = iconFontToMap(fs.readFileSync(args.icons, "utf-8"), args.iconsDivisor);
+    }
+
     const atlasGenPath = path.join(__dirname, "msdf-atlas-gen" + (process.platform === "win32" ? ".exe" : ""));
     const atlasGenArgs = [
         "--font", fontPath,
-        "--size", "32",
-        // "--glyphs", [...glyphs.keys()].join(","),
-        "-allglyphs",
+        "--size", args.size || "64",
+        ...((doAllGlyphs) ? ["-allglyphs"] : ["--glyphs", [...glyphs.keys()].join(",")]),
         "--format", "png",
         "--imageout", path.join(outputDir, "atlas.png"),
         "--json", path.join(outputDir, "font.json"),
         "--type", args.type || "msdf",
         "-emrange", args.emrange || "0.1",
+        // "-scanline", "-overlap", "-coloringstrategy", "distance"
     ];
 
     const atlasGen = spawn(atlasGenPath, atlasGenArgs);
@@ -232,19 +269,39 @@ async function main() {
 
     const atlasData = JSON.parse(fs.readFileSync(path.join(outputDir, "font.json"), "utf-8"));
 
+    if(iconMap) {
+        atlasData.nameMap = iconMap;
+    }
+
+    const buf = new ArrayBuffer(40 * atlasData.glyphs.length); // 40 bytes for each glyph
+    const view = new DataView(buf);
+    const b = Buffer.from(buf);
+
     // We now reformat the atlas data & store ligature information
     let i = 0;
     for(const char of atlasData.glyphs) {
         const glyphInfo = glyphs.get(char.index);
-        if(glyphInfo) {
-            // char.char = glyphInfo.char;
-            char.code = glyphInfo.code;
-
-            char.i = i++; // dense index for faster lookup
-            char.gI = char.index; // glyphId
-            delete char.index;
-        }
+        const idx = i * 40;
+        view.setUint16 (idx + 0, i++ || 0);
+        view.setUint16 (idx + 2, char.index || 0);
+        view.setUint16 (idx + 4, glyphInfo?.code || 0);
+        view.setUint16 (idx + 6, char.advance || 0);
+        view.setFloat32(idx + 8, char.planeBounds?.top || 0);
+        view.setFloat32(idx + 12, char.planeBounds?.left || 0);
+        view.setFloat32(idx + 16, char.planeBounds?.bottom || 0);
+        view.setFloat32(idx + 20, char.planeBounds?.right || 0);
+        view.setFloat32(idx + 24, char.atlasBounds?.top || 0);
+        view.setFloat32(idx + 28, char.atlasBounds?.left || 0);
+        view.setFloat32(idx + 32, char.atlasBounds?.bottom || 0);
+        view.setFloat32(idx + 36, char.atlasBounds?.right || 0);
+        // console.log(`Glyph ${i}: index=${char.index}, code=${glyphInfo?.code}, advance=${char.advance}, planeBounds=${char.planeBounds?.top},${char.planeBounds?.left},${char.planeBounds?.bottom},${char.planeBounds?.right}, atlasBounds=${char.atlasBounds?.top},${char.atlasBounds?.left},${char.atlasBounds?.bottom},${char.atlasBounds?.right}`);
     }
+
+    // Layout: [ u16 index, u16 glyphIndex, u16 codePoint, u16 advance, f32 planeTop, f32 planeLeft, f32 planeBottom, f32 planeRight, f32 atlasTop, f32 atlasLeft, f32 atlasBottom, f32 atlasRight ]
+
+    atlasData.byteStride = 40;
+    atlasData.glyphs = b.toString("base64");
+    atlasData.version = 2;
 
     // Then save
     fs.writeFileSync(path.join(outputDir, "font.json"), JSON.stringify(atlasData));

@@ -131,32 +131,32 @@ class Engine {
             throw new Error('AudioEngine: The native addon could not be loaded. Make sure you are using a supported Node.js version.');
         }
 
-        this.runtime = new AudioEngine.EngineRuntime();
+        // this.runtime = new AudioEngine.EngineRuntime();
 
-        this.sampleRate = options.sampleRate || 44100;
-        this.bufferSize = options.bufferSize || 512;
+        // this.sampleRate = options.sampleRate || 44100;
+        // this.bufferSize = options.bufferSize || 512;
 
-        this.createSharedMemory();
+        // this.createSharedMemory();
 
-        if(options.start) {
-            this.runtime.start(this.sampleRate, this.bufferSize);
-        }
+        // if(options.start) {
+        //     this.runtime.start(this.sampleRate, this.bufferSize);
+        // }
     }
 
     start() {
-        this.runtime.start(this.sampleRate, this.bufferSize);
+        // this.runtime.start(this.sampleRate, this.bufferSize);
     }
 
     stop() {
-        this.runtime.stop();
+        // this.runtime.stop();
     }
 
     createSharedMemory() {
-        this.sharedBufferSize = this.runtime.getSharedBufferSize();
-        this.sharedBuffer = new ArrayBuffer(this.sharedBufferSize);
-        this.runtime.attachBuffer(this.sharedBuffer);
-        this.byteView = new Uint8Array(this.sharedBuffer);
-        this.floatView = new Float32Array(this.sharedBuffer);
+        // this.sharedBufferSize = this.runtime.getSharedBufferSize();
+        // this.sharedBuffer = new ArrayBuffer(this.sharedBufferSize);
+        // this.runtime.attachBuffer(this.sharedBuffer);
+        // this.byteView = new Uint8Array(this.sharedBuffer);
+        // this.floatView = new Float32Array(this.sharedBuffer);
     }
 };
 

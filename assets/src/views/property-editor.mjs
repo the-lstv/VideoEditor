@@ -912,23 +912,23 @@ function cleanup() {
                         ]
                     })],
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-stopwatch" }, { tag: "label", i18n: "properties.duration", text: " Duration (s):" }] }, this.#createInput("clipDuration", {
-                        animatable: false, type: "number", attributes: { min: 0.1, step: 0.1 }, defaultValue: 5, onchange: () => {
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-stopwatch" }, { tag: "label", i18n: "properties.duration", text: " Duration (ms):" }] }, this.#createInput("clipDuration", {
+                        animatable: false, type: "number", attributes: { min: 1, step: 100 }, defaultValue: 5, onchange: () => {
                             this.#updateTimeline();
                     }})],
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-align-start" }, { tag: "label", i18n: "properties.start", text: " Start (s):" }] }, this.#createInput("clipStartTime", {
-                        animatable: false, type: "number", attributes: { min: 0, step: 0.1 }, defaultValue: 0, onchange: () => {
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-align-start" }, { tag: "label", i18n: "properties.start", text: " Start (ms):" }] }, this.#createInput("clipStartTime", {
+                        animatable: false, type: "number", attributes: { min: 0, step: 100 }, defaultValue: 0, onchange: () => {
                             this.#updateTimeline();
                     }})],
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-graph-up" }, { tag: "label", i18n: "properties.fadeIn", text: " Basic Fade In (s):" }] }, this.#createInput("fadeIn", {
-                        animatable: false, type: "number", attributes: { min: 0, step: 0.1 }, defaultValue: 0, onchange: () => {
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-graph-up" }, { tag: "label", i18n: "properties.fadeIn", text: " Basic Fade In (ms):" }] }, this.#createInput("fadeIn", {
+                        animatable: false, type: "number", attributes: { min: 0, step: 100 }, defaultValue: 0, onchange: () => {
                             this.#updateTimeline();
                     }})],
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-graph-down" }, { tag: "label", i18n: "properties.fadeOut", text: " Basic Fade Out (s):" }] }, this.#createInput("fadeOut", {
-                        animatable: false, type: "number", attributes: { min: 0, step: 0.1 }, defaultValue: 0, onchange: () => {
+                    [{ tag: "span", inner: [{ tag: "i", class: "bi-graph-down" }, { tag: "label", i18n: "properties.fadeOut", text: " Basic Fade Out (ms):" }] }, this.#createInput("fadeOut", {
+                        animatable: false, type: "number", attributes: { min: 0, step: 100 }, defaultValue: 0, onchange: () => {
                             this.#updateTimeline();
                     }})]
                 ]

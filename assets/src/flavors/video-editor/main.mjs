@@ -21,7 +21,7 @@
 import FlavorBase from "../../core/flavor.mjs";
 import ThreeRendererAdapter from "../../components/graphics/ThreeJS/index.mjs";
 
-import AudioRenderer from "../../components/audio/index.mjs";
+// import * as AudioEngine from "../../components/audio/index.mjs";
 
 // --- Views
 import { AssetManagerView } from "../../views/asset-manager.mjs";
@@ -131,7 +131,7 @@ class VideoEditor extends FlavorBase {
         // The frame scheduler is responsible for scheduling frames to be rendered
         this.frameScheduler = new LS.Util.FrameScheduler((delta) => {
             if(delta > 0 && this.timelineInstance) {
-                this.timelineInstance.setSeek(this.timelineInstance.seek + (delta / 1000));
+                this.timelineInstance.setSeek(this.timelineInstance.seek + delta);
             }
 
             this.renderAtTime(this.timelineInstance.seek || 0);
@@ -454,7 +454,7 @@ class VideoEditor extends FlavorBase {
      * 
      * Also, the whole setup here is quite temporary and has a lot to be worked on
      * 
-     * @param {Number} time Time in seconds of the frame to render. If not provided, it will render the current time of the timeline.
+     * @param {Number} time Time in milliseconds of the frame to render. If not provided, it will render the current time of the timeline.
      */
     async renderAtTime(time) {
         if(!this.timelineInstance || !this.renderer) return;

@@ -29,11 +29,14 @@
 #include <pthread.h>
 #endif
 
-// Sadly, this trash is mandatory for Electron >:(
+// Sadly, this is mandatory for Electron >:(
 #if defined(ELECTRON)
-// These have to match the Electron build's build settings, but of course they do not correctly expose them.
-// Sandbox may or may not be required - with the crappy official builds it is most likely enabled.
+// These have to match the Electron build's build settings (of course they do not correctly expose them).
+// Sandbox may or may not be required - with the official builds it is most likely enabled.
 // In the future I will likely build my own Electron without sandbox so that we can have proper shared memory
+
+// New idea, I was thinking I'd make my own renderer entirely and ditch Electron.. If I had the guarantee it won't just be a waste of time that nobody even sees I'd do it
+// But who am I kidding, you are not reading this anyway. Wait...
 #define V8_ENABLE_SANDBOX true
 #define V8_COMPRESS_POINTERS
 #endif
@@ -52,12 +55,28 @@ using namespace v8;
 using namespace Steinberg;
 using namespace Steinberg::Vst;
 
+// Some helpers to make the code a bit more readable & compact
+#define CREATE_CLASS(tpl, constructor, name, fc) \
+    Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate, constructor, externalPerContextData); \
+    tpl->SetClassName(String::NewFromUtf8(isolate, name, NewStringType::kNormal).ToLocalChecked()); \
+    tpl->InstanceTemplate()->SetInternalFieldCount(fc);
+
+#define EXPORT_CLASS(exports, tpl, name) \
+    exports->Set(isolate->GetCurrentContext(), String::NewFromUtf8(isolate, name, NewStringType::kNormal).ToLocalChecked(), tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked()).ToChecked();
+
+
+#define __ADD_METHOD(tpl, name, callback) \
+    tpl->PrototypeTemplate()->Set( \
+        String::NewFromUtf8(isolate, name, NewStringType::kNormal).ToLocalChecked(), \
+        FunctionTemplate::New(isolate, callback, externalPerContextData) \
+    );
+
+// Layout for the runtime shared state
 struct alignas(64) SharedState {
 
 };
 
 namespace AudioEngine {
-
     // -- TEST ONLY
     float phase = 0.0f;
     const float frequency = 440.0f;
@@ -121,14 +140,14 @@ namespace AudioEngine {
             Thread-safe: true, can be called from any thread.
         */
         bool start(){
+            if(!sharedState) {
+                return false;
+            }
+
             bool expected = false;
             if (!running.compare_exchange_strong(expected, true)) {
                 // Return if we are already running
                 return true;
-            }
-
-            if(!sharedState) {
-                return false;
             }
 
             ma_device_config config = ma_device_config_init(ma_device_type_playback);
@@ -137,7 +156,6 @@ namespace AudioEngine {
             config.sampleRate = sampleRate;
             config.dataCallback = &EngineRuntime::audioCallback;
             config.pUserData = this;
-
             return true;
         }
 
@@ -179,12 +197,17 @@ namespace AudioEngine {
 // --- Node addon implementation
 
 void js_start(const FunctionCallbackInfo<Value> &args) {
+    AudioEngine::EngineRuntime *engine = (AudioEngine::EngineRuntime *)getInternalPointer(args.This());
+    bool started = engine->start();
+    args.GetReturnValue().Set(Boolean::New(args.GetIsolate(), started));
 }
 
 void js_stop(const FunctionCallbackInfo<Value> &args) {
+    AudioEngine::EngineRuntime *engine = (AudioEngine::EngineRuntime *)getInternalPointer(args.This());
+    engine->stop();
 }
 
-// Just a simple roundtrip test, returns the frequency of a note given its semitone offset from A4 (440 Hz)
+// Just a simple roundtrip test
 // A healthy engine configuration should be able to handle this, if this fails, there is a problem.
 void js_roundTripTest(const FunctionCallbackInfo<Value> &args) {
     if(missingArguments(1, args)) {
@@ -204,25 +227,9 @@ void js_loadVST3(const FunctionCallbackInfo<Value> &args) {
 }
 
 void js_setParameter(const FunctionCallbackInfo<Value> &args) {
-    // uint32_t id = args[0]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0);
-    // float value = static_cast<float>(args[1]->NumberValue(args.GetIsolate()->GetCurrentContext()).FromMaybe(0.0));
-    // float targetValue = static_cast<float>(args[2]->NumberValue(args.GetIsolate()->GetCurrentContext()).FromMaybe(0.0));
-    // uint32_t flags = args[3]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0);
-    // EngineRuntime::instance().enqueueParameter(id, value, targetValue, flags);
-    // args.GetReturnValue().Set(Boolean::New(args.GetIsolate(), true));
 }
 
 void js_sendMidiEvent(const FunctionCallbackInfo<Value> &args) {
-    // uint32_t frameOffset = args[0]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0);
-    // v8::Local<v8::Uint8Array> dataArray = args[1].As<v8::Uint8Array>();
-    // uint32_t size = dataArray->Length();
-    // uint32_t channel = args[2]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0);
-
-    // std::vector<uint8_t> midiData(size);
-    // dataArray->CopyContents(midiData.data(), size);
-
-    // EngineRuntime::instance().enqueueMidi(frameOffset, midiData.data(), size, channel);
-    // args.GetReturnValue().Set(Boolean::New(args.GetIsolate(), true));
 }
 
 /**
@@ -233,6 +240,13 @@ void js_sendMidiEvent(const FunctionCallbackInfo<Value> &args) {
  */
 struct BufferWeakData {
     // anything you need to identify the buffer
+};
+struct PerContextData {
+    Isolate *isolate;
+    Global<Function> engineConstructor;
+
+    /* We hold all instances until free */
+    std::vector<std::unique_ptr<AudioEngine::EngineRuntime>> engines;
 };
 
 auto* weak_data = new BufferWeakData();
@@ -264,14 +278,6 @@ void js_attachBuffer(const v8::FunctionCallbackInfo<v8::Value>& args) {
     // Hello world test
     uint8_t* data = static_cast<uint8_t*>(engine->sharedBackingStore->Data());
     data[0] = 123;
-
-    // // Watch for garbage collection of the ArrayBuffer and reset the reference when it happens
-    // buffer_ref.SetWeak(weak_data, [](const v8::WeakCallbackInfo<BufferWeakData>& info) {
-    //     std::cout << "ArrayBuffer was garbage collected!" << std::endl;
-    //     buffer_ref.Reset();
-    //     data = nullptr;
-    //     backing.reset();
-    // }, v8::WeakCallbackType::kParameter);
 }
 
 void js_getSharedBufferSize(const v8::FunctionCallbackInfo<v8::Value>& args) {
@@ -279,90 +285,47 @@ void js_getSharedBufferSize(const v8::FunctionCallbackInfo<v8::Value>& args) {
     args.GetReturnValue().Set(Number::New(args.GetIsolate(), size));
 }
 
-struct PerContextData {
-    Isolate *isolate;
-    Global<Function> engineConstructor;
-
-    /* We hold all instances until free */
-    std::vector<std::unique_ptr<AudioEngine::EngineRuntime>> engines;
-};
-
+// Let's go! I finally managed to get this working correctly
+// It's a small thing but the feeling when it doesn't instantly coredump is quite strange
 void runtime_constructor(const FunctionCallbackInfo<Value> &args) {
-    // NOTE:
-    // Before you ask me why are we creating a new class and setting prototypes every time we make an instance:
-    // No idea, I took this from uWebSockets.js, when I tried to make a proper constructor, it didn't work (args.This() was different in the constructor than the instance).
-    // This obviously seems like a huge performance issue (v8 optimization is thrown out the window), but I don't know how to fix it, and I don't have time to figure it out right now.
-
     Isolate *isolate = args.GetIsolate();
 
-#if (V8_MAJOR_VERSION >= 14)
-    auto *perContextData = (PerContextData *) Local<External>::Cast(args.Data())->Value(0);
-#else
-    auto *perContextData = (PerContextData *) Local<External>::Cast(args.Data())->Value();
-#endif
-
-#define ADD_METHOD(tpl, name, callback) \
-    tpl->PrototypeTemplate()->Set( \
-        String::NewFromUtf8(isolate, name, NewStringType::kNormal).ToLocalChecked(), \
-        FunctionTemplate::New(isolate, callback, args.Data()) \
-    );
-
-    Local<FunctionTemplate> tpl = FunctionTemplate::New(isolate);
-    tpl->SetClassName(String::NewFromUtf8(isolate, "EngineRuntime", NewStringType::kNormal).ToLocalChecked());
-    tpl->InstanceTemplate()->SetInternalFieldCount(1);
-
-    ADD_METHOD(tpl, "start", js_start);
-    ADD_METHOD(tpl, "stop", js_stop);
-    ADD_METHOD(tpl, "roundTripTest", js_roundTripTest);
-    ADD_METHOD(tpl, "attachBuffer", js_attachBuffer);
-    ADD_METHOD(tpl, "getSharedBufferSize", js_getSharedBufferSize);
-    ADD_METHOD(tpl, "loadVST3", js_loadVST3);
-    ADD_METHOD(tpl, "setParameter", js_setParameter);
-    ADD_METHOD(tpl, "sendMidiEvent", js_sendMidiEvent);
-
-    Local<Object> localApp = tpl->GetFunction(isolate->GetCurrentContext()).ToLocalChecked()->NewInstance(isolate->GetCurrentContext()).ToLocalChecked();
-
-    /* Create the engine instance */
+    /* Create the engine instance that will be bound to this runtime */
     AudioEngine::EngineRuntime *engine = new AudioEngine::EngineRuntime();
-    // setInternalPointer(localApp, engine);
 
-    localApp->SetAlignedPointerInInternalField(0, engine, 0);
-
-    printf("stored\n");
-
-    if (localApp->InternalFieldCount() > 0) {
-        void* ptr = localApp->GetAlignedPointerFromInternalField(0, 0);
-    } else {
-        // Throw a regular JavaScript error instead of letting V8 abort the process
-        isolate->ThrowException(v8::Exception::TypeError(
-            v8::String::NewFromUtf8(isolate, "Invalid invocation context").ToLocalChecked()));
-        return;
-    }
-
-    printf("C %p\n", localApp);
-    printf("D %p\n", perContextData);
-    printf("E %p\n", engine);
+    Local<Object> localApp = args.This();
+    setInternalPointer(localApp, engine);
 
     /* Store for cleanup */
+    #if (V8_MAJOR_VERSION >= 14)
+        auto *perContextData = (PerContextData *) Local<External>::Cast(args.Data())->Value(0);
+    #else
+        auto *perContextData = (PerContextData *) Local<External>::Cast(args.Data())->Value();
+    #endif
     perContextData->engines.emplace_back(engine);
-
-    args.GetReturnValue().Set(localApp);
 }
-
 
 PerContextData* Main(Isolate *isolate, Local<Object> exports) {
     PerContextData *perContextData = new PerContextData();
     perContextData->isolate = isolate;
 
     /* Refer to per context data via External */
-#if (V8_MAJOR_VERSION >= 14)
-    Local<External> externalPerContextData = External::New(isolate, perContextData, 0);
-#else
-    Local<External> externalPerContextData = External::New(isolate, perContextData);
-#endif
+    #if (V8_MAJOR_VERSION >= 14)
+        Local<External> externalPerContextData = External::New(isolate, perContextData, 0);
+    #else
+        Local<External> externalPerContextData = External::New(isolate, perContextData);
+    #endif
 
-    exports->Set(isolate->GetCurrentContext(), String::NewFromUtf8(isolate, "EngineRuntime", NewStringType::kNormal).ToLocalChecked(), FunctionTemplate::New(isolate, runtime_constructor, externalPerContextData)->GetFunction(isolate->GetCurrentContext()).ToLocalChecked()).ToChecked();
-
+    CREATE_CLASS(runtime, runtime_constructor, "EngineRuntime", 1);
+    __ADD_METHOD(runtime, "start", js_start);
+    __ADD_METHOD(runtime, "stop", js_stop);
+    __ADD_METHOD(runtime, "roundTripTest", js_roundTripTest);
+    __ADD_METHOD(runtime, "attachBuffer", js_attachBuffer);
+    __ADD_METHOD(runtime, "getSharedBufferSize", js_getSharedBufferSize);
+    __ADD_METHOD(runtime, "loadVST3", js_loadVST3);
+    __ADD_METHOD(runtime, "setParameter", js_setParameter);
+    __ADD_METHOD(runtime, "sendMidiEvent", js_sendMidiEvent);
+    EXPORT_CLASS(exports, runtime, "EngineRuntime");
     return perContextData;
 }
 
@@ -405,6 +368,8 @@ NODE_MODULE_INITIALIZER(Local<Object> exports, Local<Value> module, Local<Contex
 
         // Beware that the program possibly still runs after this.
         // This hook simply calls whenever we reload, so we need to reliably destruct, then be prepared to start again.
+
+        // I also hope this does not create memory leaks but if it does blame Electron
     }, perContextData);
 }
 #endif

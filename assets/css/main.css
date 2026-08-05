@@ -87,18 +87,16 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
 
     transition-duration: 1.5s;
     transition-timing-function: ease-out;
-    transition-property: transform, border-radius, opacity, box-shadow;
+    transition-property: border-radius, opacity, box-shadow;
 
     background: var(--surface-0);
 
-    transform: scale(.95);
     border-radius: 75px;
     opacity: 0;
     box-shadow: 0 20px 100px -20px #000e;
 }
 
 #editor-container.loaded {
-    transform: none;
     border-radius: unset;
     opacity: 1;
     box-shadow: none;
@@ -901,18 +899,6 @@ pre.log-message {
     .ͼj {
         color: #1696af;
     }
-}
-
-.floating-view {
-    position: absolute;
-    inset: 40px;
-    top: 75px;
-    background: var(--elevate);
-    overflow: hidden;
-    z-index: 50000;
-    outline: 4px solid var(--accent-mix-40);
-    border-radius: var(--border-radius);
-    box-shadow: 0 10px 20px #00000085, 0 0 0 200px #00000061;
 }
 
 /* Temporary until I learn how to hide the disgusting default outline */

@@ -58,10 +58,15 @@ const palleteOverlay     = selectOrCreate("#topOverlay");
 const undoButton         = selectOrCreate("#undoButton");
 const redoButton         = selectOrCreate("#redoButton");
 
+// We use this to composite all gl components in one context:
+LS.GL.createGlobalWebGLRenderer({
+    compositeLayerParent: appContainer
+});
+
 /**
- * Global persistent application state
+ * --- Global persistent application state ---
  * Should be the only source of persistent state, everything else should follow a lifecycle pattern
- */
+*/
 const app = globalThis.app = {
     container: appContainer,
     config,
@@ -77,18 +82,41 @@ const app = globalThis.app = {
     /**
      * Enters the loading/transition shade
      */
-    enterShade() {
+    async enterShade() {
         app.container.classList.remove('loaded');
         const logo = document.querySelector("#logo");
         logo.classList.remove("jump");
+
+        await app.container.animate([
+            { transform: "none" },
+            { transform: "scale(0.95)" },
+        ], {
+            duration: 1500,
+            easing: "ease-out"
+        }).finished;
     },
 
     /**
      * Leaves the loading/transition shade & plays the logo animation
      */
-    leaveShade() {
+    async leaveShade() {
         app.container.style.display = 'flex';
-        setTimeout(() => { document.querySelector("#logo").classList.add("jump"); app.container.classList.add('loaded') }, 0);
+        app.container.style.transform = 'none';
+
+        await new Promise(resolve => setTimeout(resolve, 0));
+
+        document.querySelector("#logo").classList.add("jump");
+        app.container.classList.add('loaded');
+
+        await new Promise(resolve => setTimeout(resolve, 10));
+
+        await app.container.animate([
+            { transform: "scale(0.95)" },
+            { transform: "none" },
+        ], {
+            duration: 1500,
+            easing: "ease-out"
+        }).finished;
     },
 
     /**
@@ -116,7 +144,9 @@ const app = globalThis.app = {
      * @experimental
      */
     async setFlavor(flavorClass, options = {}) {
-        app.enterShade();
+        if(options.delay) {
+            app.enterShade();
+        }
 
         if(app.flavorInstance) {
             console.warn("Destroying previous flavor instance");
@@ -165,7 +195,7 @@ const app = globalThis.app = {
             if (typeof options.delay === "undefined" || typeof options.delay === "number") await new Promise(resolve => setTimeout(resolve, options.delay || 250));
             app.setIcon(flavorClass.iconSet, false);
             document.querySelector("#app-loading")?.remove?.();
-            app.leaveShade();
+            await app.leaveShade();
         }
 
     },
@@ -191,7 +221,7 @@ const app = globalThis.app = {
             throw new Error(`Flavor module ${flavorPath} does not export a default class`);
         }
 
-        return await app.setFlavor(flavorClass, options);
+        await app.setFlavor(flavorClass, options);
     },
 
     aboutDialog() {
@@ -285,8 +315,18 @@ window.addEventListener('DOMContentLoaded', async () => {
         // A project file could contain multiple flavors in which case the user decides which one to load.
 
         function getLayouts() {
-            // TODO: Show layouts from flavors
             const result = [];
+
+            console.log("Getting layouts from flavor", app.flavorInstance?.constructor?.name, app.flavorInstance?.constructor?.layoutPresets);
+
+            if(!app.flavorInstance || !app.flavorInstance.constructor.layoutPresets) return result;
+
+            for(const presetName in app.flavorInstance.constructor.layoutPresets) {
+                result.push({
+                    text: presetName
+                });
+            }
+
             return result;
         }
 
@@ -624,12 +664,8 @@ window.addEventListener('DOMContentLoaded', async () => {
             inputElement: paletteContainer.querySelector(".command-input"),
             terminalOutput: terminalOutput,
             fontWidth: 9.6,
-            onClose(){
-                LS.Animation.fadeOut(palleteOverlay, 300, "down");
-            },
-            onOpen(){
-                LS.Animation.fadeIn(palleteOverlay, 300, "up");
-            },
+            onClose(){ LS.Animation.fadeOut(palleteOverlay, "down") },
+            onOpen (){ LS.Animation.fadeIn(palleteOverlay,  "up")   },
             logger: paletteLogger,
         });
 

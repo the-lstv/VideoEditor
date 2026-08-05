@@ -114,16 +114,16 @@ class PreviewView extends LS.View {
         this.frameScheduler.limitFPS(30);
     }
 
-    #formatTime(seconds, decisecond = false) {
-        if(isNaN(seconds) || !isFinite(seconds)) return "0:00";
-        
-        const totalSeconds = Math.floor(seconds);
+    #formatTime(milliseconds, decisecond = false) {
+        if(isNaN(milliseconds) || !isFinite(milliseconds)) return "0:00";
+
+        const totalSeconds = Math.floor(milliseconds / 1000);
         const mins = Math.floor(totalSeconds / 60);
         const secs = totalSeconds % 60;
         let timeString = mins + ":" + (secs < 10 ? "0" : "") + secs;
 
         if(decisecond) {
-            const ds = Math.floor((seconds - totalSeconds) * 10);
+            const ds = Math.floor((milliseconds / 1000 - totalSeconds) * 10);
             timeString += "." + ds;
         }
 

@@ -89,8 +89,10 @@ function createWindow(options = {}) {
         }
     });
 
+    
     window.once("ready-to-show", () => {
         window.show();
+        window.webContents.toggleDevTools();
     });
     return window;
 }

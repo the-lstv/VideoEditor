@@ -314,7 +314,7 @@ class CommandPalette {
         this.#clearInput();
         this.#clearAutoCompletion();
 
-        const parts = this.#parseCommand(trimmed);
+        const parts = this.splitCommand(trimmed);
         const { command, args, path } = await this.#resolveCommand(parts);
 
         if (!command) {
@@ -720,14 +720,14 @@ class CommandPalette {
         const caretLeft = Math.max(0, (selectionEnd * fontWidth) - scrollLeft);
 
         if (this.caretElement) {
-            this.caretElement.style.left = `${caretLeft}px`;
+            this.caretElement.style.transform = `translateX(${caretLeft}px)`;
         }
 
         if (this.selectionHighlight) {
             if (hasSelection) {
                 const selectionLeft = Math.max(0, (selectionStart * fontWidth) - scrollLeft);
                 const selectionWidth = Math.max(0, (selectionEnd - selectionStart) * fontWidth);
-                this.selectionHighlight.style.left = `${selectionLeft}px`;
+                this.selectionHighlight.style.transform = `translateX(${selectionLeft}px)`;
                 this.selectionHighlight.style.width = `${selectionWidth}px`;
             } else {
                 this.selectionHighlight.style.width = '0';
@@ -783,7 +783,7 @@ class CommandPalette {
 
         this.#clearAutoCompletion({ resetIndex: !preserveIndex, clearUI: false });
 
-        const analysis = this.#analyzeInput(value);
+        const analysis = this.analyzeInput(value);
         const context = await this.#buildCompletionContext(analysis, token);
         if (token !== this.#autoCompletionRequestToken || context?.cancelled) return;
 
@@ -835,7 +835,7 @@ class CommandPalette {
         this.#updateIcon(selected);
 
         // Update hint using the display name, not completion value
-        const currentPart = this.#analyzeInput(this.value).currentPart ?? '';
+        const currentPart = this.analyzeInput(this.value).currentPart ?? '';
         this.#updateHint(selectedName, currentPart);
 
         // Update selection classes without rebuilding DOM
@@ -1106,16 +1106,14 @@ class CommandPalette {
             return;
         }
 
-        // Clear hint immediately
+        // Clear hint immediately (ok why?)
         if (this.hintElement) {
             this.hintElement.textContent = '';
         }
 
-        const parts = this.#splitCommand(this.inputElement.value);
-        if (parts.length === 0) parts.push('');
+        const parts = this.splitCommand(this.inputElement.value, true);
         parts[parts.length - 1] = this.#autoCompletionValue;
-
-        const cleaned = parts.join(' ').replace(/\s+$/, '');
+        const cleaned = parts.join(' ').trimEnd();
 
         // Check if the selected command should be auto-executed
         // (has no inputs and no children)
@@ -1133,7 +1131,7 @@ class CommandPalette {
         }
 
         // Resolve the command to check inputs against definitions
-        const parsedParts = this.#parseCommand(cleaned);
+        const parsedParts = this.splitCommand(cleaned);
         const { command, args } = await this.#resolveCommand(parsedParts);
 
         // Check if the last argument provided corresponds to a list item with a nested type
@@ -1191,15 +1189,14 @@ class CommandPalette {
         const file = event.target.files?.[0];
         if (!file || !this.inputElement) return;
 
-        const parts = this.#splitCommand(this.inputElement.value);
-        if (parts.length === 0) parts.push('');
+        const parts = this.splitCommand(this.inputElement.value, true);
 
         // Replace the last part (which was the file picker placeholder) with the file name
         // Use quotes if the filename contains spaces
         const fileName = file.name.includes(' ') ? `"${file.name}"` : file.name;
         parts[parts.length - 1] = fileName;
 
-        const cleaned = parts.join(' ').replace(/\s+$/, '');
+        const cleaned = parts.join(' ').trimEnd();
         this.inputElement.value = cleaned ? `${cleaned} ` : '';
 
         // Store the file object for later retrieval
@@ -1211,9 +1208,37 @@ class CommandPalette {
         this.inputElement.focus();
     }
 
-    #splitCommand(inputValue) {
-        const parts = [];
+    #openColorPicker() {
+        if (!this.#colorInputElement) return;
+
+        this.#colorInputElement.value = '#000000'; // Reset to default
+        this.#colorInputElement.click();
+    }
+
+    #handleColorSelect(event) {
+        const color = event.target.value;
+        if (!color || !this.inputElement) return;
+
+        const parts = this.splitCommand(this.inputElement.value, true);
+
+        // Replace the last part with the selected color
+        parts[parts.length - 1] = new LS.Color(color).hex;
+
+        const cleaned = parts.join(' ').trimEnd();
+        this.inputElement.value = cleaned ? `${cleaned} ` : '';
+
+        this.#updateTextDisplay();
+        this.#scheduleAutoCompletion(this.inputElement.value);
+        this.#updateCaretPosition();
+        this.inputElement.focus();
+    }
+
+    splitCommand(inputValue, expectsEmptySlot = false) {
         let stringChar = null, start = 0;
+        inputValue = inputValue.trimStart();
+
+        if(!inputValue) return [''];
+        let parts = [];
 
         for (let i = 0; i < inputValue.length; i++) {
             const char = inputValue.charCodeAt(i);
@@ -1235,47 +1260,34 @@ class CommandPalette {
             }
 
             if(char === 32) { // space
+                if (start === i) {
+                    start = i + 1;
+                    parts.push('');
+                    continue;
+                }
+
                 parts.push(inputValue.slice(start, i));
                 start = i + 1;
             }
         }
 
         parts.push(inputValue.slice(start));
+
+        if(expectsEmptySlot && inputValue.endsWith(' ')) {
+            parts = parts.filter(Boolean);
+            parts.push('');
+            return parts;
+        }
+
         return parts.filter(Boolean);
     }
 
-    #openColorPicker() {
-        if (!this.#colorInputElement) return;
-
-        this.#colorInputElement.value = '#000000'; // Reset to default
-        this.#colorInputElement.click();
-    }
-
-    #handleColorSelect(event) {
-        const color = event.target.value;
-        if (!color || !this.inputElement) return;
-
-        const parts = this.#splitCommand(this.inputElement.value);
-        if (parts.length === 0) parts.push('');
-
-        // Replace the last part with the selected color
-        parts[parts.length - 1] = color;
-
-        const cleaned = parts.join(' ').replace(/\s+$/, '');
-        this.inputElement.value = cleaned ? `${cleaned} ` : '';
-
-        this.#updateTextDisplay();
-        this.#scheduleAutoCompletion(this.inputElement.value);
-        this.#updateCaretPosition();
-        this.inputElement.focus();
-    }
-
-
-    // PRIVATE - Command Resolution & Execution
-
-
-    #parseCommand(commandString) {
-        return this.#splitCommand(commandString.trim());
+    analyzeInput(value = '') {
+        value = value ?? '';
+        const segments = this.splitCommand(value.trim());
+        const hasTrailingSpace = value.endsWith(' ');
+        const currentPart = (!hasTrailingSpace && segments.length > 0)? segments.pop() : '';
+        return { segments, currentPart, hasTrailingSpace };
     }
 
     async #resolveCommand(parts) {
@@ -1608,19 +1620,6 @@ class CommandPalette {
         return {};
     }
 
-    #analyzeInput(value = '') {
-        const safeValue = value ?? '';
-        const hasTrailingSpace = /\s$/.test(safeValue);
-        let segments = safeValue.trim() ? safeValue.trim().split(/\s+/) : [];
-        let currentPart = '';
-
-        if (!hasTrailingSpace && segments.length > 0) {
-            currentPart = segments.pop() || '';
-        }
-
-        return { segments, currentPart, hasTrailingSpace };
-    }
-
     #wrapAutoCompletionIndex(length) {
         if (length === 0) {
             this.#autoCompletionIndex = 0;
@@ -1694,6 +1693,7 @@ class CommandPalette {
                 return match ? match.value : value;
             }
             case 'color':
+                return new LS.Color(value).hex || value;
             case 'file':
             case 'string':
             default:
@@ -2000,112 +2000,6 @@ class CommandPalette {
 
 
 // // --- lstv.space specific
-
-// function init(kernel, website, LoggerContext) {
-//     const topBar = LS.SelectOne("#topOverlay");
-
-//     topBar.innerHTML = `<div id="commandTerminal" class="level-n3" style="display: none">
-//     <div class="terminal-output"></div>
-// </div>
-
-// <div id="commandPaletteBar" class="level-n3">
-//     <div id="commandPalette" onclick="this.querySelector('.command-input').focus()">
-//         <div class="completion-menu"></div>
-
-//         <i class="bi-terminal command-icon"></i>
-
-//         <div class="textContainer">
-//             <span class="command-selection"></span>
-//             <span class="command-caret"></span>
-//             <span class="command-text"></span><span class="command-hint"></span>
-//             <input type="text" class="command-input" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" aria-label="Command palette input">
-//         </div>
-//     </div>
-
-//     <div class="command-palette-buttons">
-//         <button ls-tooltip="Close" class="square clear" aria-label="Close command palette"><i class="bi-x-lg"></i></button>
-//     </div>
-// </div>`;
-
-// const paletteBar = LS.SelectOne("#commandPaletteBar");
-// const paletteContainer = LS.SelectOne("#commandPalette");
-// const terminalContainer = LS.SelectOne("#commandTerminal");
-// const terminalOutput = terminalContainer.querySelector(".terminal-output");
-
-//     const paletteLogger = new LoggerContext("Command Palette");
-//     website.palette = new CommandPalette({
-//         wrapperElement: paletteContainer,
-//         menuElement: paletteContainer.querySelector(".completion-menu"),
-//         iconElement: paletteContainer.querySelector(".command-icon"),
-//         textDisplayElement: paletteContainer.querySelector(".command-text"),
-//         hintElement: paletteContainer.querySelector(".command-hint"),
-//         inputElement: paletteContainer.querySelector(".command-input"),
-//         terminalOutput: terminalOutput,
-
-//         fontWidth: 9.6 * 1.2,
-
-//         onClose(){
-//             LS.Animation.fadeOut(topBar, 300, "down");
-//         },
-
-//         onOpen(){
-//             LS.Animation.fadeIn(topBar, 300, "up");
-//         },
-
-//         logger: paletteLogger
-//     });
-
-//     let terminalHidden = true;
-//     const terminalObserver = new MutationObserver(() => {
-//         const hasContent = terminalOutput.children.length > 0;
-//         if (hasContent) {
-//             if (terminalHidden) {
-//                 LS.Animation.fadeIn(terminalContainer, 200, "up");
-//                 terminalHidden = false;
-//             }
-//         } else {
-//             if (!terminalHidden) {
-//                 LS.Animation.fadeOut(terminalContainer, 200, "down");
-//                 terminalHidden = true;
-//             }
-//         }
-//     });
-
-//     terminalObserver.observe(terminalOutput, { childList: true });
-
-//     const terminalWriter = {
-//         log: website.palette.log.bind(website.palette)
-//     }
-
-//     kernel.terminalWriter = terminalWriter;
-//     paletteLogger.writer = terminalWriter;
-
-//     paletteBar.querySelector("button").onclick = () => {
-//         website.palette.close();
-//     };
-
-//     /**
-//      * This should later be inline, so we don't waste client memory & work. 
-//      * That's when we use Glitter
-//      */
-
-//     /*comptime*/ const kVersionMeta = {
-//         1: {
-//             codename: "Zen",
-//             color: "#B5FFEE"
-//         },
-//         2: {
-//             codename: "Aether",
-//             color: "#FFA680"
-//         },
-//         3: {
-//             codename: "Forge",
-//             color: "#8C80FF"
-//         }
-//     }
-
-//     /*comptime*/ const ckMeta = kVersionMeta[kernel.version.split(".")[0]] || { codename: "Unknown", color: "var(--accent)" };
-
 //     website.palette.register([
 //         {
 //             name: "kernel-info",
@@ -2181,52 +2075,6 @@ class CommandPalette {
 //             icon: "bi-gear",
 //             description: "More settings",
 //             children: [
-//                 // {
-//                 //     name: "notifications",
-//                 //     icon: "bi-bell",
-//                 //     description: "Enable or disable notifications",
-//                 //     children: [
-//                 //         {
-//                 //             name: "enable",
-//                 //             icon: "bi-bell-fill",
-//                 //             description: "Enable notifications",
-//                 //         },
-//                 //         {
-//                 //             name: "disable",
-//                 //             icon: "bi-bell-slash",
-//                 //             description: "Disable notifications",
-//                 //         }
-//                 //     ]
-//                 // },
-
-//                 {
-//                     name: "privacy",
-//                     icon: "bi-shield-lock",
-//                     description: "Privacy settings",
-//                     children: [
-//                         {
-//                             name: "statistics",
-//                             icon: "bi-bar-chart",
-//                             description: "Toggle anonymous statistics sharing",
-//                             onCalled(enabled) {
-//                                 localStorage.setItem("DISABLE_STATS", !enabled);
-//                                 terminalWriter.log("Statistics sharing " + (enabled ? "enabled - Thank you!" : "disabled - No statistics data will be sent from this browser from now on."));
-
-//                                 if(!enabled) {
-//                                     terminalWriter.log("Warning: This setting is not saved to your account and is specific to this browser. Make sure to update this setting on other devices.");
-//                                 }
-//                             },
-//                             inputs: [
-//                                 {
-//                                     name: "enabled",
-//                                     type: "boolean",
-//                                     default: true
-//                                 }
-//                             ]
-//                         }
-//                     ]
-//                 },
-
 //                 {
 //                     name: "performance-mode",
 //                     icon: "bi-speedometer",
@@ -2336,33 +2184,6 @@ class CommandPalette {
 //                 }
 //             ]
 //         },
-
-//         {
-//             name: "echo",
-//             alias: ["print"],
-//             icon: "bi-chat",
-//             description: "Echo input",
-//             onCalled(text) { terminalWriter.log(text) },
-//             inputs: [
-//                 { name: "text", type: "string", description: "Text to echo" }
-//             ]
-//         },
-
-//         {
-//             name: "clear",
-//             icon: "bi-trash",
-//             alias: ["clear-terminal", "cls"],
-//             description: "Clear the terminal output",
-//             onCalled() { terminalOutput.innerHTML = "" }
-//         },
-
-//         {
-//             name: "close",
-//             alias: ["exit"],
-//             icon: "bi-x-circle",
-//             description: "Close the command palette",
-//             onCalled() { website.palette.close() }
-//         }
 //     ]);
 // }
 
