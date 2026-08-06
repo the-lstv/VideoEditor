@@ -175,10 +175,9 @@ const app = globalThis.app = {
                 throw new Error(`preparation of ${flavorClass.name} failed because ${loaded}`);
             }
 
-            if(flavorClass.layoutPresets?.default) {
-                app.layoutManager.setSchema(flavorClass.layoutPresets.default);
-            }
-    
+            const layout = app.config.get("layout-for-" + flavorId);
+            app.layoutManager.setSchema((typeof layout === "string"? flavorClass.layoutPresets?.[layout]: layout) || flavorClass.layoutPresets?.default || LS.Multipane.PRESETS.default);
+
             app.currentProject = new Project();
             if(app.currentProject && app.currentProject.loaded) {
                 throw new Error("The current project is already loaded. The flavor must be set up while loading a project.");
@@ -323,7 +322,17 @@ window.addEventListener('DOMContentLoaded', async () => {
 
             for(const presetName in app.flavorInstance.constructor.layoutPresets) {
                 result.push({
-                    text: presetName
+                    text: presetName,
+                    action() {
+                        const preset = app.flavorInstance.constructor.layoutPresets[presetName];
+                        if(!preset) {
+                            LS.Toast.show(`Layout preset "${presetName}" not found in flavor ${app.flavorInstance.constructor.name}`);
+                            return;
+                        }
+
+                        app.config.set("layout-for-" + app.flavorInstance.constructor.name, presetName);
+                        app.layoutManager.setSchema(preset);
+                    }
                 });
             }
 
@@ -598,7 +607,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             ],
 
             layout: [
-                { text: "Layout presets", items: getLayouts() },
+                { text: "Flavor layout presets", items: getLayouts },
                 { text: "Saved layouts", items: [] },
 
                 // { type: "separator" },

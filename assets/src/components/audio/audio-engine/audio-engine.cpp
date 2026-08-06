@@ -24,6 +24,10 @@
 #include <thread>
 #include <vector>
 
+extern "C" {
+    #include "include/ring-buffer/TPCircularBuffer.h"
+}
+
 // --- Platform headers
 #if defined(__linux__) || defined(__APPLE__)
 #include <pthread.h>
@@ -76,6 +80,11 @@ struct alignas(64) SharedState {
 
 };
 
+/**
+ * @brief Audio engine runtime class.
+ * This one uses block-based/buffer processing so is not fully real-time.
+ * This class manages the audio engine's lifecycle and thread management.
+ */
 namespace AudioEngine {
     // -- TEST ONLY
     float phase = 0.0f;
@@ -97,9 +106,21 @@ namespace AudioEngine {
         // Shared buffer for the state
         v8::Global<v8::ArrayBuffer> sharedBuffer;
         std::shared_ptr<v8::BackingStore> sharedBackingStore;
-        
+
         // Shared state shared between the audio engine and the main thread
         std::unique_ptr<SharedState> sharedState;
+
+        // Audio device
+        ma_device_config deviceConfig {};
+        ma_device device {};
+
+        // Audio output ring buffer
+        // Currently using this implementation by Michael Tyson (https://github.com/michaeltyson)
+        // Until I implement my own
+        TPCircularBuffer outputRing;
+
+        // Processing thread for audio engine
+        std::thread processingThread;
 
         EngineRuntime(uint32_t sampleRate = 44100, uint32_t bufferSize = 512) : sampleRate(sampleRate), bufferSize(bufferSize) {
             // Initialize the audio engine
@@ -120,21 +141,6 @@ namespace AudioEngine {
             return true;
         }
 
-        static void audioCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
-            float* out = static_cast<float*>(output);
-
-            for (uint32_t i = 0; i < frameCount; i++) {
-                float sample = (phase / PI) - 1.0f;
-
-                out[i * 2 + 0] = sample;
-                out[i * 2 + 1] = sample;
-
-                phase += 2.0f * PI * frequency / 44100.0f;
-                if (phase >= 2.0f * PI)
-                    phase -= 2.0f * PI;
-            }
-        }
-
         /*
             Start the audio engine. Returns true if the engine was started successfully.
             Thread-safe: true, can be called from any thread.
@@ -144,20 +150,130 @@ namespace AudioEngine {
                 return false;
             }
 
-            bool expected = false;
-            if (!running.compare_exchange_strong(expected, true)) {
-                // Return if we are already running
+            // If running, we don't need to start again
+            if (running.load(std::memory_order_acquire)) {
                 return true;
             }
 
-            ma_device_config config = ma_device_config_init(ma_device_type_playback);
-            config.playback.format = ma_format_f32;
-            config.playback.channels = outputChannels;
-            config.sampleRate = sampleRate;
-            config.dataCallback = &EngineRuntime::audioCallback;
-            config.pUserData = this;
+            deviceConfig = ma_device_config_init(ma_device_type_playback);
+            deviceConfig.playback.format = ma_format_f32;
+            deviceConfig.playback.channels = outputChannels;
+            deviceConfig.sampleRate = sampleRate;
+            deviceConfig.dataCallback = &EngineRuntime::audioCallback;
+            deviceConfig.pUserData = this;
+
+            ma_result result = ma_device_init(nullptr, &deviceConfig, &device);
+
+            if (result != MA_SUCCESS) {
+                return false;
+            }
+            
+            processingThread = std::thread(&EngineRuntime::processingLoop, this);
+            if (!processingThread.joinable()) {
+                return false;
+            }
+
+            // Raise the thread priority for real-time audio processing
+            #if defined(__linux__) || defined(__APPLE__)
+                pthread_t native = processingThread.native_handle();
+                sched_param params {};
+                params.sched_priority = sched_get_priority_max(SCHED_FIFO);
+                pthread_setschedparam(native, SCHED_FIFO, &params);
+            #else
+                (void)processingThread;
+            #endif
+
+            ma_result startResult = ma_device_start(&device);
+            if (startResult != MA_SUCCESS) {
+                ma_device_uninit(&device);
+                return false;
+            }
+
+            running.store(true, std::memory_order_release);
             return true;
         }
+
+        /**
+         * The main block processing loop.
+         * This one runs in batches of audio frames (not in real-time).
+         */
+        void processingLoop() {
+            const auto blockDuration = std::chrono::duration<double>(static_cast<double>(bufferSize) / static_cast<double>(sampleRate));
+
+            // Initialize the ring buffer with enough space for 8 blocks of audio data
+            TPCircularBufferInit(&outputRing, bufferSize * outputChannels * sizeof(float) * 8);
+
+            static std::atomic<int> count = 0;
+            while (running.load(std::memory_order_acquire)) {
+                // drainCommands();
+
+
+if (++count % 100 == 0) {
+    printf("callback alive\n");
+}
+
+                // Process audio block
+
+                // Temporarily testing:
+
+                // Get the pointer to the output buffer
+                void* outputBuffer = TPCircularBufferHead(&outputRing, nullptr);
+
+                // Fill the output buffer with audio data (das wave for testing)
+                float* samples = static_cast<float*>(outputBuffer);
+                for (uint32_t i = 0; i < bufferSize * outputChannels; i++) {
+                    float sample = (phase / PI) - 1.0f;
+                    samples[i] = sample;
+
+                    phase += 2.0f * PI * frequency / static_cast<float>(sampleRate);
+                    if (phase >= 2.0f * PI)
+                        phase -= 2.0f * PI;
+                }
+
+                // Mark the produced bytes as available for reading
+                TPCircularBufferProduce(&outputRing, bufferSize * outputChannels * sizeof(float));
+
+                std::this_thread::sleep_for(blockDuration / 2);
+                // sharedState->sequence.fetch_add(1, std::memory_order_release);
+            }
+
+            TPCircularBufferCleanup(&outputRing);
+        }
+
+        static void audioCallback(ma_device* device, void* output, const void*, ma_uint32 frameCount) {
+            EngineRuntime* engine = static_cast<EngineRuntime*>(device->pUserData);
+
+            // Get the pointer to the output buffer
+            float* samples = static_cast<float*>(output);
+
+            // Get a pointer to the available data in the ring buffer
+            uint32_t availableBytes;
+            void* ringBufferData = TPCircularBufferTail(&engine->outputRing, &availableBytes);
+
+            // Calculate how many frames we can read from the ring buffer
+            uint32_t framesToRead = std::min<ma_uint32>(frameCount, availableBytes / (engine->outputChannels * sizeof(float)));
+
+            // Copy the data from the ring buffer to the output buffer
+            if (ringBufferData && framesToRead > 0) {
+                std::memcpy(samples, ringBufferData, framesToRead * engine->outputChannels * sizeof(float));
+                TPCircularBufferConsume(&engine->outputRing, framesToRead * engine->outputChannels * sizeof(float));
+            }
+        }
+
+        // static void audioCallback(ma_device*, void* output, const void*, ma_uint32 frameCount) {
+        //     float* out = static_cast<float*>(output);
+
+        //     for (uint32_t i = 0; i < frameCount; i++) {
+        //         float sample = (phase / PI) - 1.0f;
+
+        //         out[i * 2 + 0] = sample;
+        //         out[i * 2 + 1] = sample;
+
+        //         phase += 2.0f * PI * frequency / 44100.0f;
+        //         if (phase >= 2.0f * PI)
+        //             phase -= 2.0f * PI;
+        //     }
+        // }
 
         /*
             Stops the audio engine.
@@ -165,6 +281,10 @@ namespace AudioEngine {
         */
         void stop() {
             // Stop the audio engine
+            ma_device_uninit(&device);
+            if (processingThread.joinable()) {
+                processingThread.join();
+            }
         }
     };
 
@@ -186,11 +306,6 @@ namespace AudioEngine {
 // }
 
 }
-
-
-
-
-
 
 
 

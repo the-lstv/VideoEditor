@@ -211,7 +211,8 @@ const char* source_files[] = {
     "vst3sdk/public.sdk/source/vst/hosting/pluginterfacesupport.cpp",
     "vst3sdk/public.sdk/source/vst/hosting/plugprovider.cpp",
     "vst3sdk/public.sdk/source/vst/hosting/hostclasses.cpp",
-    "vst3sdk/public.sdk/source/vst/hosting/hostdataexchangehandler.cpp"
+    "vst3sdk/public.sdk/source/vst/hosting/hostdataexchangehandler.cpp",
+    "include/ring-buffer/TPCircularBuffer.cpp",
 };
 
 int source_has_wildcard(const char *source) {
@@ -235,7 +236,12 @@ void make_object_name(const char *source, char *object_name, size_t object_name_
     object_name[j] = '\0';
 }
 
-void compile_vst3_source_unix(char *cpp_compiler, char *cpp_shared, const char *source_file) {
+bool source_isC(const char *source) {
+    size_t len = strlen(source);
+    return len >= 2 && source[len - 2] == '.' && source[len - 1] == 'c';
+}
+
+void compile_vst3_source_unix(char *c_compiler, char *cpp_compiler, char *cpp_shared, char *c_shared, const char *source_file) {
     if (source_has_wildcard(source_file)) {
         glob_t matches;
 
@@ -257,7 +263,11 @@ void compile_vst3_source_unix(char *cpp_compiler, char *cpp_shared, const char *
                 continue;
             }
 
-            run("%s %s %s -o %s", cpp_compiler, cpp_shared, matches.gl_pathv[i], path);
+            if (source_isC(matches.gl_pathv[i])) {
+                run("%s %s %s -o %s", c_compiler, c_shared, matches.gl_pathv[i], path);
+            } else {
+                run("%s %s %s -o %s", cpp_compiler, cpp_shared, matches.gl_pathv[i], path);
+            }
         }
 
         globfree(&matches);
@@ -273,11 +283,15 @@ void compile_vst3_source_unix(char *cpp_compiler, char *cpp_shared, const char *
         printf("Skipping %s since it already exists\n", object_name);
         return;
     }
-    run("%s %s %s -o %s", cpp_compiler, cpp_shared, source_file, path);
+    if (source_isC(source_file)) {
+        run("%s %s %s -o %s", c_compiler, c_shared, source_file, path);
+    } else {
+        run("%s %s %s -o %s", cpp_compiler, cpp_shared, source_file, path);
+    }
 }
 
 #ifdef IS_WINDOWS
-void compile_vst3_source_windows(char *cpp_compiler, char *cpp_shared, const char *source_file) {
+void compile_vst3_source_windows(char *c_compiler, char *cpp_compiler, char *cpp_shared, char *c_shared, const char *source_file) {
     if (source_has_wildcard(source_file)) {
         char search_pattern[256];
         char source_prefix[256];
@@ -317,7 +331,11 @@ void compile_vst3_source_windows(char *cpp_compiler, char *cpp_shared, const cha
                 }
             }
             make_object_name(matched_source, object_name, sizeof(object_name));
-            run("%s %s %s /Fo:fragments\\%s.obj", cpp_compiler, cpp_shared, matched_source, object_name);
+            if (source_isC(matched_source)) {
+                run("%s %s %s /Fo:fragments\\%s.obj", c_compiler, c_shared, matched_source, object_name);
+            } else {
+                run("%s %s %s /Fo:fragments\\%s.obj", cpp_compiler, cpp_shared, matched_source, object_name);
+            }
         } while (_findnext(search_handle, &file_info) == 0);
 
         _findclose(search_handle);
@@ -335,23 +353,22 @@ void compile_vst3_source_windows(char *cpp_compiler, char *cpp_shared, const cha
     }
 
     make_object_name(source_path, object_name, sizeof(object_name));
-    run("%s %s %s /Fo:fragments\\%s.obj", cpp_compiler, cpp_shared, source_path, object_name);
+    if (source_isC(source_path)) {
+        run("%s %s %s /Fo:fragments\\%s.obj", c_compiler, c_shared, source_path, object_name);
+    } else {
+        run("%s %s %s /Fo:fragments\\%s.obj", cpp_compiler, cpp_shared, source_path, object_name);
+    }
 }
 #endif
 
-void build_vst3sdk(char *cpp_compiler, char *cpp_shared, int windows_build) {
+void build_vst3sdk(char *c_compiler, char *cpp_compiler, char *cpp_shared, char *c_shared) {
     size_t count = sizeof(source_files) / sizeof(source_files[0]);
 
     for (size_t i = 0; i < count; i++) {
 #ifdef IS_WINDOWS
-        if (windows_build) {
-            compile_vst3_source_windows(cpp_compiler, cpp_shared, source_files[i]);
-        } else {
-            compile_vst3_source_unix(cpp_compiler, cpp_shared, source_files[i]);
-        }
+        compile_vst3_source_windows(c_compiler, cpp_compiler, cpp_shared, c_shared, source_files[i]);
 #else
-        (void)windows_build;
-        compile_vst3_source_unix(cpp_compiler, cpp_shared, source_files[i]);
+        compile_vst3_source_unix(c_compiler, cpp_compiler, cpp_shared, c_shared, source_files[i]);
 #endif
     }
 }
@@ -359,8 +376,9 @@ void build_vst3sdk(char *cpp_compiler, char *cpp_shared, int windows_build) {
 /* Build for Unix systems */
 void build(char *compiler, char *cpp_compiler, char *cpp_linker, char *os, const char *arch) {
     char *cpp_shared = "-pthread" OPT_FLAGS " -stdlib=libc++ -c -fPIC -std=c++20 -DRELEASE -Ivst3sdk -Ivst3sdk/public.sdk -Ivst3sdk/pluginterfaces -Iinclude";
+    char *c_shared = "-pthread" OPT_FLAGS " -c -fPIC -std=c11 -DRELEASE -Ivst3sdk -Ivst3sdk/public.sdk -Ivst3sdk/pluginterfaces -Iinclude";
 
-    build_vst3sdk(cpp_compiler, cpp_shared, 0);
+    build_vst3sdk(compiler, cpp_compiler, cpp_shared, c_shared);
 
     char *runtimeExtras = "";
     if (buildingForElectron) {
@@ -385,10 +403,11 @@ void build(char *compiler, char *cpp_compiler, char *cpp_linker, char *os, const
 /* Special case for windows (Untested, no idea if it works) */
 void build_windows(char *compiler, char *cpp_compiler, char *cpp_linker, char *os, const char *arch) {
     char *cpp_shared = "-DWIN32_LEAN_AND_MEAN -O3 -c -std=c++20 -DRELEASE -Ivst3sdk -Ivst3sdk/public.sdk -Ivst3sdk/pluginterfaces -Iinclude";
+    char *c_shared = "-DWIN32_LEAN_AND_MEAN -O3 -c -std=c11 -DRELEASE -Ivst3sdk -Ivst3sdk/public.sdk -Ivst3sdk/pluginterfaces -Iinclude";
 
     run("del /Q *.obj >NUL 2>&1");
 
-    build_vst3sdk(cpp_compiler, cpp_shared, 1);
+    build_vst3sdk(compiler, cpp_compiler, cpp_shared, c_shared);
 
     char *runtimeExtras = "";
     if (buildingForElectron) {
