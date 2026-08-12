@@ -1,5 +1,8 @@
 Warning; this changelog is just rough notes and may not be comprehensive.
 
+# Update: I gave up on the changelog, too many changes to keep track of.
+It will begin being updated again when the program is released
+
 # Version 2.0
 ## 2.3.0-alpha
 ### Core:

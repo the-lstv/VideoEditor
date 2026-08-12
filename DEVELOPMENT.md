@@ -9,12 +9,12 @@ The advantage of this is that you can easily create custom workflows and share r
 # File structure:
 
 - `index.html`: The entry HTML file that holds the base structure.
-- `assets/src/main.mjs`: The main JavaScript file that loads the flavor.
-  - `assets/src/flavors/`: Directory for different flavors
-  - `assets/src/core/`: Directory for core modules.
-  - `assets/src/views/`: Directory for UI views
-  <!-- - `assets/src/libraries/`: Directory for external library files. -->
-  - `assets/src/components/`: Directory for different components that are commonly used by flavors
+- `src/main.mjs`: The main JavaScript file that loads the flavor.
+  - `src/flavors/`: Directory for different flavors
+  - `src/core/`: Directory for core modules.
+  - `src/views/`: Directory for UI views
+  <!-- - `src/libraries/`: Directory for external library files. -->
+  - `src/components/`: Directory for different components that are commonly used by flavors
 - `assets/css/`: Directory for CSS stylesheets.
 - `assets/audio/`: Contains sound files the application uses.
 - `assets/images/`: Contains images.

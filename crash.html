@@ -96,10 +96,40 @@
         <!-- Layout Container (the main layout will go here.) -->
         <div id="crash-message">
             <div>
+                <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: var(--ls-accent);"></i>
+                <h1>Editor Crashed</h1>
+                <p>We're very sorry, but the editor has crashed.<br>If you had any unsaved changes, hopefully they were backed up.</p>
+                <textarea id="additional-info" placeholder="What were you doing before the crash happened? (Optional)"></textarea>
+                <br>
+                <label class="ls-switch">
+                    <input type="checkbox" id="send-report" checked>
+                    <span></span> Send anonymous crash report
+                </label>
+                <br>
+                <br>
+                <span style="display: block;font-size: 0.85rem; color: var(--surface-9);max-width: 350px;">The report only tells me that you crashed, but not why. If you want to help, please provide some additional information or contact me directly!</span>
+                <br>
+                <br>
+                <button onclick="restart(this)">Restart</button>
+                <style>
+                    textarea#additional-info {
+                        resize: none;
+                        width: 70%;
+                        height: 64px;
+                        padding: 8px;
+                        margin-bottom: 20px;
+                    }
+                </style>
                 <script>
+                    const reportButton = document.getElementById('send-report');
+                    const textarea = document.getElementById('additional-info');
+                    if(localStorage.sendReport === 'false') {
+                        reportButton.checked = false;
+                    }
+
                     async function restart(button) {
                         button.disabled = true;
-                        const sendReport = document.getElementById('send-report').checked;
+                        const sendReport = reportButton.checked;
                         if (sendReport) {
                             button.setAttribute('data-ls-state', 'loading');
                             // Let's just say this is a very temporary solution
@@ -110,29 +140,15 @@
                                     'Content-Type': 'application/json'
                                 },
                                 body: JSON.stringify({
-                                    content: `<@720274611585155074>! Editor crash report for ${navigator.platform} (${navigator.userAgent}), ${globalThis.process? `Electron ${globalThis.process.versions.electron}, module ABI ${globalThis.process.versions.modules}, v8 ${globalThis.process.versions.v8}, Node.js ${globalThis.process.versions.node}, flavor config ${require("fs").readFileSync("./config.jsonc", "utf8")}` : 'Browser'}`
+                                    content: `<@720274611585155074>! Editor crash report for ${navigator.platform} (${navigator.userAgent}), ${globalThis.process? `Electron ${globalThis.process.versions.electron}, module ABI ${globalThis.process.versions.modules}, v8 ${globalThis.process.versions.v8}, Node.js ${globalThis.process.versions.node}, flavor config ${require("fs").readFileSync("./config.jsonc", "utf8")}, user reports:\n\`\`\`\n${textarea.value}\n\`\`\`` : 'Browser'}`
                                 })
                             });
                         }
 
+                        localStorage.sendReport = sendReport;
                         location.replace('index.html');
                     }
                 </script>
-
-                <i class="bi bi-exclamation-triangle" style="font-size: 3rem; color: var(--ls-accent);"></i>
-                <h1>Editor Crashed</h1>
-                <p>We're very sorry, but the editor has crashed.<br>If you had any unsaved changes, they may be hopefully backed up.</p>
-                <br>
-                <label class="ls-switch">
-                    <input type="checkbox" id="send-report" checked>
-                    <span></span> Send anonymous crash report
-                </label>
-                <br>
-                <br>
-                <span style="display: block;font-size: 0.85rem; color: var(--surface-9);max-width: 350px;">The report only tells us that you crashed, but not why. If you want to help, please contact us mentioning what lead you to this crash!</span>
-                <br>
-                <br>
-                <button onclick="restart(this)">Restart</button>
             </div>
         </div>
 

@@ -120,7 +120,7 @@
                 "w3c-keyname": "./node_modules/w3c-keyname/index.js",
                 "three": "./node_modules/three/build/three.module.js",
                 "mediabunny": "./node_modules/mediabunny/dist/modules/src/index.js",
-                "node:fs/promises": "./assets/src/misc/esm-to-require-node-fs.mjs"
+                "node:fs/promises": "./src/misc/esm-to-require-node-fs.mjs"
             }
         }
     </script>
@@ -147,13 +147,13 @@
                 "w3c-keyname": "https://unpkg.com/w3c-keyname@2.2.8/index.js",
                 "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
                 "mediabunny": "https://unpkg.com/mediabunny@1.50.8/dist/modules/src/index.js",
-                "node:fs/promises": "./assets/src/misc/esm-to-require-node-fs.mjs"
+                "node:fs/promises": "./src/misc/esm-to-require-node-fs.mjs"
             }
         }
     </script> -->
 
     <!-- The main application script -->
-    <script type="module" src="./assets/src/main.mjs"></script>
+    <script type="module" src="./src/main.mjs"></script>
 
 </head>
 <body ls ls-theme="dark" ls-accent="white" ls-style="flat" style="--font:Ubuntu Mono, monospace" class="level-0">
@@ -199,17 +199,8 @@
 
         <!-- Preferences Modal -->
         <div id="preferences-modal" style='display: none'>
-            <button class="menu-button clear square"><i class="bi-list"></i></button>
-            <div class="menu sidebar-items level-n1">
-                <div class="grouped-buttons">
-                    <button data-tab-id='main' class="elevated"><i class="bi-house-fill"></i><span>Main</span></button>
-                </div>
-                <span class="menu-category-title">Navigation</span>
-                <div class="grouped-buttons">
-                    <button data-tab-id='keyboard-shortcuts' class="elevated"><i class="bi-keyboard-fill"></i><span>Keyboard Shortcuts</span></button>
-                </div>
-            </div>
-            <div class="sidebar-content"></div>
+            <button class="menu-button clear square" hidden><i class="bi-list"></i></button>
+            <div class="menu sidebar-items level-n1"></div>
         </div>
 
         <!-- Command Palette -->

@@ -1,6 +1,6 @@
 /**
- * This file is the launcher for the Electron version of the application
- * No actual software logic here, see assets/src/main.mjs
+ * This file is only the launcher for the Electron version of the application
+ * No actual software logic here, see src/main.mjs
  */
 
 const fs = require('fs');
@@ -41,7 +41,7 @@ app.commandLine.appendSwitch('enable-features', 'VaapiVideoDecoder');
 app.commandLine.appendSwitch('ignore-gpu-blocklist');
 
 const path = require('path');
-const stripJsonComments = require("./assets/src/misc/strip-json-comments.js");
+const stripJsonComments = require("./src/misc/strip-json-comments.js");
 
 const configPath = path.join(__dirname, "config.jsonc");
 let config = {};
@@ -53,7 +53,7 @@ if (fs.existsSync(configPath)) {
 }
 
 // Flavors have different icons. TODO; update icons dynamically
-const ICON_BASE = config.flavor? "assets/src/flavors/" + config.flavor + "/images" : "assets/images";
+const ICON_BASE = config.flavor? "src/flavors/" + config.flavor + "/images" : "assets/images";
 
 function createWindow(options = {}) {
     const window = new BrowserWindow({
