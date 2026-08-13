@@ -75,35 +75,6 @@
     overflow: hidden;
 }
 
-layout-item, .layout-tabs {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    outline: 1px solid var(--surface-1);
-}
-
-layout-item:last-of-type, .layout-tabs:last-of-type {
-    flex: 1;
-}
-
-.layout-row, .layout-column {
-    display: flex;
-}
-
-.layout-row {
-    flex-direction: row;
-}
-
-.layout-column {
-    flex-direction: column;
-}
-
-.layout-slot {
-    display: flex;
-    min-height: 0;
-    flex-direction: column;
-}
-
 #editor-container {
     width: 100%;
     height: 100%;
@@ -191,67 +162,6 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
     overflow: hidden;
 }
 
-.editor-view {
-    width: 100%;
-    height: 100%;
-    position: relative;
-    overflow: hidden;
-    min-height: 0;
-    min-width: 0;
-    flex: 1;
-}
-
-.centered-layout, .layout-slot-empty {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    height: 100%;
-    width: 100%;
-}
-
-.layout-slot-header {
-    height: 25px;
-    display: flex;
-    align-items: center;
-    background: var(--surface-n2);
-    padding: 0 10px;
-    justify-content: space-between;
-    overflow: hidden;
-    white-space: nowrap;
-}
-
-.layout-slot-header > div {
-    display: flex;
-    align-items: center;
-    gap: 6px;
-}
-
-.layout-slot-drop-target::before {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.35);
-    z-index: 1000;
-    pointer-events: none;
-}
-
-.layout-slot-drop-target::after {
-    content: "Drop here to Swap";
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    position: absolute;
-    padding: 10px;
-    left: 50%;
-    top: 50%;
-    transform: translate(-50%, -50%);
-    border-radius: 8px;
-    background: var(--surface-2);
-    border: 1px solid var(--accent);
-    z-index: 1000;
-    pointer-events: none;
-}
-
 .dragging-item-card-preview {
     position: fixed;
     top: 0;
@@ -284,17 +194,6 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
     background: var(--accent-60);
     transition: none;
     --ls-resize-anchor: 0;
-}
-
-/* Empty slot */
-.layout-slot-empty {
-    flex-direction: column;
-    color: var(--surface-8);
-}
-
-.layout-slot-empty i {
-    font-size: xx-large;
-    margin-bottom: 8px;
 }
 
 /* Editor Timeline */
@@ -350,11 +249,6 @@ layout-item:last-of-type, .layout-tabs:last-of-type {
     display: flex;
     align-items: center;
     gap: 2px;
-}
-
-.editor-view, layout-item, .ls-tabs {
-    min-height: 0;
-    min-width: 0;
 }
 
 .control-button {
@@ -474,38 +368,6 @@ ls-box ul li {
 .editor-property-editor > .ls-tabs, .editor-property-editor > .ls-tabs > .ls-tabs-content, .ls-tab-content, .ls-tabs-content {
     width: 100%;
     height: 100%;
-}
-
-.editor-tabs {
-    display: flex;
-    flex-direction: column;
-}
-
-.editor-tabs .ls-tabs-list {
-    display: flex;
-    overflow-x: overlay;
-    overflow-y: hidden;
-    min-height: 35px;
-    align-items: center;
-    border-bottom: 1px solid var(--elevate);
-}
-
-.editor-tabs .ls-tab-handle {
-    user-select: none;
-    cursor: pointer;
-    white-space: nowrap;
-    padding: 5px 20px;
-    border-right: 1px solid var(--elevate-n1);
-    border-top: 1px solid var(--elevate-n1);
-    background: var(--elevate);
-}
-
-.editor-tabs .ls-tab-handle.active {
-    cursor: default;
-    background: var(--elevate-n1);
-    padding: 7px 20px 4px;
-    border-top: none;
-    border-bottom: 3px solid var(--accent);
 }
 
 .aidBox {
@@ -653,6 +515,11 @@ pre.log-message {
     padding: 4px 8px;
     user-select: text;
     border-radius: var(--border-radius);
+}
+
+.logs-panel {
+    display: flex;
+    flex-direction: column;
 }
 
 .editor-tip {

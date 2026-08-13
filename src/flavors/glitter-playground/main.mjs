@@ -8,7 +8,7 @@ import Project from "../../core/project.mjs";
  * The editor text renderer should be unified
  */
 
-import AcceleratedTextGridRenderer from "../../components/graphics/text-engine.mjs";
+// import AcceleratedTextGridRenderer from "../../components/graphics/text-engine.mjs";
 import { CodeEditor, EditorState } from "../../components/code-editor/index.mjs";
 
 // I hate how fragmented CM is for no reason

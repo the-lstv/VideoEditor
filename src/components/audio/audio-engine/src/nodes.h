@@ -29,10 +29,8 @@ AUDIO_PROCESSOR(VST3Processor) {
     }
 
     plugin->processData.numSamples = static_cast<int32>(bufferSize);
-    plugin->processData.numInputs = static_cast <int32>(instruction->inputCount);
-    plugin->processData.numOutputs = static_cast<int32>(instruction->outputCount);
-
-    // This is some utterly dumb API.
+    plugin->processData.numInputs = static_cast <int32>(instruction->aInputCount);
+    plugin->processData.numOutputs = static_cast<int32>(instruction->aOutputCount);
 
     // Since our program buffer indexes can vary, we need to rebuild the input/output pointers.
     // Todo: Of course this should not be per process() call though there isn't a good way to do it without a lot of extra complexity
@@ -40,20 +38,20 @@ AUDIO_PROCESSOR(VST3Processor) {
 
     // Also shouldn't be hardcoded to 2 channels and 16 buses
 
-    for (uint32_t i = 0; i < instruction->inputCount; ++i) {
+    for (uint32_t i = 0; i < instruction->aInputCount; ++i) {
         plugin->inputs[i].numChannels = outputChannels;
         plugin->inputs[i].silenceFlags = 0;
         plugin->inputs[i].channelBuffers32 = plugin->iChannels[i].data();
-        plugin->inputs[i].channelBuffers32[0] = GET_BUFFER_BYTE(instruction->inputs[i]);
-        plugin->inputs[i].channelBuffers32[1] = GET_BUFFER_BYTE(instruction->inputs[i]) + bufferSize;
+        plugin->inputs[i].channelBuffers32[0] = GET_BUFFER_FLOAT(instruction->indexes[i + FIRST_INPUT_INDEX]);
+        plugin->inputs[i].channelBuffers32[1] = GET_BUFFER_FLOAT(instruction->indexes[i + FIRST_INPUT_INDEX]) + bufferSize;
     }
 
-    for (uint32_t i = 0; i < instruction->outputCount; ++i) {
+    for (uint32_t i = 0; i < instruction->aOutputCount; ++i) {
         plugin->outputs[i].numChannels = outputChannels;
         plugin->outputs[i].silenceFlags = 0;
         plugin->outputs[i].channelBuffers32 = plugin->oChannels[i].data();
-        plugin->outputs[i].channelBuffers32[0] = GET_BUFFER_BYTE(instruction->outputs[i]);
-        plugin->outputs[i].channelBuffers32[1] = GET_BUFFER_BYTE(instruction->outputs[i]) + bufferSize;
+        plugin->outputs[i].channelBuffers32[0] = GET_BUFFER_FLOAT(instruction->indexes[i + FIRST_OUTPUT_INDEX]);
+        plugin->outputs[i].channelBuffers32[1] = GET_BUFFER_FLOAT(instruction->indexes[i + FIRST_OUTPUT_INDEX]) + bufferSize;
     }
 
     plugin->processData.inputs = plugin->inputs.data();
@@ -91,7 +89,7 @@ AUDIO_PROCESSOR(Oscillator) {
     float shape     = instruction->uniforms[1];
     bool reverse = (instruction->flags & FlagInvertPhase) != 0;
 
-    float* outBuffer = GET_BUFFER_FLOAT(instruction->outputs[0]);
+    float* outBuffer = GET_BUFFER_FLOAT(instruction->indexes[FIRST_OUTPUT_INDEX]);
     float phaseIncrement = (reverse? -1.0f : 1.0f) * frequency / fSampleRate;
 
     // std::cout << "Oscillator: frequency=" << frequency << ", shape=" << shape << ", phase=" << gPhase << ", phaseIncrement=" << phaseIncrement << ", outputBuffer=" << static_cast<int>(instruction->outputs[0]) << std::endl;
@@ -122,8 +120,8 @@ AUDIO_PROCESSOR(Oscillator) {
 // break;
 
 AUDIO_PROCESSOR(MixerTrack) {
-    int in = instruction->inputs[0];
-    int out = instruction->outputs[0];
+    int in = instruction->indexes[0];
+    int out = instruction->indexes[instruction->aInputCount];
     if(in == out) {
         return;
     }

@@ -18,7 +18,7 @@ class PropertyEditorView extends LS.View {
 
         // Shown when no element is selected
         this.emptyMessage = LS.Create({
-            class: "centered-layout",
+            class: "ls-centered-layout",
             style: "flex-direction: column; color: var(--surface-8); text-align: center",
             inner: [
                 {
@@ -44,7 +44,7 @@ class PropertyEditorView extends LS.View {
         this.propertyGroups = {};
 
         // --- Tabs
-        this.tabs = new LS.Tabs((this.tabContainer = LS.Create("ls-tabs.property-editor-tabs.editor-tabs")), {
+        this.tabs = new LS.Tabs((this.tabContainer = LS.Create("ls-tabs.property-editor-tabs.ls-layout-tabs")), {
             list: true,
             styled: false
         });

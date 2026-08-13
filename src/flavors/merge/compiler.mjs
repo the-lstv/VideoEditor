@@ -2,6 +2,12 @@ import * as AudioEngine from "../../components/audio/index.mjs";
 
 // The struct layouts are still drafts and subject to change
 
+// This MUST remain in sync with the engine's program interpreter
+const STRUCT_SIZE = 128; // sizeof(AudioInstruction)
+const EVENT_STRUCT_SIZE = 20; // sizeof(Event)
+const MAX_IO_COUNT = 36; // Maximum number of inputs/outputs per node (audio + event + data)
+const LE = true; // Little-endian
+
 /*struct AudioInstruction {
     // Pointer to the audio processor function (e.g., a VST plugin)
     AUDIO_PROCESSOR_SIGN(process) = nullptr;
@@ -13,11 +19,16 @@ import * as AudioEngine from "../../components/audio/index.mjs";
     // So we are forced to use integer types instead of bitfields
     uint8_t flags = 0;
 
-    uint8_t inputCount = 0; // Number of input buffers
-    uint8_t inputs[16]; // Input buffer indexes (up to 16)
+    uint8_t aInputCount  = 0; // Number of input buffers
+    uint8_t aOutputCount = 0; // Number of output buffers
+    uint8_t eInputCount  = 0; // Number of event input buffers
+    uint8_t eOutputCount = 0; // Number of event output buffers
+    uint8_t dInputCount  = 0; // Number of data input buffers
+    uint8_t dOutputCount = 0; // Number of data output buffers
 
-    uint8_t outputCount = 0; // Number of output buffers
-    uint8_t outputs[16]; // Output buffer indexes (up to 16)
+    // The indexes of the individual input and output buffers.
+    // Currently this means that each node can have up to 36 inputs/outputs total.
+    uint8_t indexes[36];
 
     uint8_t masterFlags = 0;
 
@@ -66,10 +77,6 @@ import * as AudioEngine from "../../components/audio/index.mjs";
     };
 };*/
 
-
-// This MUST remain in sync with the engine's program interpreter
-const STRUCT_SIZE = 120; // sizeof(AudioInstruction)
-
 export default {
     /**
      * Compiles the patcher into a runnable program for the audio engine.
@@ -83,11 +90,12 @@ export default {
         const intermediateProgram = [];
 
         let bufferMap = new Map(); // Maps port IDs to buffer indexes
-        let bufferIndex = -1; // Current buffer index
+
+        // Current buffer indexes
+        // It's an array since JS does not have pass-by-reference for primitive types :(
+        const bufferIndexes = [0, 0]; // audioBufferIndex, eventBufferIndex
 
         // todo: optimize
-
-        const masterNode = patcher.nodes.find(node => node.kind === "master");
 
         for(const node of sorted) {
             if(node.kind === "master") continue;                // Master node is handled separately
@@ -108,42 +116,59 @@ export default {
                 continue;
             }
 
-            // Opening node
-            let audioOutputs = [], audioInputs = [], masterFlags = 0, mix = 1.0;
+            let audioOutputs = [], audioInputs = [], eventInputs = [], eventOutputs = [], dataInputs = [], dataOutputs = [], masterFlags = 0, mix = 1.0;
 
             let j = 0;
             for(const output of node.outputs) {
-                if(output.type !== "audio") continue;
+                const type = output.type;
+                const typeIndex = type === "audio"? 0: type === "midi" || type === "event"? 1: -1;
+                const targetCollection = type === "audio"? audioOutputs: type === "midi" || type === "event"? eventOutputs: null;
+
+                if(typeIndex === -1 || !targetCollection) {
+                    LS.quickEmit("log", "warn", `Unknown output type: ${type}`);
+                    continue;
+                }
 
                 const outputConnections = nodeConsumers.filter(c => c.sourcePortId === output.id);
 
                 // todo: temp; later have a better algorithm to set buffer indexes and reuse them when possible
-                bufferIndex++;
+                bufferIndexes[typeIndex]++;
 
                 let routed = false;
                 for(const connection of outputConnections) {
-                    if(connection.targetNodeId === masterNode.id) {
+                    if(!connection.targetNodeId) continue;
+
+                    if(patcher.nodeMap.get(connection.targetNodeId)?.kind === "master") {
                         // Master node has special handling
                         masterFlags |= 1 << j;
                         // mix = typeof connection.strength === "number"? connection.strength: 1.0;
                     }
 
-                    bufferMap.set(`${connection.id}:${node.id}`, bufferIndex);
+                    bufferMap.set(`${connection.id}:${node.id}`, bufferIndexes[typeIndex]);
                     routed = true;
                 }
 
                 if(routed) {
-                    audioOutputs.push(bufferIndex);
+                    targetCollection.push(bufferIndexes[typeIndex]);
                 } else {
-                    bufferIndex--;
+                    bufferIndexes[typeIndex]--;
                 }
             }
 
             for(const input of node.inputs) {
+                const type = input.type;
+                // const typeIndex = type === "audio"? 0: type === "midi" || type === "event"? 1: -1;
+                const targetCollection = type === "audio"? audioInputs: type === "midi" || type === "event"? eventInputs: null;
+
+                if(!targetCollection) {
+                    LS.quickEmit("log", "warn", `Unknown input type: ${type}`);
+                    continue;
+                }
+
                 const inputConnections = nodeDeps.filter(c => c.targetPortId === input.id);
 
                 for(const connection of inputConnections) {
-                    if(connection.sourceNodeId === masterNode.id) {
+                    if(patcher.nodeMap.get(connection.sourceNodeId)?.kind === "master") {
                         // This will not happen (at least not yet until we have after-master routing) but just in case
                         continue;
                     }
@@ -153,7 +178,7 @@ export default {
                         const bufferIdx = bufferMap.get(`${connection.id}:${connection.sourceNodeId}`);
 
                         if(bufferIdx !== undefined) {
-                            audioInputs.push(bufferIdx);
+                            targetCollection.push(bufferIdx);
                         } else {
                             LS.quickEmit("log", "warn", `No buffer index found for source port ${sourcePort?.id} of node ${connection.sourceNodeId}`);
                         }
@@ -161,16 +186,14 @@ export default {
                 }
             }
 
-            intermediateProgram.push([node, audioInputs, audioOutputs, masterFlags, mix, handle]);
+            intermediateProgram.push([node, audioInputs, audioOutputs, eventInputs, eventOutputs, dataInputs, dataOutputs, masterFlags, mix, handle]);
         }
 
         const program = new ArrayBuffer(intermediateProgram.length * STRUCT_SIZE);
         const programView = new DataView(program);
 
-        const LE = true;
-
         for (let i = 0; i < intermediateProgram.length; i++) {
-            const [node, inputs, outputs, masterFlags, mix, handle] = intermediateProgram[i];
+            const [node, inputs, outputs, eventInputs, eventOutputs, dataInputs, dataOutputs, masterFlags, mix, handle] = intermediateProgram[i];
 
             let offset = i * STRUCT_SIZE;
 
@@ -200,19 +223,62 @@ export default {
             programView.setUint8(offset, inputs.length);
             offset += 1;
 
-            // Input buffer indexes
-            for (let j = 0; j < 16; j++) {
-                programView.setUint8(offset, inputs[j] || 0);
-                offset += 1;
-            }
-
             // Output count
             programView.setUint8(offset, outputs.length);
             offset += 1;
 
+            // Event input count
+            programView.setUint8(offset, eventInputs.length);
+            offset += 1;
+
+            // Event output count
+            programView.setUint8(offset, eventOutputs.length);
+            offset += 1;
+
+            // Data input count (not used yet)
+            programView.setUint8(offset, 0);
+            offset += 1;
+
+            // Data output count (not used yet)
+            programView.setUint8(offset, 0);
+            offset += 1;
+
+            let totalIOSize = inputs.length + outputs.length + eventInputs.length + eventOutputs.length + dataInputs.length + dataOutputs.length;
+            if(totalIOSize > MAX_IO_COUNT) {
+                LS.quickEmit("log", "warn", `Node ${node.id} has too many inputs/outputs (${totalIOSize}), maximum is ${MAX_IO_COUNT}. Some connections will be ignored.`);
+                totalIOSize = MAX_IO_COUNT;
+
+                // ! TODO: clamp
+                // It shoulsn't be possible but just in case
+            }
+
+            // Input buffer indexes
+            for (let j = 0; j < inputs.length; j++) {
+                programView.setUint8(offset, inputs[j]);
+                offset += 1;
+            }
+
             // Output buffer indexes
-            for (let j = 0; j < 16; j++) {
-                programView.setUint8(offset, outputs[j] || 0);
+            for (let j = 0; j < outputs.length; j++) {
+                programView.setUint8(offset, outputs[j]);
+                offset += 1;
+            }
+
+            // Event input buffer indexes
+            for (let j = 0; j < eventInputs.length; j++) {
+                programView.setUint8(offset, eventInputs[j]);
+                offset += 1;
+            }
+
+            // Event output buffer indexes
+            for (let j = 0; j < eventOutputs.length; j++) {
+                programView.setUint8(offset, eventOutputs[j]);
+                offset += 1;
+            }
+
+            // Fill remaining buffer indexes with 0
+            for (let j = totalIOSize; j < MAX_IO_COUNT; j++) {
+                programView.setUint8(offset, 0);
                 offset += 1;
             }
 
@@ -250,25 +316,70 @@ export default {
     },
 
 
-    note2midi(note) {
-        return [
-            0,
-            0,
-            note.velocity || 127,
-        ]
+    note2midi(note, type, out = []) {
+        const noteData = note.data || {};
+        out[0] = 0;                       // MIDI event enum
+        out[1] = noteData?.flags || 0;    // Flags
+        out[2] = noteData?.velocity || 0; // Velocity
+        out[3] = note.start;              // Timestamp OR node index for immediate events
+        out[4] = type;                    // MIDI event type
+        out[5] = noteData?.channel || 0;  // MIDI channel
+        out[6] = noteData?.bend || 0;     // MIDI bend
+        out[7] = noteData?.note || 0;     // MIDI note
+        return out;
     },
 
-    compileTimeline(timeline) {
-        for(const item of timeline.items) {
-            if(item.type === "pattern" && item.data.notes && item.data.notes.length > 0) {
-                // Notes should be sorted, but we make sure
-                item.data.notes.sort((a, b) => a.start - b.start);
+    writeEvent(event, view, offset) {
+        view.setUint8(offset, event[0]); // Event type
+        offset += 1;
 
-                // Convert notes to MIDI events
-                for(const note of item.data.notes) {
+        view.setUint8(offset, event[1]); // Flags
+        offset += 1;
 
-                }
-            }
+        view.setUint8(offset, event[2]); // Velocity
+        offset += 1;
+
+        view.setUint32(offset, event[3], LE); // Timestamp OR node index
+        offset += 4;
+
+        view.setUint8(offset, event[4]); // MIDI event type
+        offset += 1;
+
+        view.setUint8(offset, event[5]); // MIDI channel
+        offset += 1;
+
+        view.setUint8(offset, event[6]); // MIDI bend
+        offset += 1;
+
+        view.setUint16(offset, event[7], LE); // MIDI note
+    },
+
+    compilePattern(pattern) {
+        let eventCount = 0;
+        const immediateEventArray = [];
+
+        if(!pattern || !pattern.items || pattern.items.length === 0) return;
+
+        // Notes should be sorted, but we make sure
+        pattern.items.sort((a, b) => a.start - b.start);
+
+        // Convert notes to MIDI events
+        for(const note of pattern.items) {
+            immediateEventArray.push(this.note2midi(note, 0));
+            eventCount++;
         }
+
+        // Convert to a typed array
+        const eventArray = new ArrayBuffer(eventCount * EVENT_STRUCT_SIZE);
+        const eventView = new DataView(eventArray);
+
+        for(let i = 0; i < immediateEventArray.length; i++) {
+            const event = immediateEventArray[i];
+            let offset = i * EVENT_STRUCT_SIZE;
+            this.writeEvent(event, eventView, offset);
+        }
+
+        LS.quickEmit("log", "info", `Compiled pattern with ${eventCount} events.`);
+        return eventArray;
     }
 }

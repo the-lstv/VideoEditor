@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <cstdint>
+#include <vector>
 #define MINIAUDIO_IMPLEMENTATION
 #include "miniaudio.h"
 
@@ -19,6 +20,7 @@
 // --- V8 headers (This should not be here though)
 #include <v8.h>
 using namespace v8;
+#include "v8-utils.h"
 
 // Global map of loaded VST3 plugins
 std::unordered_map<std::string, VST3Plugin> gLoadedVST3;
@@ -127,7 +129,10 @@ namespace Merge {
         std::jthread processingThread;
 
         // Scratch buffers storage for audio processing
-        std::vector<float> scratchBuffers;
+        std::vector<float> audioScratchBuffers;
+
+        // Scratch buffers storage for audio processing
+        std::vector<Merge::Event> eventScratchBuffers;
 
         // Current program of audio instructions to execute
         // This will contain the compiled node graph
@@ -135,15 +140,11 @@ namespace Merge {
 
         SPSCQueue<Merge::Event> queue = SPSCQueue<Merge::Event>(8192);
 
-        // MIDI lists
-        std::vector<MIDIList> midiLists;
+        // Static event lists (eg. patterns)
+        std::vector<std::vector<Merge::Event>> EventLists;
 
-        // Shared state shared between the audio engine and the main thread
-        SharedState* sharedState;
-
-        // Shared buffer for the state
-        std::shared_ptr<v8::BackingStore> sharedBackingStore;
-        v8::Global<v8::ArrayBuffer> sharedBuffer;
+        // Shared data to let the main thread read into the state of the audio engine
+        V8OwnedArrayBuffer<SharedState> sharedState;
 
         EngineRuntime(uint32_t sampleRate = 44100, uint16_t bufferSize = 512, uint16_t scratchBufferCount = 64, uint8_t outputChannels = 2) : sampleRate(sampleRate), bufferSize(bufferSize), scratchBufferCount(scratchBufferCount), outputChannels(outputChannels) {
             // Initialize the audio engine
@@ -170,7 +171,8 @@ namespace Merge {
             }
 
             // Allocate scratch buffers
-            scratchBuffers.resize(scratchBufferCount * bufferSize * outputChannels, 0.0f);
+            audioScratchBuffers.resize(scratchBufferCount * bufferSize * outputChannels, 0.0f);
+            eventScratchBuffers.resize(scratchBufferCount * 2048, Merge::Event{});
 
             // Initialize the ring buffer with enough space
             int result = TPCircularBufferInit(&outputRing, bufferSize * outputChannels * sizeof(float) * 8);
@@ -185,27 +187,22 @@ namespace Merge {
             std::cout << "Destroying audio engine runtime." << std::endl;
             stop();
 
-            scratchBuffers.clear();
+            audioScratchBuffers.clear();
             program.clear();
-            midiLists.clear();
-            
-            // Should only run if not destroying the renderer
-            // sharedState.reset();
-            // sharedBuffer.Reset();
-            // sharedBackingStore.reset();
+            EventLists.clear();
+            eventScratchBuffers.clear();
         }
 
         /**
          * Sets the external shared state pointer. This should be called before starting the engine.
          * Returns true if the shared state was set successfully, false if the engine is already running.
-         * Thread-safe: true but be careful
          */
-        bool setExternalSharedState(void* ptr) {
+        bool setExternalSharedState(v8::Isolate* isolate, v8::Local<v8::ArrayBuffer> value) {
             if (running.load(std::memory_order_acquire)) {
                 return false; // Cannot set shared state while running
             }
 
-            sharedState = static_cast<SharedState*>(ptr);
+            sharedState.reset(isolate, value);
             return true;
         }
 
@@ -213,7 +210,7 @@ namespace Merge {
          * Start the audio engine. Returns true if the engine was started successfully.
          * Thread-safe: true, can be called from any thread.
          */
-        bool start(uint64_t startTime = 0){
+        bool start(){
             // if(!sharedState) {
             //     return false;
             // }
@@ -248,8 +245,6 @@ namespace Merge {
             }
 
             running.store(true, std::memory_order_release);
-
-            currentTime = startTime;
 
             if(!eInitialized) {
                 processingThread = std::jthread(&EngineRuntime::processingLoop, this);
@@ -308,7 +303,7 @@ namespace Merge {
          *
          * Inside the loop, we should avoid allocations and be as fast as possible.
          *
-         * TODO: There's a bunch of optimization work here, but I'm currently in a rush, so I'll get it working first. It's already fast though!
+         * TODO: There's a LOT of optimization work to be done here, but I'm currently in a big rush, so I'll get it working first 🙏
          */
         void processingLoop() {
             uint32_t blockByteSize = bufferSize * outputChannels * sizeof(float);
@@ -322,8 +317,8 @@ namespace Merge {
 
             // Get a pointer to the scratch buffers for processing
             // Must not move while processing
-            std::fill(scratchBuffers.begin(), scratchBuffers.end(), 0.0f);
-            float* buffer = scratchBuffers.data();
+            std::fill(audioScratchBuffers.begin(), audioScratchBuffers.end(), 0.0f);
+            float* buffer = audioScratchBuffers.data();
 
             float fSampleRate = static_cast<float>(sampleRate);
             uint32_t availableBytes;
@@ -346,6 +341,13 @@ namespace Merge {
                     continue;
                 }
 
+                // Clear the master output buffer to avoid garbage data
+                std::memset(output, 0, blockByteSize);
+
+                // TODO!!! You know what to do here
+                // Clear the scratch buffer to avoid garbage data
+                std::memset(buffer, 0, blockByteSize * scratchBufferCount);
+
                 // Fetch events from the queue and process them
                 // Should this be done here?
                 while (queue.front()) {
@@ -361,8 +363,6 @@ namespace Merge {
                         switch (command->type) {
                             case Merge::EventType::MIDIEvent: {
                                 // Process MIDI event
-                                // As of now this is handled quite awkwardly: MIDI events are stored in a list (which is also how VST3 requires it) and well..
-                                midiLists[command->node].events.push_back(*command);
                                 break;
                             }
 
@@ -415,13 +415,6 @@ namespace Merge {
                     }
                 }
 
-                // Clear the master output buffer to avoid garbage data
-                std::memset(output, 0, blockByteSize);
-
-                // TODO!!! You know what to do here for optimization
-                // Clear the scratch buffer to avoid garbage data
-                std::memset(buffer, 0, blockByteSize * scratchBufferCount);
-
                 // Execute the compiled program of audio instructions
                 for (const auto& instruction : program) {
                     if (instruction.flags & FlagBypass) {
@@ -433,6 +426,26 @@ namespace Merge {
                         continue;
                     }
 
+                    // todo: this is bad
+                    for(uint32_t i = 0; i < instruction.eInputCount; ++i) {
+                        // Process event inputs
+                        uint32_t eventListIndex = instruction.indexes[i + FIRST_EVENT_INPUT_INDEX_R];
+                        if(eventListIndex >= EventLists.size()) {
+                            std::cerr << "Error: Event list index " << eventListIndex << " is out of bounds for EventLists size " << EventLists.size() << std::endl;
+                            continue;
+                        }
+
+                        // TODO: we should advance through lists efficiently (seek via binary search and advance for playback)
+                        auto& eventList = EventLists[eventListIndex];
+                        for(const auto& event : eventList) {
+                            if(event.timestamp > currentTime.load(std::memory_order_relaxed)) {
+                                break; // Stop processing if the event is scheduled for the future
+                            }
+
+                            // Process the event
+                        }
+                    }
+
                     if (instruction.process) {
                         instruction.process(&instruction, buffer, blockByteSize, bufferSize, fSampleRate, outputChannels, currentTime, nullptr);
                     }
@@ -442,9 +455,9 @@ namespace Merge {
                     // This is also annoyingly currently converting to an interleaved format, though that is necessary for playback so we'd have to do it sooner or later, and this removes the need for a separate buffer per channel.
                     // But it's something to consider in the future.
                     if (instruction.masterFlags != 0) {
-                        for(uint32_t i = 0; i < instruction.outputCount; ++i) {
+                        for(uint32_t i = 0; i < instruction.aOutputCount; ++i) {
                             if(instruction.masterFlags & (1 << i)) {
-                                const float* dataBuffer = GET_BUFFER_BYTE(instruction.outputs[i]);
+                                const float* dataBuffer = GET_BUFFER_FLOAT(instruction.indexes[i + FIRST_OUTPUT_INDEX_R]);
 
                                 float left = instruction.left;
                                 float right = instruction.right;
@@ -474,7 +487,7 @@ namespace Merge {
                                 }
 
                                 // debug msg
-                                // std::cout << "Mixing output from node " << &instruction << " to master output, left gain: " << left << ", right gain: " << right << ", preview: " << dataBuffer[0] << "," << dataBuffer[1] << std::endl;
+                                std::cout << "Mixing output from node " << &instruction << " output: " << instruction.indexes[i + instruction.aInputCount] << " to master output, left gain: " << left << ", right gain: " << right << ", preview: " << dataBuffer[0] << "," << dataBuffer[1] << std::endl;
                             }
                         }
                     }
@@ -484,12 +497,12 @@ namespace Merge {
                 auto now = std::chrono::steady_clock::now();
                 uint16_t usage = std::chrono::duration_cast<std::chrono::duration<uint16_t, std::milli>>(now - nextDeadline).count() / std::chrono::duration_cast<std::chrono::duration<uint16_t, std::milli>>(bufferDuration).count();
 
-                if(sharedState) {
+                if(sharedState.ptr) {
                     // Another necessary copy >:(
                     // Why do we have zerocopy processing when we still need to copy everything
                     // (this is Electron's fault btw)
-                    memcpy(sharedState->sampleHistory, output, blockByteSize);
-                    sharedState->usage = usage;
+                    memcpy(sharedState.data()->sampleHistory, output, blockByteSize);
+                    sharedState.data()->usage = usage;
                 }
 
                 // Mark the produced bytes as available for reading by the audio callback

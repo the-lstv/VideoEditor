@@ -153,3 +153,34 @@ public:
         }
     }
 };
+
+
+// Electron's stupid sandboxing prevents us from using shared memory, so we have to let V8 manage the memory
+// I hope at some point I can make a custom renderer and abandon Electron but that is currently way out of scope
+
+template <typename T>
+struct V8OwnedArrayBuffer {
+    v8::Global<v8::ArrayBuffer> handle = {};
+    void* ptr = nullptr;
+
+    V8OwnedArrayBuffer() = default;
+    V8OwnedArrayBuffer(v8::Isolate* isolate, v8::Local<v8::ArrayBuffer> buffer) {
+        handle.Reset(isolate, buffer);
+        ptr = buffer->GetBackingStore()->Data();
+    }
+
+    ~V8OwnedArrayBuffer() {
+        handle.Reset();
+        ptr = nullptr;
+    }
+
+    void reset(v8::Isolate* isolate, v8::Local<v8::ArrayBuffer> buffer) {
+        handle.Reset();
+        handle.Reset(isolate, buffer);
+        ptr = buffer->GetBackingStore()->Data();
+    }
+
+    inline T* data() {
+        return reinterpret_cast<T*>(ptr);
+    }
+};

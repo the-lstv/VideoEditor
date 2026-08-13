@@ -104,17 +104,15 @@ class MergeDaw extends FlavorBase {
     constructor(project) {
         super(project);
 
-        // LS.Timeline instance
+        // Attached LS.Timeline instance
         this.timelineInstance = null;
-        this.firstFrameRendered = false;
 
         // Current timeline data
         this.currentTimeline = null;
 
-        // Set of currently active render items
-        this.activeRenderItems = [];
-
         this.editingItem = null;
+
+        this.tempo = 120;
 
         // Cache event references that are emitted frequently (small benefit but skips event lookup)
         // In general this doesn't do much BUT in high-perf scenarios any detail matters so why not do it
@@ -150,6 +148,7 @@ class MergeDaw extends FlavorBase {
                     { i18n: "assets.base.sound", icon: "bi-music-note-beamed", label: "Sound", type: "audio", item: { type: "audio", label: "Sound", tileColor: "purple" } },
                     { i18n: "assets.base.timeline_script", icon: "bi-braces-asterisk", label: "Timeline script", type: "script", item: { type: "script", label: "Timeline script", tileColor: "pastel-indigo" } },
                     { i18n: "assets.base.anotherTimeline", icon: "bi-bar-chart-steps", label: "Another arrangement", type: "timeline", item: { type: "timeline", label: "Timeline" } },
+                    { i18n: "assets.base.effect", icon: "bi-sliders", label: "Effect", type: "effect", item: { type: "effect", label: "Effect" } },
                     { i18n: "assets.base.pattern", icon: "bi-music-note-list", label: "Pattern", type: "pattern", item: { type: "pattern", label: "Pattern" } },
                     // { i18n: "assets.base.events", icon: "bi-toggles", label: "Events", type: "events", item: { type: "events", label: "Events" } },
                     { i18n: "assets.base.empty_item", icon: "bi-file-earmark", label: "Empty item", type: "empty", item: { type: "empty", label: "Empty item" } },
@@ -178,6 +177,22 @@ class MergeDaw extends FlavorBase {
                     console.error("Error compiling patcher program:", error);
                 }
             });
+
+            const program = this.compileProgram(patcherView.patcher);
+            this.engine.uploadProgram(program);
+        });
+
+        // Treat the close button as a suspend button since we keep windows alive in the background
+        LS.WindowManager.SUSPEND_ON_CLOSE = true;
+
+        const pianoRollWindow = new LS.Window({
+            transparent: true,
+            content: pianoRollView,
+            show: false
+        });
+
+        pianoRollWindow.on("move", () => {
+            LS.GlobalWebGLRenderer.render(false, true);
         });
 
         if(!AudioEngine.module) {
@@ -195,6 +210,22 @@ class MergeDaw extends FlavorBase {
         window.engine = this.engine;
         window.AudioEngine = AudioEngine;
         // ! ----
+
+        this.updateTicker = new LS.Util.FrameScheduler(() => {
+            if(!this.timelineInstance) return;
+
+            const time = this.engine.currentTime();
+            this.timelineInstance.setSeek(this.samplesToTime(time), true, false);
+
+            const selection = this.timelineInstance.selectionRange;
+
+            // Loop the selection
+            if(Math.abs(selection[0] - selection[1]) > 0) {
+                if(time > this.timeToSamples(selection[1])) {
+                    this.engine.setTime(this.timeToSamples(selection[0]));
+                }
+            }
+        });
 
         // --- Project hooks
 
@@ -232,11 +263,14 @@ class MergeDaw extends FlavorBase {
                     this.timelineInstance = view.timeline;
                     this.setTimeline(this.currentTimeline || "main");
 
-                    this.addExternalEventListener(this.timelineInstance, 'seek', () => {
+                    this.addExternalEventListener(this.timelineInstance, 'seek', (value, _updateEngineTime) => {
                         if(this.destroyed) return console.error("Timeline emitted seek event for a destroyed instance! This is a bug!", this);
 
-                        this.quickEmit(this.__seekEventRef, view.timeline.seek);
-                        this.render();
+                        this.quickEmit(this.__seekEventRef, value);
+
+                        if (_updateEngineTime !== false) {
+                            this.engine.setTime(this.timeToSamples(value));
+                        }
                     });
 
                     this.addExternalEventListener(this.timelineInstance, 'duration-changed', (duration) => {
@@ -248,7 +282,6 @@ class MergeDaw extends FlavorBase {
                         if(itemEditor) {
                             itemEditor.setTarget(item);
                             this.editingItem = item;
-                            this.render();
                         }
 
                         console.log("Timeline item selected:", item);
@@ -260,6 +293,8 @@ class MergeDaw extends FlavorBase {
                             if(pianoRoll) {
                                 pianoRoll.setNotes((item.data.notes ??= []));
                             }
+
+                            pianoRollWindow.show();
                         }
                     });
 
@@ -270,7 +305,6 @@ class MergeDaw extends FlavorBase {
                         }
 
                         this.editingItem = null;
-                        this.render();
                     });
 
                     this.addExternalEventListener(this.timelineInstance, "drag-start", (type) => {
@@ -296,11 +330,6 @@ class MergeDaw extends FlavorBase {
 
                     this.addExternalEventListener(this.timelineInstance, "item-cleanup", (item) => {
                     });
-
-                    if(!this.firstFrameRendered) {
-                        this.renderAtTime(0);
-                        this.firstFrameRendered = true;
-                    }
 
                     this.quickEmit(this.__seekEventRef, this.timelineInstance.seek);
                     this.emit('duration-changed', [this.timelineInstance.duration]);
@@ -341,6 +370,16 @@ class MergeDaw extends FlavorBase {
         });
 
         LS.emit("flavor-ready", [this]);
+    }
+
+    timeToSamples(time) {
+        const tempo = this.tempo || 120;
+        return Math.floor((time / 1000) * (tempo / 60) * this.engine.sampleRate);
+    }
+
+    samplesToTime(samples) {
+        const tempo = this.tempo || 120;
+        return (samples / this.engine.sampleRate) * (60 / tempo) * 1000;
     }
 
     #exportTo(data) {
@@ -388,8 +427,10 @@ class MergeDaw extends FlavorBase {
 
         if(value) {
             this.engine.start();
+            this.updateTicker.start();
         } else {
             this.engine.pause();
+            this.updateTicker.stop();
         }
 
         console.log("MergeDaw: playing state changed to", value);
@@ -444,21 +485,13 @@ class MergeDaw extends FlavorBase {
         }
     }
 
-    async renderAtTime(time) {
-        // ...
-    }
-
     compileProgram(patcher) {
         const program = AudioCompiler.compileProgram(patcher || this.patcher);
         return program;
     }
 
-    render() {
-        // ...
-    }
-
     /**
-     * Handles file drops on the timeline, either as new resources or as timeline items.
+     * Handles drops on the timeline, either as new resources or as timeline items.
      * @param {*} event The file drop event
      * @param {*} event.data The data associated with the drop, which can be a Resource or raw file data
      * @param {*} event.data.item If the dropped data is a timeline item template, it will be included here for cloning
@@ -699,8 +732,7 @@ class MergeDaw extends FlavorBase {
                                             {
                                                 direction: 'column',
                                                 inner: [
-                                                    { type: 'slot', view: 'TimelineView' },
-                                                    { type: 'slot', view: 'PianoRollView', minHeight: 200, resize: { height: 200 } },
+                                                    { type: 'slot', view: 'TimelineView' }
                                                 ], resize: { width: "75%" }
                                             },
                                             { type: 'slot', view: 'PropertyEditorView', minWidth: 350 }

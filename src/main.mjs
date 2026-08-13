@@ -309,6 +309,12 @@ window.addEventListener('DOMContentLoaded', async () => {
         icon.src = "./src/flavors/" + window.app_config.flavor + "/images/icon.svg";
     }
 
+    app.layoutManager.on("resize", (event, child) => {
+        // TODO: Temporary, there should be a proper position update listener
+        // schedule render on resize
+        LS.GlobalWebGLRenderer.render(false, true);
+    });
+
     try {
         // --- Global shortcuts
         app.shortcutManager.map({

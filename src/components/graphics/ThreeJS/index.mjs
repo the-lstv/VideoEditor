@@ -5,7 +5,7 @@
  */
 
 import RendererAdapter from "../adapter-base.mjs";
-import AcceleratedTextRenderer from "../text-engine.mjs";
+// import AcceleratedTextRenderer from "../text-engine.mjs";
 
 import * as THREE from "three";
 

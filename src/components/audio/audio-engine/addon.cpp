@@ -10,6 +10,8 @@
 */
 
 // Sadly, this is mandatory for Electron >:(
+#include "src/structures.h"
+#include <vector>
 #if defined(ELECTRON)
 // These have to match the Electron build's build settings (of course they do not correctly expose them).
 // Sandbox may or may not be required - with the official builds it is most likely enabled.
@@ -29,15 +31,7 @@
 
 void js_start(const FunctionCallbackInfo<Value> &args) {
     Merge::EngineRuntime *engine = (Merge::EngineRuntime *)getInternalPointer(args.This());
-
-    uint8_t startTime = 0;
-
-    // Parse arguments
-    if (args.Length() >= 1 && args[0]->IsUint32()) {
-        startTime = args[0]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(startTime);
-    }
-
-    bool started = engine->start(startTime);
+    bool started = engine->start();
     args.GetReturnValue().Set(Boolean::New(args.GetIsolate(), started));
 }
 
@@ -205,12 +199,22 @@ void js_debugPrintProgram(const FunctionCallbackInfo<Value> &args) {
             ", toMaster=" << (instruction.masterFlags & FlagOut0Master) << "," << (instruction.masterFlags & FlagOut1Master) << "," << (instruction.masterFlags & FlagOut2Master) << "," << (instruction.masterFlags & FlagOut3Master) << "," << (instruction.masterFlags & FlagOut4Master) << "," << (instruction.masterFlags & FlagOut5Master) << "," << (instruction.masterFlags & FlagOut6Master) << "," << (instruction.masterFlags & FlagOut7Master) <<
             ", mute=" << (instruction.flags & FlagMute) << ", bypass=" << (instruction.flags & FlagBypass) << ", left=" << instruction.left << ", right=" << instruction.right;
 
-        for(uint8_t j = 0; j < instruction.inputCount; ++j) {
-            std::cout << ", i[" << (int)j << "]=" << static_cast<int>(instruction.inputs[j]);
+        uint8_t j = 0;
+
+        for(; j < instruction.aInputCount; ++j) {
+            std::cout << ", i[" << (int)j << "]=" << static_cast<int>(instruction.indexes[j]);
         }
 
-        for(uint8_t j = 0; j < instruction.outputCount; ++j) {
-            std::cout << ", o[" << (int)j << "]=" << static_cast<int>(instruction.outputs[j]);
+        for(; j < instruction.aOutputCount; ++j) {
+            std::cout << ", o[" << (int)j << "]=" << static_cast<int>(instruction.indexes[j]);
+        }
+
+        for(; j < instruction.eInputCount; ++j) {
+            std::cout << ", ei[" << (int)j << "]=" << static_cast<int>(instruction.indexes[j]);
+        }
+
+        for(; j < instruction.eOutputCount; ++j) {
+            std::cout << ", eo[" << (int)j << "]=" << static_cast<int>(instruction.indexes[j]);
         }
 
         for(uint8_t j = 0; j < 15; ++j) {
@@ -268,6 +272,37 @@ void js_uploadProgram(const FunctionCallbackInfo<Value> &args) {
     js_debugPrintProgram(args);
 }
 
+void js_uploadEventList(const FunctionCallbackInfo<Value> &args) {
+    Merge::EngineRuntime *engine = (Merge::EngineRuntime *)getInternalPointer(args.This());
+
+    if(missingArguments(2, args)) {
+        return;
+    }
+
+    if(!args[0]->IsUint32()) {
+        args.GetReturnValue().Set(args.GetIsolate()->ThrowException(v8::Exception::TypeError(String::NewFromUtf8(args.GetIsolate(), "Argument must be an unsigned integer (event list index)", NewStringType::kNormal).ToLocalChecked())));
+        return;
+    }
+
+    if(!args[1]->IsArrayBuffer()) {
+        args.GetReturnValue().Set(args.GetIsolate()->ThrowException(v8::Exception::TypeError(String::NewFromUtf8(args.GetIsolate(), "Argument must be an ArrayBuffer containing event data", NewStringType::kNormal).ToLocalChecked())));
+        return;
+    }
+
+    uint32_t eventListIndex = args[0]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0);
+    auto buffer = args[1].As<v8::ArrayBuffer>();
+
+    std::vector<Merge::Event> eventList;
+
+    // Populate the event list with data from the ArrayBuffer
+    // Sadly we have to copy...
+    size_t eventCount = buffer->ByteLength() / sizeof(Merge::Event);
+    if (eventCount > 0) {
+        engine->EventLists[eventListIndex].resize(eventCount);
+        std::memcpy(engine->EventLists[eventListIndex].data(), buffer->GetBackingStore()->Data(), buffer->ByteLength());
+    }
+}
+
 void js_dynamicReplaceNode(const FunctionCallbackInfo<Value> &args) {
     Merge::EngineRuntime *engine = (Merge::EngineRuntime *)getInternalPointer(args.This());
 
@@ -307,10 +342,10 @@ void js_destroyRuntime(const FunctionCallbackInfo<Value> &args) {
     delete engine;
 }
 
-void js_createMidiList(const FunctionCallbackInfo<Value> &args) {
+void js_createEventList(const FunctionCallbackInfo<Value> &args) {
     Merge::EngineRuntime *engine = (Merge::EngineRuntime *)getInternalPointer(args.This());
-    engine->midiLists.emplace_back(); // Add a new MIDIList to the vector
-    uint32_t index = static_cast<uint32_t>(engine->midiLists.size() - 1); // Get the index of the newly added MIDIList
+    engine->EventLists.emplace_back(); // Add a new EventList to the vector
+    uint32_t index = static_cast<uint32_t>(engine->EventLists.size() - 1); // Get the index of the newly added EventList
     args.GetReturnValue().Set(Number::New(args.GetIsolate(), index)); // Return the index to JavaScript
 }
 
@@ -335,16 +370,15 @@ void js_attachBuffer(const v8::FunctionCallbackInfo<v8::Value>& args) {
     }
 
     engine->stop();
+
     v8::Isolate* isolate = args.GetIsolate();
 
-    engine->sharedBuffer.Reset(isolate, buffer);
-    engine->sharedBackingStore = buffer->GetBackingStore();
-
-    if(!engine->setExternalSharedState(engine->sharedBackingStore->Data())) {
+    if(!engine->setExternalSharedState(isolate, buffer)) {
         std::cerr << "Failed to set external shared state." << std::endl;
         args.GetReturnValue().Set(Boolean::New(isolate, false));
         return;
     }
+
     args.GetReturnValue().Set(Boolean::New(isolate, true));
 }
 
@@ -452,6 +486,7 @@ PerContextData* Main(Isolate *isolate, Local<Object> exports) {
     __ADD_METHOD(runtime, "setParam", js_setParam);
     __ADD_METHOD(runtime, "createVSTInstance", js_loadVST3);
     __ADD_METHOD(runtime, "uploadProgram", js_uploadProgram);
+    __ADD_METHOD(runtime, "uploadEventList", js_uploadEventList);
     __ADD_METHOD(runtime, "dynamicReplaceNode", js_dynamicReplaceNode);
     __ADD_METHOD(runtime, "debugPrintProgram", js_debugPrintProgram);
     __ADD_METHOD(runtime, "start", js_start);
@@ -459,8 +494,9 @@ PerContextData* Main(Isolate *isolate, Local<Object> exports) {
     __ADD_METHOD(runtime, "stop", js_stop);
     __ADD_METHOD(runtime, "isRunning", js_running);
     __ADD_METHOD(runtime, "currentTime", js_currentTime);
+    __ADD_METHOD(runtime, "setTime", js_setTime);
     __ADD_METHOD(runtime, "destroy", js_destroyRuntime);
-    __ADD_METHOD(runtime, "createMidiList", js_createMidiList);
+    __ADD_METHOD(runtime, "createEventList", js_createEventList);
     EXPORT_CLASS(exports, runtime, "EngineRuntime");
 
     // Set version

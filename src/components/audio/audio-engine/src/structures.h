@@ -26,11 +26,21 @@
 #define AUDIO_PROCESSOR(name) void name(const AudioInstruction* instruction, float* buffer, uint16_t blockByteSize, uint16_t bufferSize, float fSampleRate, uint8_t outputChannels, uint64_t currentTime, Merge::Event** events)
 
 #define GET_BUFFER_FLOAT(index) (buffer + (bufferSize * outputChannels * index))
-#define GET_BUFFER_BYTE(index) (buffer + (blockByteSize * index))
+#define GET_BUFFER_BYTE(index) (reinterpret_cast<std::byte*>GET_BUFFER_FLOAT(index))
+
+#define FIRST_INPUT_INDEX 0
+#define FIRST_OUTPUT_INDEX instruction->aInputCount
+#define FIRST_OUTPUT_INDEX_R instruction.aInputCount
+#define FIRST_EVENT_INPUT_INDEX instruction->aInputCount + instruction->aOutputCount
+#define FIRST_EVENT_INPUT_INDEX_R instruction.aInputCount + instruction.aOutputCount
+#define FIRST_EVENT_OUTPUT_INDEX instruction->aInputCount + instruction->aOutputCount + instruction->eInputCount
+#define FIRST_DATA_INPUT_INDEX instruction->aInputCount + instruction->aOutputCount + instruction->eInputCount + instruction->eOutputCount
+#define FIRST_DATA_OUTPUT_INDEX instruction->aInputCount + instruction->aOutputCount + instruction->eInputCount + instruction->eOutputCount + instruction->dInputCount
 
 #define CLEAR_BUFFER(index) std::memset(GET_BUFFER_BYTE(index), 0, blockByteSize)
-#define CLEAR_OUTPUT_BUFFERS for (uint8_t i = 0; i < instruction->outputCount; ++i) { CLEAR_BUFFER(instruction->outputs[i]); }
-#define CLEAR_INPUT_BUFFERS for (uint8_t i = 0; i < instruction->inputCount; ++i) { CLEAR_BUFFER(instruction->inputs[i]); }
+#define CLEAR_INPUT_BUFFERS for (uint8_t i = 0; i < instruction->aInputCount; ++i) { CLEAR_BUFFER(instruction->indexes[i]); }
+#define CLEAR_OUTPUT_BUFFERS for (uint8_t i = 0; i < instruction->aOutputCount; ++i) { CLEAR_BUFFER(instruction->indexes[i + FIRST_OUTPUT_INDEX]); }
+
 #define CLEAR_ALL_BUFFERS CLEAR_INPUT_BUFFERS; CLEAR_OUTPUT_BUFFERS;
 
 // --- VST3 SDK
@@ -78,8 +88,11 @@ struct Event {
     uint8_t flags;        // Flags
     uint8_t velocity = 0; // Velocity for MIDI events (here since padding's taking space anyway)
 
-    uint32_t timestamp = 0; // Timestamp in samples
-    uint32_t node;          // Node index
+    // Events either have a timestamp (for scheduling) or a node index
+    union {
+        uint32_t timestamp = 0; // Timestamp in samples
+        uint32_t node;          // Node index
+    };
 
     union {
         struct {
@@ -99,8 +112,8 @@ struct Event {
         struct {
             uint8_t type;    // MIDI event type
             uint8_t channel; // MIDI channel
-            uint16_t note;   // MIDI note
             uint8_t bend;    // MIDI bend value
+            uint16_t note;   // MIDI note
         } midi;
 
         struct {
@@ -108,10 +121,6 @@ struct Event {
             float right; // Right channel pan value
         } mix;
     };
-};
-
-struct MIDIList {
-    std::vector<Event> events;
 };
 
 enum BitFlags : uint32_t {
@@ -145,11 +154,16 @@ struct AudioInstruction {
     // So we are forced to use integer types instead of bitfields
     uint8_t flags = 0;
 
-    uint8_t inputCount = 0; // Number of input buffers
-    uint8_t inputs[16]; // Input buffer indexes (up to 16)
+    uint8_t aInputCount  = 0; // Number of input buffers
+    uint8_t aOutputCount = 0; // Number of output buffers
+    uint8_t eInputCount  = 0; // Number of event input buffers
+    uint8_t eOutputCount = 0; // Number of event output buffers
+    uint8_t dInputCount  = 0; // Number of data input buffers
+    uint8_t dOutputCount = 0; // Number of data output buffers
 
-    uint8_t outputCount = 0; // Number of output buffers
-    uint8_t outputs[16]; // Output buffer indexes (up to 16)
+    // The indexes of the individual input and output buffers.
+    // Currently this means that each node can have up to 36 inputs/outputs total.
+    uint8_t indexes[36];
 
     uint8_t masterFlags = 0;
 

@@ -34,8 +34,8 @@ export default class PlaybackPanel extends LS.View {
         this.tempoKnob = new LS.Knob({
             min: 1,
             max: 9999, // tempo go brrr
-            value: 140,
-            defaultValue: 140,
+            value: 0,
+            defaultValue: 120,
             step: 1,
 
             preset: "numeric",
@@ -43,7 +43,10 @@ export default class PlaybackPanel extends LS.View {
             label: "Tempo",
 
             onInput: (value) => {
-                if (this.onTempoChange) this.onTempoChange(value);
+                const attachment = this.attachedTo || this.parent;
+                if(attachment) {
+                    attachment.tempo = value;
+                }
             }
         });
 
@@ -145,6 +148,8 @@ export default class PlaybackPanel extends LS.View {
         this.addExternalEventListener(attachment, 'seek', (time) => this.#updateSeek(time));
         this.addExternalEventListener(attachment, 'duration-changed', (duration) => this.#updateDuration(duration));
         this.addExternalEventListener(attachment, 'playing-changed', (playing) => this.#updatePlay(playing));
+
+        this.tempoKnob.value = attachment.tempo || 140;
     }
 
     #formatTime(ms, decisecond = false) {

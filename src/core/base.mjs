@@ -150,8 +150,8 @@ const dragState = new class DragState extends LS.Util.FrameScheduler {
         this.reset();
         this.target = target;
 
-        const icon = ((target instanceof LS.Multipane.Slot)? "bi-columns-gap": target.icon || "bi-puzzle");
-        const title = ((target instanceof LS.Multipane.Slot)? target.__titleElement.innerText: (target.title || target.name || target.label || target.__name || target.constructor.name));
+        const icon = ((target instanceof LS.Slot)? "bi-columns-gap": target.icon || "bi-puzzle");
+        const title = ((target instanceof LS.Slot)? target.__titleElement.innerText: (target.title || target.name || target.label || target.__name || target.constructor.name));
 
         this.iconElement.className = icon;
         this.labelElement.textContent = " " + title;
