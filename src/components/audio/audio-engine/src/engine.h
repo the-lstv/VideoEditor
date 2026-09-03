@@ -295,6 +295,9 @@ namespace Merge {
         // Current time
         std::atomic<uint64_t> currentTime {0};
 
+        // !!!
+        EventQueue tEventBuffer[64];
+
         /**
          * The main block processing loop.
          * This one runs in batches of audio frames (not in real-time).
@@ -347,6 +350,12 @@ namespace Merge {
                 // TODO!!! You know what to do here
                 // Clear the scratch buffer to avoid garbage data
                 std::memset(buffer, 0, blockByteSize * scratchBufferCount);
+                // TODO!!! You know what to do here
+                // Clear tEventBuffer
+                for (auto& eventQueue : tEventBuffer) {
+                    eventQueue.eventCount = 0;
+                    std::fill(std::begin(eventQueue.events), std::end(eventQueue.events), nullptr);
+                }
 
                 // Fetch events from the queue and process them
                 // Should this be done here?
@@ -361,8 +370,9 @@ namespace Merge {
                         // std::cout << "Processing event of type: " << static_cast<int>(command->type) << std::endl;
 
                         switch (command->type) {
-                            case Merge::EventType::MIDIEvent: {
-                                // Process MIDI event
+                            case Merge::EventType::NoteOn: case Merge::EventType::NoteOff: {
+                                tEventBuffer[command->node].events[tEventBuffer[command->node].eventCount] = command;
+                                tEventBuffer[command->node].eventCount ++;
                                 break;
                             }
 
@@ -416,7 +426,9 @@ namespace Merge {
                 }
 
                 // Execute the compiled program of audio instructions
-                for (const auto& instruction : program) {
+                for (uint32_t i = 0; i < program.size(); ++i) {
+                    auto& instruction = program[i];
+
                     if (instruction.flags & FlagBypass) {
                         continue; // Skip bypassed
                     }
@@ -441,13 +453,11 @@ namespace Merge {
                             if(event.timestamp > currentTime.load(std::memory_order_relaxed)) {
                                 break; // Stop processing if the event is scheduled for the future
                             }
-
-                            // Process the event
                         }
                     }
 
                     if (instruction.process) {
-                        instruction.process(&instruction, buffer, blockByteSize, bufferSize, fSampleRate, outputChannels, currentTime, nullptr);
+                        instruction.process(&instruction, buffer, blockByteSize, bufferSize, fSampleRate, outputChannels, currentTime, &tEventBuffer[i]);
                     }
 
                     // Mix in the processed audio to the output buffer if master (output) route is enabled.
@@ -487,7 +497,7 @@ namespace Merge {
                                 }
 
                                 // debug msg
-                                std::cout << "Mixing output from node " << &instruction << " output: " << instruction.indexes[i + instruction.aInputCount] << " to master output, left gain: " << left << ", right gain: " << right << ", preview: " << dataBuffer[0] << "," << dataBuffer[1] << std::endl;
+                                // std::cout << "Mixing output from node " << &instruction << " output: " << instruction.indexes[i + instruction.aInputCount] << " to master output, left gain: " << left << ", right gain: " << right << ", preview: " << dataBuffer[0] << "," << dataBuffer[1] << std::endl;
                             }
                         }
                     }

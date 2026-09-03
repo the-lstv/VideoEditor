@@ -40,6 +40,7 @@ function loadEngine() {
                 this.scratchBufferCount = options.scratchBufferCount || 64;
 
                 this.createSharedMemory();
+                this.km = keyboardMidi(this);
             }
             
             // ! Warning: the shared memory is read-only (and not thread safe). Writing to it will cause undefined behavior.
@@ -91,6 +92,14 @@ function loadEngine() {
                 const nodeId = node.__programOffset;
                 if(typeof nodeId === "number") this.setUniform(time, node, uniformIndex, node.uniforms[uniformIndex]);
             }
+
+            destroy() {
+                if(this.km) {
+                    this.km();
+                    this.km = null;
+                }
+                super.destroy();
+            }
         };
 
         module.Engine = Engine;
@@ -98,6 +107,62 @@ function loadEngine() {
     } catch (e) {
         throw new Error('AudioEngine: The native addon could not be loaded. Make sure you are using a supported Node.js version.\n\n' + e.toString());
     }
+}
+
+const keyRows = [
+    ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "MINUS", "EQUAL"],
+    ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "BRACKETLEFT", "BRACKETRIGHT"],
+    ["A", "S", "D", "F", "G", "H", "J", "K", "L", "SEMICOLON", "QUOTE"],
+    ["Z", "X", "C", "V", "B", "N", "M", "COMMA", "PERIOD", "SLASH"]
+]
+
+function keyboardMidi(engine) {
+    const pressed = new Set();
+
+    let kd, ku, target = 0;
+
+    addEventListener('keydown', kd = (event) => {
+        const code = event.code.replace('Key', '').replace('Digit', '').toUpperCase();
+
+        const row = keyRows.findIndex(row => row.includes(code));
+        const col = row >= 0 ? keyRows[row].indexOf(code) : -1;
+
+        if(row >= 0 && col >= 0) {
+            const midiNote = 60 + (row * 12) + col; // C4 is MIDI note 60
+            if(!pressed.has(midiNote)) {
+                pressed.add(midiNote);
+                console.log('Key pressed:', code, 'MIDI note:', midiNote, 'Event:', event);
+                engine.enqueueMidi(true, event.timeStamp, target, 0, midiNote, 0, 1);
+            }
+        } else {
+            console.log('Key pressed:', code, 'Event:', event);
+        }
+    });
+
+    addEventListener('keyup', ku = (event) => {
+        const code = event.code.replace('Key', '').replace('Digit', '').toUpperCase();
+
+        const row = keyRows.findIndex(row => row.includes(code));
+        const col = row >= 0 ? keyRows[row].indexOf(code) : -1;
+
+        if(row >= 0 && col >= 0) {
+            const midiNote = 60 + (row * 12) + col; // C4 is MIDI note 60
+            pressed.delete(midiNote);
+            console.log('Key released:', code, 'MIDI note:', midiNote, 'Event:', event);
+            engine.enqueueMidi(false, event.timeStamp, target, 0, midiNote, 0, 1);
+        } else {
+            console.log('Key released:', code, 'Event:', event);
+        }
+    });
+
+    return () => {
+        removeEventListener('keydown', kd);
+        removeEventListener('keyup', ku);
+        for(const midiNote of pressed) {
+            engine.enqueueMidi(false, performance.now(), target, 0, midiNote, 0, 1);
+        }
+        pressed.clear();
+    };
 }
 
 function getEnginePath() {

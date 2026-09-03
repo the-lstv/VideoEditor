@@ -437,7 +437,7 @@ function cleanup() {
         }
 
         const hasDefault = typeof defaultValue !== "undefined";
-        if(hasDefault || inputObject.helpModal) {            
+        if(hasDefault || inputObject.helpModal) {
             inputObject.container = LS.Create({
                 class: "input-with-reset",
                 inner: [ inputObject.container || inputObject.input ]

@@ -172,15 +172,16 @@ void js_setFlags(const FunctionCallbackInfo<Value> &args) {
 
 void js_enqueueMidi(const FunctionCallbackInfo<Value> &args) {
     Merge::EngineRuntime *engine = (Merge::EngineRuntime *)getInternalPointer(args.This());
-    
+
     Merge::Event event;
-    event.type =         Merge::EventType::MIDIEvent;
-    event.timestamp =    args[0]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0);
-    event.node =         args[1]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0);
-    event.midi.type =    static_cast<uint8_t> (args[2]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0));
-    event.midi.channel = static_cast<uint8_t> (args[3]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0));
-    event.midi.note =    static_cast<uint16_t>(args[4]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0));
-    event.midi.bend =    static_cast<uint8_t> (args[5]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0));
+    event.type =          args[0]->BooleanValue(args.GetIsolate())? Merge::EventType::NoteOn: Merge::EventType::NoteOff;
+    event.timestamp =     args[1]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0);
+    event.node =          args[2]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0);
+    event.midi.channel =  static_cast<uint8_t> (args[3]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0));
+    event.midi.note =     static_cast<uint16_t>(args[4]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0));
+    event.midi.bend =     static_cast<uint8_t> (args[5]->Uint32Value(args.GetIsolate()->GetCurrentContext()).FromMaybe(0));
+    event.midi.velocity = static_cast<float>   (args[6]->NumberValue(args.GetIsolate()->GetCurrentContext()).FromMaybe(1.0));
+    event.midi.id = nextMidiId();
     engine->queue.push(event);
 }
 

@@ -2,6 +2,9 @@
 
 #include "structures.h"
 #include "helpers.h"
+#include <cstdint>
+#include <deque>
+#include <unordered_map>
 using namespace Merge;
 namespace Merge {
 
@@ -60,7 +63,8 @@ AUDIO_PROCESSOR(VST3Processor) {
     plugin->processData.inputParameterChanges = nullptr;
     plugin->processData.outputParameterChanges = nullptr;
 
-    plugin->processData.inputEvents = nullptr;
+    plugin->processData.inputEvents = &plugin->eventList;
+    plugin->eventList.eventCount = events->eventCount;
     plugin->processData.outputEvents = nullptr;
 
     plugin->processData.processContext = nullptr;
@@ -75,6 +79,46 @@ AUDIO_PROCESSOR(VST3Processor) {
     }
 }
 
+float midiToFrequency(float midiNote) {
+    return 440.0 * std::pow(2.0, (midiNote - 69.0) / 12.0);
+}
+
+struct VoiceState {
+    bool active : 1 = false;      // Is the voice actively producing new sound
+    bool gate : 1 = false;        // Gate
+    float phase = 0.0f;       // oscillator phase
+    float pan = 0.0f;         // panning value (-1.0 to 1.0)
+    int frequency = 0;        // frequency in Hz
+    float velocity = 0.0f;
+
+    void reset() {
+        active = false;
+        gate = false;
+        phase = 0.0f;
+        pan = 0.0f;
+        frequency = 0;
+        velocity = 0.0f;
+    }
+
+    void increment(float phaseIncrement, float fSampleRate, bool reverse = false) {
+        phase += (reverse? -1.0f : 1.0f) * frequency / fSampleRate;
+        if (phase >= 1.0f) {
+            phase -= 1.0f; // Wrap around to keep phase in [0, 1)
+        }
+    }
+
+    void increment(float phaseIncrement, bool reverse = false) {
+        phase += (reverse? -1.0f : 1.0f) * phaseIncrement;
+        if (phase >= 1.0f) {
+            phase -= 1.0f; // Wrap around to keep phase in [0, 1)
+        }
+    }
+};
+
+VoiceState voices[64];
+uint8_t activeVoices = 0;
+std::unordered_map<uint32_t, uint8_t> noteToVoice;
+
 /**
  * @brief Simple oscillator audio node processor callback.
  * This function generates a waveform based on the frequency and shape morph.
@@ -83,24 +127,66 @@ AUDIO_PROCESSOR(VST3Processor) {
  * 0: frequency (Hz)
  * 1: shape - lerp 0-4, sine, triangle, saw, square, pulse
  */
-float gPhase = 0.0f; // temporary
 AUDIO_PROCESSOR(Oscillator) {
-    float frequency = instruction->uniforms[0];
+    float frequencyShift = instruction->uniforms[0];
     float shape     = instruction->uniforms[1];
     bool reverse = (instruction->flags & FlagInvertPhase) != 0;
 
     float* outBuffer = GET_BUFFER_FLOAT(instruction->indexes[FIRST_OUTPUT_INDEX]);
-    float phaseIncrement = (reverse? -1.0f : 1.0f) * frequency / fSampleRate;
 
-    // std::cout << "Oscillator: frequency=" << frequency << ", shape=" << shape << ", phase=" << gPhase << ", phaseIncrement=" << phaseIncrement << ", outputBuffer=" << static_cast<int>(instruction->outputs[0]) << std::endl;
+    for(uint16_t i = 0; i < events->eventCount; ++i) {
+        const Merge::Event* event = events->events[i];
+        if(event->type == Merge::EventType::NoteOn || event->type == Merge::EventType::NoteOff) {
+            // Find an available voice
+            int voiceIndex = -1;
+            if(event->type == Merge::EventType::NoteOn && event->midi.velocity > 0) {
+                // Check if the note is already assigned to a voice
+                auto it = noteToVoice.find(event->midi.id);
+                if (it != noteToVoice.end()) {
+                    voiceIndex = it->second;
+                } else {
+                    // Use a free voice
+                    voiceIndex = activeVoices;
+                    if(voiceIndex >= 64) {
+                        continue;
+                    }
+                }
+            }
 
-    for (uint16_t i = 0; i < bufferSize; ++i) {
-        float v = waveFromShape(gPhase, shape);
-        // float v = std::sin(gPhase); // temporary
+            VoiceState& voice = voices[voiceIndex];
 
-        outBuffer[i]              += v; // Write to the first channel
-        outBuffer[i + bufferSize] += v; // Write to the second channel
-        gPhase = wrapUnit(gPhase + phaseIncrement);
+            voice.frequency = midiToFrequency(event->midi.note) + frequencyShift;
+            voice.velocity = static_cast<float>(event->midi.velocity) / 127.0f;
+            voice.active = (event->type == Merge::EventType::NoteOn && event->midi.velocity > 0); // Note On with velocity > 0
+            voice.gate = true;
+
+            if(!voice.active) {
+                // Note Off event
+                voice.gate = false;
+                noteToVoice.erase(event->midi.id);
+                activeVoices--;
+            } else {
+                // Note On event
+                noteToVoice[event->midi.id] = voiceIndex;
+                activeVoices++;
+            }
+
+            std::cout << "Oscillator: MIDI Event - channel=" << static_cast<int>(event->midi.channel) << ", note=" << static_cast<int>(event->midi.note) << ", frequency=" << voice.frequency << ", velocity=" << voice.velocity << ", active=" << voice.active << std::endl;
+        }
+    }
+
+    for(uint8_t voice = 0; voice < activeVoices; ++voice) {
+        VoiceState& v = voices[voice];
+        if(v.active && v.gate) {
+            for (uint16_t i = 0; i < bufferSize; ++i) {
+                float vSample = waveFromShape(v.phase, shape) * v.velocity;
+
+                outBuffer[i]              += vSample; // Write to the first channel
+                outBuffer[i + bufferSize] += vSample; // Write to the second channel
+
+                v.increment(v.frequency, fSampleRate, reverse);
+            }
+        }
     }
 }
 

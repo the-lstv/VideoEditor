@@ -576,7 +576,6 @@ window.addEventListener('DOMContentLoaded', async () => {
             ],
 
             options: [
-                // TODO
                 { text: "Preferences", action() {
                     app.shortcutManager.triggerMapping("OPEN_PREFERENCES");
                 }, icon: "bi-sliders" },
@@ -598,7 +597,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                         settings.openPage("appearance");
                     }}
                 ] },
-                
+
                 { text: "Set editor accent", items: [
                     { text: "Default", action() { LS.Color.setAccent('white'); localStorage.removeItem("ls-accent"); } },
                     { text: "Blue", action() { LS.Color.setAccent('blue'); localStorage.setItem("ls-accent", "blue"); } },

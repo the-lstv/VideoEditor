@@ -22,8 +22,8 @@
 #include <pthread.h>
 #endif
 
-#define AUDIO_PROCESSOR_SIGN(name) void (*name)(const AudioInstruction*, float*, uint16_t, uint16_t, float, uint8_t, uint64_t, Merge::Event**)
-#define AUDIO_PROCESSOR(name) void name(const AudioInstruction* instruction, float* buffer, uint16_t blockByteSize, uint16_t bufferSize, float fSampleRate, uint8_t outputChannels, uint64_t currentTime, Merge::Event** events)
+#define AUDIO_PROCESSOR_SIGN(name) void (*name)(const AudioInstruction*, float*, uint16_t, uint16_t, float, uint8_t, uint64_t, EventQueue *)
+#define AUDIO_PROCESSOR(name) void name(const AudioInstruction* instruction, float* buffer, uint16_t blockByteSize, uint16_t bufferSize, float fSampleRate, uint8_t outputChannels, uint64_t currentTime, EventQueue *events)
 
 #define GET_BUFFER_FLOAT(index) (buffer + (bufferSize * outputChannels * index))
 #define GET_BUFFER_BYTE(index) (reinterpret_cast<std::byte*>GET_BUFFER_FLOAT(index))
@@ -62,6 +62,12 @@ using namespace rigtorp;
 // --- Constants
 constexpr float PI = 3.14159265358979323846f;
 
+uint32_t midiId = 0; // Global MIDI event ID counter
+uint32_t nextMidiId() {
+    // Automatically wraps to 0 when it reaches the maximum value
+    return midiId++;
+}
+
 // Layout for the runtime shared state
 struct alignas(64) SharedState {
     float sampleHistory[1024];
@@ -71,11 +77,25 @@ struct alignas(64) SharedState {
 namespace Merge {
 
 enum class EventType : uint8_t {
-    MIDIEvent,
+    NoteOn,
+    NoteOff,
     SetParameter,
     SetUniform,
     SetMix,
     SetFlags
+};
+
+enum MIDIEventTypes {
+    kNoteOnEvent       = 0,			///< is \ref NoteOnEvent
+    kNoteOffEvent      = 1,			///< is \ref NoteOffEvent
+    kDataEvent         = 2,			///< is \ref DataEvent
+    kPolyPressureEvent = 3,			///< is \ref PolyPressureEvent
+    kNoteExpressionValueEvent = 4,	///< is \ref NoteExpressionValueEvent
+    kNoteExpressionTextEvent  = 5,	///< is \ref NoteExpressionTextEvent
+    kChordEvent        = 6,			///< is \ref ChordEvent
+    kScaleEvent        = 7,			///< is \ref ScaleEvent
+    kNoteExpressionIntValueEvent = 8,///< is \ref NoteExpressionIntValueEvent
+    kLegacyMIDICCOutEvent = 65535	///< is \ref LegacyMIDICCOutEvent
 };
 
 /**
@@ -83,20 +103,22 @@ enum class EventType : uint8_t {
  * Used to send events from the main thread to the audio engine thread.
  */
 struct Event {
-    EventType type = EventType::MIDIEvent;
+    EventType type = EventType::NoteOn;
 
-    uint8_t flags;        // Flags
-    uint8_t velocity = 0; // Velocity for MIDI events (here since padding's taking space anyway)
+    // Flags
+    uint32_t flags : 24 = 0;
 
-    // Events either have a timestamp (for scheduling) or a node index
+    // Events can be bound to:
+    // - A timestamp (routing being resolved externally, eg. via an event list such as a pattern)
+    // - A target node index for immediate pooled events (eg. from hardware)
     union {
         uint32_t timestamp = 0; // Timestamp in samples
-        uint32_t node;          // Node index
+        uint32_t node;          // Target program node index
     };
 
     union {
         struct {
-            uint8_t data[12]; // Data for the event (e.g., MIDI message or parameter value)
+            uint8_t data[16]; // Byte data for the event
         } u8data;
 
         struct {
@@ -110,17 +132,26 @@ struct Event {
         } parameter;
 
         struct {
-            uint8_t type;    // MIDI event type
-            uint8_t channel; // MIDI channel
-            uint8_t bend;    // MIDI bend value
-            uint16_t note;   // MIDI note
+            float velocity;
+            float note;       // MIDI note
+            uint8_t channel;  // MIDI channel
+            uint8_t bend;     // MIDI bend value
+            uint16_t length;  // Optional length of the MIDI event
+            uint32_t id;      // Optional ID
         } midi;
 
         struct {
-            float left; // Left channel pan value
+            float left;  // Left channel pan value
             float right; // Right channel pan value
         } mix;
     };
+};
+
+
+// !!! BAD, very BAD design, but I'm in a rush
+struct EventQueue {
+    uint32_t eventCount = 0;
+    const Merge::Event* events[128];
 };
 
 enum BitFlags : uint32_t {
@@ -185,6 +216,55 @@ struct VST3Plugin {
     IPtr<PlugProvider> provider;
 };
 
+class VST3EventList : public IEventList {
+public:
+    uint32_t eventCount = 0;
+
+	/** Returns the count of events. */
+	int32 getEventCount () override {
+        return static_cast<int32>(eventCount);
+    }
+
+    /** Gets parameter by index. */
+    tresult getEvent (int32 index /*in*/, Steinberg::Vst::Event& e /*out*/) override {
+        // if (index < 0 || index >= static_cast<int32>(events.size())) {
+        //     return kResultFalse;
+        // }
+        // e = events[index];
+        // return kResultTrue;
+    }
+
+    /** Adds a new event. */
+    tresult addEvent (Steinberg::Vst::Event& e /*in*/) override {
+        // events.push_back(e);
+        // return kResultTrue;
+    }
+
+    tresult PLUGIN_API queryInterface (const TUID _iid, void** obj) override {
+        // if (FUnknownPrivate::iidEqual (_iid, IEventList::iid)) {
+        //     *obj = static_cast<IEventList*> (this);
+        //     addRef ();
+        //     return kResultOk;
+        // }
+        // return FUnknownPrivate::queryInterface (_iid, obj);
+    }
+
+	/** Adds a reference and returns the new reference count.
+	\par Remarks:
+	    The initial reference count after creating an object is 1. */
+	uint32 PLUGIN_API addRef () override {
+        // return FUnknownPrivate::atomicAdd (__funknownRefCount, 1);
+    }
+
+	/** Releases a reference and returns the new reference count.
+	If the reference count reaches zero, the object will be destroyed in memory. */
+	uint32 PLUGIN_API release () override {
+        // return FUnknownPrivate::atomicAdd (__funknownRefCount, -1);
+    }
+
+	// static const FUID iid;
+};
+
 /**
  * @brief VST3 plugin per-instance state structure
  */
@@ -194,6 +274,8 @@ struct VST3PluginInstance {
     IPtr<IComponent> component;
     IPtr<IAudioProcessor> processor;
     IPtr<IEditController> controller;
+
+    VST3EventList eventList {};
 
     ProcessData processData {};
 
