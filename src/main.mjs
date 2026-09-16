@@ -27,7 +27,6 @@ import Version from "./utils/version.mjs";
 import WelcomeView from "./views/welcome.mjs";
 
 // Experimental
-import { CommandPalette } from "./core/pallete.mjs";
 import * as settings from "./core/settings.mjs";
 
 if(!globalThis.LS) {
@@ -693,9 +692,16 @@ window.addEventListener('DOMContentLoaded', async () => {
         const terminalContainer = palleteOverlay.querySelector("#commandTerminal");
         const terminalOutput = terminalContainer && terminalContainer.querySelector(".terminal-output");
 
-        const paletteLogger = {};
+        const paletteLogger = {
+            info : (...a) => LS.CommandPalette.writeLogTo(terminalOutput, 0, ...a),
+            log  : (...a) => LS.CommandPalette.writeLogTo(terminalOutput, 1, ...a),
+            warn : (...a) => LS.CommandPalette.writeLogTo(terminalOutput, 2, ...a),
+            error: (...a) => LS.CommandPalette.writeLogTo(terminalOutput, 3, ...a),
+            fatal: (...a) => LS.CommandPalette.writeLogTo(terminalOutput, 4, ...a),
+            clear: () => terminalOutput.replaceChildren()
+        }
 
-        const palette = new CommandPalette({
+        const palette = new LS.CommandPalette({
             wrapperElement: paletteContainer,
             menuElement: paletteContainer.querySelector(".completion-menu"),
             iconElement: paletteContainer.querySelector(".command-icon"),
@@ -724,11 +730,6 @@ window.addEventListener('DOMContentLoaded', async () => {
                 }
             }
         });
-
-        paletteLogger.log = palette.log.bind(palette);
-        paletteLogger.warn = palette.log.bind(palette);
-        paletteLogger.error = palette.log.bind(palette);
-        paletteLogger.clear = () => terminalOutput.replaceChildren();
 
         terminalObserver.observe(terminalOutput, { childList: true });
 
