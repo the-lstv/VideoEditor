@@ -15,7 +15,7 @@ pnpm-*
 
 node_modules
 .vs
-*.ttf
+# *.ttf
 
 # The generator binary
 msdf-atlas-gen
