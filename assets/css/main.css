@@ -987,3 +987,7 @@ ls-knob[preset=numeric]:active {
 .window-handle, #editor-header {
     -webkit-app-region: drag;
 }
+
+.ls-command-palette-wrapper {
+    box-shadow: 0 10px 60px 0 rgb(0 0 0 / 60%);
+}
