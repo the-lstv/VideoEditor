@@ -27,7 +27,7 @@ import WelcomeView from "./views/welcome.mjs";
 
 // Experimental
 import * as settings from "./core/settings.mjs";
-import loadPaletteOverlay from "./core/commandpalette.js";
+import loadPaletteOverlay from "./core/commandpalette.mjs";
 
 if(!globalThis.LS) {
     alert("Fatal error: LS library is missing or failed to load. This software cannot run without it.");
