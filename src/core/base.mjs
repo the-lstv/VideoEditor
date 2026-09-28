@@ -187,25 +187,21 @@ function createTip(id, text, target = null) {
         return null;
     }
 
-    const hint = LS.Create("ls-box.elevated.editor-tip", {
-        inner: [LS.Create("button.small.square.clear", {
-            inner: { tag: "i", class: "bi-x-lg" },
-            onclick() {
+    return  LS.Create("ls-box.elevated.editor-tip", {
+        parent: target,
+        inner: [
+            { emmet: "button.small.square.clear>i.bi-x-lg", onclick() {
                 localStorage.setItem("hideTip_" + id, "true");
                 hint.remove();
+            }},
+
+            {
+                tag: "span",
+                i18n: "tips." + id,
+                text
             }
-        }), {
-            tag: "span",
-            i18n: "tips." + id,
-            text
-        }]
+        ]
     });
-
-    if(target) {
-        target.appendChild(hint);
-    }
-
-    return hint;
 }
 
 

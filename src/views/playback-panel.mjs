@@ -86,17 +86,18 @@ export default class PlaybackPanel extends LS.View {
                             }
                         }
                     ],
+
+                    {
+                        class: "preview-seeker",
+                        inner: this.seeker
+                    },
     
-                    [
-                        { tag: "span", class: "preview-time-current", inner: "0:00", style: { color: "var(--accent)" } },
+                    { class: "time-display", inner: [
+                        { tag: "span", class: "preview-time-current", inner: "0:00.0", style: { color: "var(--accent)" } },
                         { tag: "span", inner: "/" },
                         { tag: "span", class: "preview-time-total", inner: "0:00" }
-                    ]
+                    ] }
                 ] },
-                {
-                    class: "preview-seeker",
-                    inner: this.seeker
-                },
             ],
         ], this.container);
 

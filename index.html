@@ -80,7 +80,7 @@
     <link rel=stylesheet href="./assets/ls/ls.css"> -->
 
     <!-- Development/Hosted/Akeno: -->
-    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,windowmanager,i18n,node,gl,resize,tree,tabs,timeline,timeline-dom,toast,tooltips,range,multipane,commandpalette,effect/ls.js"></script>
+    <script src="https://cdn-origin.extragon.localhost/ls/beta/compiletemplate,shortcutmanager,animation,automationgraph,color,knob,menu,modal,patcher,windowmanager,i18n,node,gl,resize,tree,tabs,timeline,toast,tooltips,range,multipane,commandpalette,effect/ls.js"></script>
     <link rel=stylesheet href="https://cdn-origin.extragon.localhost/ls/beta/flat,knob,cursors,timeline,windowmanager,timeline-dom/ls.css">
 
 
@@ -168,6 +168,7 @@
     <!-- Main Editor Container -->
     <main id="editor-container" style='display: none'>
         <!-- Editor Header -->
+        <!-- TODO: to be refactored to ToolbarComponents -->
         <nav id="editor-header" class="level-2">
 
             <!-- Navigation Items -->
@@ -186,6 +187,22 @@
                 </div>
                 <div tabindex='0' id="redoButton" ls-tooltip='Redo' class="disabled nav-menu-item">
                     <svg xmlns='http://www.w3.org/2000/svg' width='1em' height='1em' fill='currentColor' viewBox='0 0 256 256'><path d='M167.51,127.51,195,100H88a44,44,0,0,0,0,88h88a12,12,0,0,1,0,24H88A68,68,0,0,1,88,76H195L167.51,48.49a12,12,0,1,1,17-17l48,48a12,12,0,0,1,0,17l-48,48a12,12,0,0,1-17-17Z'></path></svg>
+                </div>
+
+                <!-- Window Control Buttons -->
+
+                <div class="window-controls">
+                    <button tabindex='0' id="minimizeButton" ls-tooltip='Minimize' class="clear square">
+                        <i class="bi-dash-lg"></i>
+                    </button>
+    
+                    <button tabindex='0' id="maximizeButton" ls-tooltip='Maximize' class="clear square" style="font-size: 10px">
+                        <i class="bi-square"></i>
+                    </button>
+    
+                    <button tabindex='0' id="closeButton" ls-tooltip='Close' class="clear square">
+                        <i class="bi-x-lg"></i>
+                    </button>
                 </div>
             </div>
 

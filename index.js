@@ -63,6 +63,10 @@ function createWindow(options = {}) {
 
         show: false,
 
+        frame: false,
+
+        hasShadow: true,
+
         backgroundColor: "#1e1e1e", // No flashbangs
 
         webPreferences: {
@@ -127,6 +131,31 @@ ipcMain.on('hard-reload', (event) => {
 
 ipcMain.on('new-window', (event, options) => {
     createWindow(options);
+});
+
+ipcMain.on('minimize-window', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+        window.minimize();
+    }
+});
+
+ipcMain.on('maximize-window', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+        if (window.isMaximized()) {
+            window.unmaximize();
+        } else {
+            window.maximize();
+        }
+    }
+});
+
+ipcMain.on('close-window', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+        window.close();
+    }
 });
 
 ipcMain.on('open-external', (event, url) => {

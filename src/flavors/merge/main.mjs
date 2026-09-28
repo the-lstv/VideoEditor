@@ -709,7 +709,6 @@ class MergeDaw extends FlavorBase {
             direction: 'column',
             category: CATEGORY_NAME,
             inner: [
-
                 // Two horizontal rows
                 { type: "tabs", tabs: [
                     {
@@ -719,7 +718,7 @@ class MergeDaw extends FlavorBase {
                                 direction: 'column',
                                 resize: { width: 350 },
                                 inner: [
-                                    { type: 'slot', view: 'PlaybackPanelView', minHeight: 110, resize: { height: 200 } },
+                                    { type: 'slot', view: 'PlaybackPanelView', minHeight: 120, maxHeight: 155, resize: { height: 155 } },
                                     { type: 'slot', view: 'AssetManagerView' },
                                 ]
                             },
@@ -738,7 +737,13 @@ class MergeDaw extends FlavorBase {
                                             { type: 'slot', view: 'PropertyEditorView', minWidth: 350 }
                                         ], resize: { height: "75%" }
                                     },
-                                    { type: 'slot', view: 'MixerView' }
+                                    {
+                                        direction: 'row',
+                                        inner: [
+                                            { type: 'slot', view: 'InstrumentView', minWidth: 250, resize: { width: 300 } },
+                                            { type: 'slot', view: 'MixerView' },
+                                        ]
+                                    }
                                 ]
                             }
                         ]

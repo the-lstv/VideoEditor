@@ -36,6 +36,17 @@
     }
 }
 
+/**
+ * On desktop, we have a custom frame. This should apply when the window is not maximized.
+ */
+body {
+    border: 1px solid var(--base-30);
+    border-radius: 12px; /* Radius in Plasma, may be different on other platforms */
+    overflow: hidden;
+    box-sizing: border-box;
+    /* Shadow should be handled natively, I guess depends on the platform; tested on KDE plasma + Wayland where it works fine. */
+}
+
 .ls-flavor-about-dialog {
     background: linear-gradient(-175deg, var(--accent-20) 0%, var(--surface-n3) 50%);
 }
@@ -108,8 +119,9 @@
 
 #editor-header {
     align-items: center;
-    padding: 0 10px;
+    padding-left: 10px;
     border-bottom: 1px solid var(--surface-4);
+    border-top: 1px solid var(--surface-1);
 }
 
 #editor-footer {
@@ -132,10 +144,27 @@
     }
 }
 
+.window-controls {
+    display: flex;
+    align-items: center;
+    height: 100%;
+    gap: 4px;
+    margin-left: 8px;
+    margin-right: 2px;
+
+    button {
+        font-size: small;
+        aspect-ratio: 1 / 1;
+        height: 90% !important;
+        width: auto !important;
+    }
+}
+
 #editor-header > div {
     display: flex;
     align-items: center;
     height: 100%;
+    -webkit-app-region: no-drag;
 }
 
 .nav-menu-item {
@@ -243,12 +272,12 @@
     align-items: center;
     z-index: 25;
     padding: 4px 6px;
-}
-
-.controls-bar div {
-    display: flex;
-    align-items: center;
-    gap: 2px;
+    
+    > div {
+        display: flex;
+        align-items: center;
+        gap: 2px;
+    }
 }
 
 .control-button {
@@ -808,11 +837,17 @@ pre.log-message {
 }
 
 .preview-seeker {
-    padding: 20px;
+    padding: 0 30px 0 10px;
+    width: 100%;
+}
+
+.time-display {
+    justify-content: end;
+    min-width: 80px;
 }
 
 .playback-panel-header {
-    padding: 15px 20px;
+    padding: 0 20px;
     background: var(--surface-n2);
     border-bottom: 1px solid var(--surface-2);
     display: flex;
@@ -947,4 +982,8 @@ ls-knob[preset=numeric]:active {
     font-size: 9px;
     color: rgba(0, 0, 0, 0.55);
     pointer-events: none;
+}
+
+.window-handle, #editor-header {
+    -webkit-app-region: drag;
 }

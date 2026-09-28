@@ -14,10 +14,9 @@
  */
 
 // Check if we're running in Electron/Node.js environment
-window.isNode = typeof process !== "undefined" && process.versions != null && process.versions.node != null;
+globalThis.isNode = typeof process !== "undefined" && process.versions != null && process.versions.node != null;
 
 // --- Core imports
-import * as EditorBaseClasses from "./core/base.mjs";
 import StatusBar from "./core/statusbar.mjs";
 import ConfigStore from "./core/configstore.mjs";
 import Project from "./core/project.mjs";
@@ -31,11 +30,11 @@ import * as settings from "./core/settings.mjs";
 
 if(!globalThis.LS) {
     alert("Fatal error: LS library is missing or failed to load. This software cannot run without it.");
-    if(isNode) process.exit(1);
+    if(globalThis.isNode) process.exit(1);
     throw new Error("LS library is missing");
 } else if(LS.v < 6) {
     alert("Fatal error: LS library version is too old. This software requires LS version 6 or higher.");
-    if(isNode) process.exit(1);
+    if(globalThis.isNode) process.exit(1);
     throw new Error("LS library is outdated");
 }
 
@@ -57,6 +56,18 @@ const statusBarContainer = selectOrCreate("#editor-footer");
 const palleteOverlay     = selectOrCreate("#topOverlay");
 const undoButton         = selectOrCreate("#undoButton");
 const redoButton         = selectOrCreate("#redoButton");
+
+const minimizeButton = selectOrCreate("#minimizeButton");
+const maximizeButton = selectOrCreate("#maximizeButton");
+const closeButton    = selectOrCreate("#closeButton");
+
+if(!globalThis.isNode) {
+    // todo: use toolbarcomponents
+    const windowControls = document.querySelector(".window-controls");
+    if(windowControls) {
+        windowControls.remove();
+    }
+}
 
 // We use this to composite all gl components in one context:
 LS.GL.createGlobalWebGLRenderer({
@@ -320,7 +331,8 @@ window.addEventListener('DOMContentLoaded', async () => {
             GLOBAL_PAUSE: 'space',
             GLOBAL_SEEK_HOME: 'home',
             GLOBAL_SEEK_END: 'end',
-            GLOBAL_FULLSCREEN: 'f',
+            GLOBAL_FULLSCREEN_VIEW: 'f',
+            GLOBAL_FULLSCREEN_WINDOW: ['f11'],
             GLOBAL_NEXT_FRAME: 'shift+right',
             GLOBAL_PREVIOUS_FRAME: 'shift+left',
             GLOBAL_SAVE: 'ctrl+s',
@@ -347,6 +359,7 @@ window.addEventListener('DOMContentLoaded', async () => {
             TIMELINE_TOOL_PAINT: 'b',
             TIMELINE_TOOL_SLIDE: 's',
             TIMELINE_TOOL_RIPPLE: 'r',
+
 
             DEBUG_TOGGLE_DEVTOOLS: 'ctrl+shift+i',
             DEBUG_HARD_RELOAD: 'ctrl+shift+r',
@@ -414,10 +427,14 @@ window.addEventListener('DOMContentLoaded', async () => {
             }
         });
 
-        app.shortcutManager.assign("GLOBAL_FULLSCREEN", () => {
+        app.shortcutManager.assign("GLOBAL_FULLSCREEN_VIEW", () => {
             if(app.focusedPreview) {
                 app.focusedPreview.toggleFullscreen();
             }
+        });
+
+        app.shortcutManager.assign("GLOBAL_FULLSCREEN_WINDOW", () => {
+            document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
         });
 
         app.shortcutManager.assign("GLOBAL_NEXT_FRAME", () => {
@@ -537,6 +554,22 @@ window.addEventListener('DOMContentLoaded', async () => {
             app.layoutManager.setSchema(app.flavorInstance.constructor.layoutPresets[layoutName]);
         });
 
+        // --- Setup window control buttons
+        minimizeButton.addEventListener('click', () => {
+            if(isNode) {
+                app.ipc.send("minimize-window");
+            }
+        });
+
+        maximizeButton.addEventListener('click', () => {
+            if(isNode) {
+                app.ipc.send("maximize-window");
+            }
+        });
+
+        closeButton.addEventListener('click', () => {
+            window.close();
+        });
 
         // --- Setup undo/redo buttons
         undoButton.addEventListener('click', () => {
