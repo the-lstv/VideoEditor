@@ -20,52 +20,36 @@ class PreviewView extends LS.View {
                     {
                         tag: "button",
                         class: "control-button square clear",
-                        inner: { tag: "i", class: "bi-arrow-90deg-left" },
+                        inner: { tag: "i", class: "bi-arrow-clockwise" },
                         style: "font-size: smaller",
-                        tooltip: "Jump to the beginning <kbd>Home</kbd>",
+                        tooltip: "Reset <kbd>R</kbd>",
                         onclick: () => this.seek(0, true)
                     },
-
                     {
                         tag: "button",
                         class: "control-button square clear",
-                        inner: { tag: "i", class: "bi-arrow-left" },
-                        tooltip: "Previous frame <kbd>Shift</kbd> + <kbd>←</kbd>",
-                        onclick: () => {}
-                    },
-
-                    (this.__playButton = LS.Create("button", {
-                        class: "control-button square clear",
-                        inner: { tag: "i", class: "bi-play-fill" },
-                        tooltip: "Play/Pause <kbd>Space</kbd>",
-                        onclick: () => this.togglePlay()
-                    })),
-
-                    {
-                        tag: "button",
-                        class: "control-button square clear",
-                        inner: { tag: "i", class: "bi-arrow-right" },
-                        tooltip: "Next frame <kbd>Shift</kbd> + <kbd>→</kbd>",
-                        onclick: () => {}
-                    },
-
-                    {
-                        tag: "button",
-                        class: "control-button square clear",
-                        inner: { tag: "i", class: "bi-arrow-90deg-right" },
+                        inner: { tag: "i", class: "bi-camera-video-fill" },
                         style: "font-size: smaller",
-                        tooltip: "Jump to the end <kbd>End</kbd>",
-                        onclick: () => this.seek(this.details.totalTime)
+                        tooltip: "Free camera <kbd>Ctrl+Shift+C</kbd>",
+                        onclick: () => this.seek(0, true)
                     },
                 ],
 
-                [
-                    { tag: "span", class: "preview-time-current", inner: "0:00", style: { color: "var(--accent)" } },
-                    { tag: "span", inner: "/" },
-                    { tag: "span", class: "preview-time-total", inner: "0:00" }
-                ],
+                // [
+                //     { tag: "span", class: "preview-time-current", inner: "0:00", style: { color: "var(--accent)" } },
+                //     { tag: "span", inner: "/" },
+                //     { tag: "span", class: "preview-time-total", inner: "0:00" }
+                // ],
 
                 [
+                    {
+                        tag: "button",
+                        class: "control-button square clear",
+                        inner: { tag: "i", class: "bi-camera-fill" },
+                        style: "font-size: smaller",
+                        tooltip: "Save screenshot",
+                        onclick: () => this.seek(0, true)
+                    },
                     {
                         tag: "button",
                         class: "control-button square clear",

@@ -87,6 +87,7 @@ const app = globalThis.app = {
      * Enters the loading/transition shade
      */
     async enterShade() {
+        document.body.classList.remove('loaded');
         app.container.classList.remove('loaded');
         const logo = document.querySelector("#logo");
         logo.classList.remove("jump");
@@ -110,6 +111,7 @@ const app = globalThis.app = {
         await new Promise(resolve => setTimeout(resolve, 0));
 
         document.querySelector("#logo").classList.add("jump");
+        document.body.classList.add('loaded');
         app.container.classList.add('loaded');
 
         await new Promise(resolve => setTimeout(resolve, 10));
@@ -142,6 +144,16 @@ const app = globalThis.app = {
                 console.log("Animating icon change");
             }
         });
+
+        // Set favicon
+        const favicon = document.querySelector("link[rel~='icon']");
+        if(favicon) {
+            favicon.href = iconSet.favicon || iconSet.icon;
+        }
+
+        const meta = app.flavorInstance?.constructor?.meta;
+
+        document.title = meta? meta.title || meta.name: "Editor";
     },
 
     /**
@@ -283,14 +295,20 @@ if(globalThis.isNode) {
     }
 
     document.body.classList.add("isNode");
+
+    electron.ipcRenderer.on('window-maximized', (_, maximized) => {
+        document.documentElement.toggleAttribute('data-maximized', maximized)
+    });
+
+    electron.ipcRenderer.invoke('is-maximized').then(isMaximized => {
+        document.documentElement.toggleAttribute('data-maximized', isMaximized);
+    });
 } else {
     window.app_config = LS.Util.parseURLParams();
 
     // todo: use toolbarcomponents
-    const windowControls = document.querySelector(".window-controls");
-    if(windowControls) {
-        windowControls.remove();
-    }
+    const windowControls = document.querySelectorAll(".window-controls-wrapper, .window-controls");
+    windowControls.forEach(el => el.remove());
 }
 
 

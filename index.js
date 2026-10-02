@@ -93,11 +93,17 @@ function createWindow(options = {}) {
         }
     });
 
-    
     window.once("ready-to-show", () => {
         window.show();
         window.webContents.toggleDevTools();
     });
+    
+    function updateMaximizedState() {
+        window.webContents.send('window-maximized', window.isMaximized());
+    }
+    
+    window.on('maximize', updateMaximizedState);
+    window.on('unmaximize', updateMaximizedState);
     return window;
 }
 
@@ -112,6 +118,14 @@ ipcMain.handle('select-directory', async (event, operation) => {
     } else {
         return result.filePaths[0];
     }
+});
+
+ipcMain.handle('is-maximized', (event) => {
+    const window = BrowserWindow.fromWebContents(event.sender);
+    if (window) {
+        return window.isMaximized();
+    }
+    return false;
 });
 
 // When menu is disabled, Electron also kindly fucks up the keyboard shortcuts, so we have to implement them ourselves

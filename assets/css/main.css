@@ -37,15 +37,15 @@
 }
 
 body {
-    overflow: hidden;
     box-sizing: border-box;
 }
 
 /**
  * On desktop, we have a custom frame. This should apply when the window is not maximized.
  */
-.isNode {
+html:not([data-maximized]) .isNode {
     border: 1px solid var(--base-30);
+    overflow: hidden;
     border-radius: 12px; /* Radius in Plasma, may be different on other platforms */
     /* Shadow should be handled natively, I guess depends on the platform; tested on KDE plasma + Wayland where it works fine. */
 }
@@ -147,19 +147,58 @@ body {
     }
 }
 
+.window-controls-wrapper {
+    width: 92px;
+    height: calc(100% + 20px);
+    -webkit-app-region: no-drag;
+    position: relative;
+    top: -10px;
+}
+
 .window-controls {
     display: flex;
     align-items: center;
-    height: 100%;
-    gap: 4px;
-    margin-left: 8px;
-    margin-right: 2px;
+    z-index: 500000;
+    position: fixed;
+    top: 0;
+    right: 0;
 
     button {
         font-size: small;
         aspect-ratio: 1 / 1;
-        height: 90% !important;
-        width: auto !important;
+        height: 26px !important;
+        width: 30px !important;
+        color: var(--color) !important;
+
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 4px 2px;
+            border-radius: 6px;
+            z-index: 0;
+        }
+
+        i {
+            position: relative;
+            z-index: 1;
+        }
+
+        &:last-child {
+            width: 32px !important;
+            padding-right: 2px !important;
+
+            &::before {
+                right: 4px;
+            }
+        }
+
+        &:hover {
+            &::before {
+                background: var(--surface-4);
+            }
+
+            background: none !important;
+        }
     }
 }
 

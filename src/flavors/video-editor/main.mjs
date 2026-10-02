@@ -55,6 +55,7 @@ class VideoEditor extends FlavorBase {
 
     static meta = {
         name: "Video Editor",
+        title: "Video Editor",
         description: "A professional video editor built on the universal LS creative engine with web technologies and the LS framework.",
         category: CATEGORY_NAME,
         engine_version: ">=2.3.0-alpha",

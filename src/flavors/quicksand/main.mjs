@@ -33,6 +33,7 @@ class QuickSand extends FlavorBase {
 
     static meta = {
         name: "Quicksand",
+        title: "Quicksand Game Engine Editor",
         category: CATEGORY_NAME,
         engine_version: ">=2.3.0-alpha",
     };

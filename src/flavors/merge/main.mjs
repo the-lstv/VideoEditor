@@ -77,6 +77,13 @@ class MergeDaw extends FlavorBase {
         desktopIcon: 'src/flavors/merge/images/favicon.png'
     };
 
+    static meta = {
+        name: "MergeDaw",
+        title: "MergeDaw Editor",
+        category: CATEGORY_NAME,
+        engine_version: ">=2.3.0-alpha",
+    };
+
     static version = "0.0.1-alpha";
 
     async #init() { }

@@ -156,6 +156,7 @@
     <script type="module" src="./src/main.mjs"></script>
 
 </head>
+
 <body ls ls-theme="dark" ls-accent="white" ls-style="flat" style="--font:Ubuntu Mono, monospace" class="level-0">
     <!-- Splash logo -->
     <img id="logo" width='200px' src='assets/images/icon.svg' alt='Editor Icon'>
@@ -191,18 +192,20 @@
 
                 <!-- Window Control Buttons -->
 
-                <div class="window-controls">
-                    <button tabindex='0' id="minimizeButton" ls-tooltip='Minimize' class="clear square">
-                        <i class="bi-dash-lg"></i>
-                    </button>
-    
-                    <button tabindex='0' id="maximizeButton" ls-tooltip='Maximize' class="clear square" style="font-size: 10px">
-                        <i class="bi-square"></i>
-                    </button>
-    
-                    <button tabindex='0' id="closeButton" ls-tooltip='Close' class="clear square">
-                        <i class="bi-x-lg"></i>
-                    </button>
+                <div class="window-controls-wrapper">
+                    <div class="window-controls">
+                        <button tabindex='0' id="minimizeButton" ls-tooltip='Minimize' class="clear square">
+                            <i class="bi-dash-lg"></i>
+                        </button>
+
+                        <button tabindex='0' id="maximizeButton" ls-tooltip='Maximize' class="clear square" style="font-size: 10px">
+                            <i class="bi-square"></i>
+                        </button>
+
+                        <button tabindex='0' id="closeButton" ls-tooltip='Close' class="clear square">
+                            <i class="bi-x-lg"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
 
