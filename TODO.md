@@ -1,4 +1,7 @@
 ## TODO List
+- [ ] Virtual filesystem
+- [ ] Flavor project data management
+
 - [ ] Multiple render backends
 
 - [ ] Resize modes/behavior

@@ -62,14 +62,6 @@ const minimizeButton = selectOrCreate("#minimizeButton");
 const maximizeButton = selectOrCreate("#maximizeButton");
 const closeButton    = selectOrCreate("#closeButton");
 
-if(!globalThis.isNode) {
-    // todo: use toolbarcomponents
-    const windowControls = document.querySelector(".window-controls");
-    if(windowControls) {
-        windowControls.remove();
-    }
-}
-
 // We use this to composite all gl components in one context:
 LS.GL.createGlobalWebGLRenderer({
     compositeLayerParent: appContainer
@@ -179,12 +171,15 @@ const app = globalThis.app = {
 
         try {
             const flavorId = flavorClass.name;
+
+            const newurl = location.origin + location.pathname + '?flavor=' + flavorId;
+            window.history.pushState({ path: newurl }, '', newurl);
     
             app.flavor = flavorClass;
 
             const loaded = flavorClass?.prepare? await flavorClass?.prepare?.(): true;
             if(loaded !== true) {
-                throw new Error(`preparation of ${flavorClass.name} failed because ${loaded}`);
+                throw new Error(`preparation of ${flavorId} failed because ${loaded}`);
             }
 
             const layout = app.config.get("layout-for-" + flavorId);
@@ -275,7 +270,7 @@ const app = globalThis.app = {
 
 window.app_config = {};
 
-if(isNode) {
+if(globalThis.isNode) {
     const fs = require("fs");
     const path = require("path");
     const electron = require("electron");
@@ -287,9 +282,20 @@ if(isNode) {
         window.app_config = LS.Util.parseJSONC(fs.readFileSync(configPath, "utf-8"));
     }
 
-    if(window.app_config?.flavor) {
-        app.dynamicLoadFlavor(window.app_config.flavor, { delay: false });
+    document.body.classList.add("isNode");
+} else {
+    window.app_config = LS.Util.parseURLParams();
+
+    // todo: use toolbarcomponents
+    const windowControls = document.querySelector(".window-controls");
+    if(windowControls) {
+        windowControls.remove();
     }
+}
+
+
+if(window.app_config?.flavor) {
+    app.dynamicLoadFlavor(window.app_config.flavor, { delay: false });
 }
 
 const SHOW_WELCOME_SCREEN = (!window.app_config?.flavor) && window.app_config?.welcomeScreen !== false;

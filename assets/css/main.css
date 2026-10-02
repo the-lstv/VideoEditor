@@ -36,14 +36,17 @@
     }
 }
 
+body {
+    overflow: hidden;
+    box-sizing: border-box;
+}
+
 /**
  * On desktop, we have a custom frame. This should apply when the window is not maximized.
  */
-body {
+.isNode {
     border: 1px solid var(--base-30);
     border-radius: 12px; /* Radius in Plasma, may be different on other platforms */
-    overflow: hidden;
-    box-sizing: border-box;
     /* Shadow should be handled natively, I guess depends on the platform; tested on KDE plasma + Wayland where it works fine. */
 }
 
@@ -388,6 +391,11 @@ ls-box ul li {
     font-size: 0.8em;
     color: var(--surface-8);
     margin-right: 6px;
+}
+
+.property-editor-input {
+    --padding-input-h: 6px;
+    --padding-control-v: 6px;
 }
 
 .property-editor-container input[type="number"] {

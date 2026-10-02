@@ -7,6 +7,11 @@
 export default class Flavor extends LS.Context {
     static name = "default";
 
+    /**
+     * @type {Project}
+     */
+    project = null;
+
     constructor(project) {
         super();
 
