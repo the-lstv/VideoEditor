@@ -4,6 +4,8 @@
  * @license GPL-3.0
  */
 
+/** @typedef {import('./project.mjs').default} Project */
+
 export default class Flavor extends LS.Context {
     static name = "default";
 
@@ -27,6 +29,9 @@ export default class Flavor extends LS.Context {
         });
     }
 
+    /**
+     * @returns {Object}
+     */
     get flavorConfig() {
         const name = this.constructor.name || this.name || "default";
 

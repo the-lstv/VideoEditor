@@ -107,10 +107,24 @@ function createWindow(options = {}) {
     return window;
 }
 
-ipcMain.handle('select-directory', async (event, operation) => {
+ipcMain.handle('select-directory', async (event, operation, options) => {
     const properties = operation === 'export' ? ['openDirectory', 'createDirectory'] : ['openDirectory'];
     const result = await dialog.showOpenDialog({
-        properties: properties
+        properties: properties,
+        ...options
+    });
+
+    if (result.canceled) {
+        return null;
+    } else {
+        return result.filePaths[0];
+    }
+});
+
+ipcMain.handle('select-file', async (event, options) => {
+    const result = await dialog.showOpenDialog({
+        properties: ['openFile'],
+        ...options
     });
 
     if (result.canceled) {

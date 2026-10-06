@@ -21,7 +21,6 @@ node_modules
 msdf-atlas-gen
 *.exe
 
-video_proxies
 
 vst3sdk
 
@@ -36,3 +35,7 @@ targets
 build
 
 ___*
+
+user/video_proxies
+user/projects/*
+!user/projects/.gitkeep

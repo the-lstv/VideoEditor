@@ -10,6 +10,8 @@
  * QuickSand is a lightweight, low-level, dynamic game engine for JavaScript designed for
  * creating highly performant games with an intuitive API and GUI.
  * 
+ * It is designed to efficiently work for both 2D and 3D graphics.
+ * 
  * You can use the QuickSand editor to create games with a visual editor, or you can use the QuickSand runtime to create games programmatically.
  */
 
@@ -964,16 +966,14 @@ class Sound {
 }
 
 /**
- * BatchedSpriteRenderer efficiently renders multiple sprites in a single draw call, with a few limitations:
- * - All sprites share one texture atlas.
- * - All sprites use the same shader program.
- * - All sprites have the same blending mode.
- * - All sprites are rendered in order and can't be easile interleaved with other renderables, and aren't recursive.
+ * Draws 2D sprites with batching, reducing the number of draw calls when possible. Possible to switch sprite shaders.
+ * For best performance, put sprites that share the same texture next to eachother, as every texture switch causes a new draw call and removes the possibilty of reusing buffers.
  * 
- * Good for:
- * - Rendering many sprites with the same atlas on one layer, eg. UI elements.
+ * It is also recommended to reuse the BatchedSpriteRenderer instance when you can, as it is relatively expensive.
  * 
- * Supported sprite properties: x, y, w, h, texture, texture region, color/transparency and xyz rotation
+ * Supported sprite properties: x, y, w, h, texture and region, color/transparency and xyz rotation
+ * 
+ * Doesn't render 3D objects
  */
 class BatchedSpriteRenderer extends LS.GL.Renderable {
     /**
@@ -998,6 +998,7 @@ class BatchedSpriteRenderer extends LS.GL.Renderable {
      * // This way you can also generate custom data if you wish.
      * spriteRenderer.draw(3, atlasTexture, 0, 3, 1.0); // count, texture, low, high, opacity, x, y
      * // The above will draw whatever container was last stored in the buffers with render()
+     * // But will only work if you don't have multiple textures in the batch.
      */
     constructor(lsgli, { frag = null, vert = null, uniforms = null, attributes = null, binds = null, batchSize = 512 } = {}) {
         super({
@@ -1005,7 +1006,7 @@ class BatchedSpriteRenderer extends LS.GL.Renderable {
 
             parent: lsgli,
 
-            uniforms: ["uProjection", "uOffset", "uTexture", "uOpacity", ...(uniforms || [])],
+            uniforms:   ["uProjection", "uOffset", "uTexture", "uOpacity",   ...(uniforms || [])  ],
             attributes: ["iOffset", "iSize", "iUVRect", "iColor", "iRotate", ...(attributes || [])],
  
             vao: true,
@@ -1034,7 +1035,6 @@ void main() {
     vec4 texColor = texture(uTexture, v_texCoord);
     fragColor = texColor * v_color;
     fragColor.a *= uOpacity;
-    //fragColor = (texColor * 0.1)  + vec4(1.0, 1.0, 1.0, 1.0) + (v_color * 0.1);
 }`,
             vert: vert || `#version 300 es
 
@@ -1134,9 +1134,12 @@ void main() {
             }
 
             const child = currentContainer.children[i];
+            if(!child || !child.visible) continue;
 
             // Enter container
             if(child.isContainer) {
+                if(child.children.length === 0 || child.opacity <= 0) continue;
+
                 parent = currentContainer;
                 parentI = i;
                 currentContainer = child;
@@ -1147,7 +1150,7 @@ void main() {
                 continue;
             }
 
-            if(!child || !child.texture) continue;
+            if(!child.texture) continue;
 
             const data       = child.data;
             const mixOpacity = data[9] * data[13];
@@ -1246,16 +1249,117 @@ void main() {
         // Todo: sadly, drawArraysInstanced does not support low, meaning the only way would be to rebind the array, which i am yet to test the performance of.
         // This means that we are sadly forced to rebuid nearly every time which limits the optimization potential a lot.
     }
-
-    renderCallback(delta, now, gl, width, height, updatedDimensions, uniforms, attributes, projectionMatrix) {
-        // this.render(this.container, true);
-    }
 }
 
-class DynamicRenderer extends LS.GL.Renderable {
-    constructor(lsgli) {
-        super();
-        this.renderer = lsgli;
+/**
+ * Renderer capable of rendering 3D objects.
+ */
+class Renderer3D extends LS.GL.Renderable {
+    constructor(lsgli, { frag = null, vert = null, uniforms = null, attributes = null, binds = null, batchSize = 2048 } = {}) {
+        super({
+            version: 0,
+
+            parent: lsgli,
+
+            uniforms:   ["uProjection", "uOffset", "uTexture", "uOpacity",   ...(uniforms || [])  ],
+            attributes: ["iOffset", "iSize", "iUVRect", "iColor", "iRotate", ...(attributes || [])],
+ 
+            vao: true,
+            bind: {
+                iOffset:  { cellSize: 2, type: "float", size: batchSize },
+                iRotate:  { cellSize: 3, type: "float", size: batchSize },
+                iSize:    { cellSize: 2, type: "float", size: batchSize },
+                iColor:   { cellSize: 4, type: "ubyte", size: batchSize, normalized: true },
+                iUVRect:  { cellSize: 4, type: "float", size: batchSize },
+                ...binds
+            },
+
+            frag: frag || `#version 300 es
+precision mediump float;
+
+in vec2 v_texCoord;
+in vec4 v_color;
+
+out vec4 fragColor;
+
+uniform sampler2D uTexture;
+
+uniform float uOpacity;
+
+void main() {
+    vec4 texColor = texture(uTexture, v_texCoord);
+    fragColor = texColor * v_color;
+    fragColor.a *= uOpacity;
+}`,
+            vert: vert || `#version 300 es
+
+${LS.GL.utils.quad}
+
+in vec2 iOffset;
+in vec3 iRotate;
+in vec4 iUVRect;
+in vec4 iColor;
+in vec2 iSize;
+
+uniform mat4 uProjection;
+uniform vec2 uOffset;
+
+out  vec2 v_texCoord;
+out  vec4 v_color;
+
+mat3 rotationXYZ(vec3 r) {
+    float cx = cos(r.x);
+    float sx = sin(r.x);
+    float cy = cos(r.y);
+    float sy = sin(r.y);
+    float cz = cos(r.z);
+    float sz = sin(r.z);
+
+    mat3 Rx = mat3(
+        1.0, 0.0, 0.0,
+        0.0, cx,  -sx,
+        0.0, sx,   cx
+    );
+
+    mat3 Ry = mat3(
+         cy, 0.0, sy,
+        0.0, 1.0, 0.0,
+        -sy, 0.0, cy
+    );
+
+    mat3 Rz = mat3(
+        cz, -sz, 0.0,
+        sz,  cz, 0.0,
+        0.0, 0.0, 1.0
+    );
+
+    return Rz * Ry * Rx;
+}
+
+void main() {
+    vec2 quadCoord = positions[gl_VertexID] * 0.5 + 0.5;
+    vec2 local = (quadCoord - 0.5) * iSize;
+
+    vec3 p = rotationXYZ(iRotate) * vec3(local, 0.0);
+
+    p.xy += iOffset + 0.5 * iSize + uOffset;
+
+    gl_Position = uProjection * vec4(p, 1.0);
+
+    v_texCoord = iUVRect.xy + quadCoord * iUVRect.zw;
+    v_color = iColor;
+}`
+        });
+    }
+
+    render(container, x = container.data[0], y = container.data[1], opacity = container.opacity, _skipSetup = false) {
+        if(!container || !container.children || container.children.length === 0 || (opacity !== null && opacity <= 0)) return;
+        
+
+    }
+
+    draw() {
+
     }
 }
 
@@ -1266,10 +1370,10 @@ class Sprite {
     texture = null;
 
     /**
-     * @type {number[]} data Packed array of x, y, z, width, height, depth, r, g, b, a, rx, ry, rz, alphaMultiplier, sx, sy, sz
+     * @type {number[]} data Packed array of x, y, z, width, height, depth, r, g, b, a, rx, ry, rz, alphaMultiplier, sx, sy, sz, visible
      * its efficient i guess; also could later be linked to subarrays
      */
-    data = [0, 0, 0, -1, -1, 1, 255, 255, 255, 255, 0, 0, 0, 1.0, 0, 0, 0];
+    data = [0, 0, 0, -1, -1, 1, 255, 255, 255, 255, 0, 0, 0, 1.0, 0, 0, 0, 1];
 
     /**
      * @typedef SpriteOptions
@@ -1308,6 +1412,7 @@ class Sprite {
         if(options.color)                 this.setColor(options.color);
         if(options.rotation)              this.setRotation(options.rotation);
         if(options.scale)                 this.setScale(options.scale);
+        if(options.visible !== undefined) this.visible = options.visible? 1: 0;
         // if(options.anchor)                this.setAnchor(options.anchor);
         if(options.texture)               this.texture = options.texture;
         if(options.opacity !== undefined) this.opacity = options.opacity;
@@ -1417,6 +1522,14 @@ class Sprite {
         return this.data[16];
     }
 
+    set visible(value) {
+        this.data[17] = value? 1: 0;
+    }
+
+    get visible() {
+        return this.data[17] === 1;
+    }
+
     setPosition(x, y, z) {
         if(Array.isArray(x)) {
             [x, y, z] = x;
@@ -1514,15 +1627,384 @@ class Sprite {
 
 /**
  * Abstract class for 3D objects, or sprites with geometry support.
+ * It is just like a regular sprite but holds geometry data.
  */
-class Object3D extends Sprite {
-    indices   = new Uint32Array();
+class Mesh extends Sprite {
+    /**
+     * Positions of vectors in 3D space.
+     * These are more of an indexed collection for reuse
+     * 
+     * Eg.
+     * (0, 0, 0), (10, 10, 0), (0, 10, 0)
+     */
     positions = new Float32Array();
+
+    /**
+     * Makes triangles out of positions.
+     * It is a list of indices that define the triangles in the geometry.
+     * Not sure why this is separated but it is how it is
+     * 
+     * Eg.
+     * (0, 1, 2)
+     */
+    indices   = new Uint16Array();
+
+    /**
+     * Normals are used for lighting calculations, and are usually perpendicular to the surface of the geometry.
+     */
     normals   = new Float32Array();
+
+    /**
+     * UVs define how a texture maps to geometry, simillarly to a 2D texture region.
+     */
     uvs       = new Float32Array();
 
+    /**
+     * Creates a new Mesh instance.
+     * @param {Array} data - The data for the object.
+     * @param {Object} options - The options for the object.
+     */
     constructor(data, options) {
         super(options);
+    }
+}
+
+function op(a, b, op) {
+    switch(op) {
+        case op.add: return a + b;
+        case op.sub: return a - b;
+        case op.mul: return a * b;
+        case op.div: return a / b;
+        default: throw new Error("Invalid operation");
+    }
+}
+
+op.add = 0;
+op.sub = 1;
+op.mul = 2;
+op.div = 3;
+
+class MeshBuilder {
+    /**
+     * A builder for programmatically creating Mesh instances.
+     * This should likely not be used in bulids
+     * 
+     * @example
+     * // The following makes a 1x1 cube
+     * const builder = new MeshBuilder().box(0, 0, 0, 1, 1, 1);
+     * 
+     * // Convert to a 3D object
+     * const myObject = builder.toObject();
+     * 
+     * builder.reset();
+     * // you can build another object after that
+     * builder.destroy();
+     */
+    constructor() {
+        this.cursor    = new Vector(0, 0, 0);
+        this.triangles = [];
+        this.normals   = [];
+        this.uvs       = [];
+    }
+
+    beginRecording (name) { return this }
+    endRecording   (name) { return this }
+    paste          (name) { return this }
+
+    move    (x, y, z) { this.cursor.set(x, y, z); return this }
+    vto     (x, y, z) { return this }
+
+    triangle(x1, y1, z1, x2, y2, z2, x3 = this.cursor.x, y3 = this.cursor.y, z3 = this.cursor.z) {
+        this.triangles.push([x1, y1, z1, x2, y2, z2, x3, y3, z3]);
+        return this;
+    }
+
+    plane(x1, y1, z1, x2, y2, z2, x3, y3, z3, x4, y4, z4) {
+        this.triangle(x1, y1, z1, x2, y2, z2, x3, y3, z3);
+        this.triangle(x3, y3, z3, x4, y4, z4, x1, y1, z1);
+        return this;
+    }
+
+    planeTo(x, y, z) {
+        const x1 = this.cursor.x, y1 = this.cursor.y, z1 = this.cursor.z;
+        this.plane(x1, y1, z1, x, y1, z1, x, y, z, x1, y, z);
+        return this;
+    }
+
+    box(x, y, z, width, height, depth) {
+        const x1 = x, y1 = y, z1 = z;
+        const x2 = x + width, y2 = y + height, z2 = z + depth;
+
+        // Bottom
+        this.plane(x1, y1, z1, x2, y1, z1, x2, y2, z1, x1, y2, z1);
+        // Top
+        this.plane(x1, y1, z2, x2, y1, z2, x2, y2, z2, x1, y2, z2);
+        // Left
+        this.plane(x1, y1, z1, x1, y1, z2, x1, y2, z2, x1, y2, z1);
+        // Right
+        this.plane(x2, y1, z1, x2, y1, z2, x2, y2, z2, x2, y2, z1);
+        // Front
+        this.plane(x1, y1, z1, x2, y1, z1, x2, y1, z2, x1, y1, z2);
+        // Back
+        this.plane(x1, y2, z1, x2, y2, z1, x2, y2, z2, x1, y2, z2);
+
+        return this;
+    }
+
+    toObject() {
+        const positions = [];
+        const indices   = [];
+
+        // Yes this is very slow
+        for(const triangle of this.triangles) {
+            for(const vertex of triangle) {
+                const index = positions.indexOf(vertex);
+                if(index === -1) {
+                    positions.push(vertex);
+                    indices.push(positions.length - 1);
+                } else {
+                    indices.push(index);
+                }
+            }
+        }
+
+        const obj = new Mesh();
+        obj.indices   = new Uint16Array (indices);
+        obj.positions = new Float32Array(positions);
+        obj.normals   = new Float32Array(this.normals);
+        obj.uvs       = new Float32Array(this.uvs);
+        return obj;
+    }
+
+    reset() {
+        this.cursor.set(0, 0, 0);
+        this.positions.reset();
+        this.normals.length = 0;
+        this.uvs.length     = 0;
+        return this;
+    }
+
+    destroy() {
+        this.cursor    = null;
+        this.positions = null;
+        this.normals   = null;
+        this.uvs       = null;
+    }
+}
+
+/**
+ * Dynamic vector with arbitrary size and offset, backed by either Array or any TypedArray.
+ * Note that this is heavier than a normal { x, y, z } object but allows more efficient browsing of vector arrays.
+ */
+class Vector {
+    data = [0, 0, 0];
+    size = 3;
+    offset = 0;
+
+    /**
+     * Creates a new Vector instance. Number of arguments matters; it can be a 2D vector, 3D vector, etc.
+     * @param {number|Array|TypedArray} x x or data - Data array
+     * @param {number} y y or offset - Offset into the data array
+     * @param {number} z z or size - Size of the vector
+     * 
+     * @example
+     * new Vector(1, 2, 3); // x=1, y=2, z=3
+     * 
+     * @example
+     * new Vector(1, 2); // x=1, y=2
+     * 
+     * @example
+     * new Vector([1, 2, 3, 4, 5], 1, 3); // data=[1, 2, 3, 4, 5], offset=1, size=3 (y=2, z=3, w=4)
+     * 
+     * @example
+     * new Vector(object.positions, 0, 3); // View into the positions array of an Mesh
+     */
+    constructor(x = 0, y = 0, z = 0) {
+        if(Array.isArray(x)) {
+            this.data = x;
+            this.offset = y;
+            this.size = z || 3;
+        } else {
+            this.size = arguments.length || 3;
+            this.data = new Array(this.size);
+
+            for(let i = 0; i < this.size; i++) {
+                this.data[i] = arguments[i] || 0;
+            }
+        }
+    }
+
+    get x() { return this.data[this.offset + 0] }
+    get y() { return this.data[this.offset + 1] }
+    get z() { return this.data[this.offset + 2] }
+    get w() { return this.data[this.offset + 2] }
+    get h() { return this.data[this.offset + 3] }
+    set x(value) { this.data[this.offset + 0] = value }
+    set y(value) { this.data[this.offset + 1] = value }
+    set z(value) { this.data[this.offset + 2] = value }
+    set w(value) { this.data[this.offset + 2] = value }
+    set h(value) { this.data[this.offset + 3] = value }
+
+    set(x, y, z) {
+        if(x !== undefined) this.data[this.offset + 0] = x;
+        if(y !== undefined) this.data[this.offset + 1] = y;
+        if(z !== undefined) this.data[this.offset + 2] = z;
+    }
+
+    /**
+     * Returns an iterator for the vector's components.
+     * @returns {Iterator} An iterator for the vector's components.
+     */
+    *iterator() {
+        for(let i = 0; i < this.size; i++) {
+            yield this.data[this.offset + i];
+        }
+    }
+
+    [Symbol.iterator]() {
+        return this.iterator();
+    }
+
+    toArray() {
+        return this.data.slice(this.offset, this.offset + this.size);
+    }
+
+    /**
+     * Perform an operation on the vector with either a scalar or another vector.
+     * @param {number|Vector} scalarOrVector The scalar or vector to operate with.
+     * @param {number} operation The operation to perform (0: add, 1: sub, 2: mul, 3: div).
+     * @returns {Vector} The modified vector.
+     */
+    op(scalarOrVector, operation = op.add) {
+        const offset = this.offset;
+        const data   = this.data;
+
+        if(scalarOrVector instanceof Vector) {
+            for(let i = 0; i < this.size; i++) {
+                const index = offset + i;
+                data[index] = op(data[index], scalarOrVector.data[scalarOrVector.offset + i], operation);
+            }
+            return this;
+        }
+
+        for(let i = 0; i < this.size; i++) {
+            const index = offset + i;
+            data[index] = op(data[index], scalarOrVector, operation);
+        }
+        return this;
+    }
+
+    add(scalarOrVector) {
+        return this.op(scalarOrVector, op.add);
+    }
+
+    sub(scalarOrVector) {
+        return this.op(scalarOrVector, op.sub);
+    }
+
+    mul(scalarOrVector) {
+        return this.op(scalarOrVector, op.mul);
+    }
+
+    div(scalarOrVector) {
+        return this.op(scalarOrVector, op.div);
+    }
+
+    static fromSize(size) {
+        return new Vector(Array(size).fill(0), 0, size);
+    }
+
+    clone() {
+        const newVector = new Vector(Array(this.size), 0, this.size);
+
+        for(let i = 0; i < this.size; i++) {
+            newVector.data[i] = this.data[this.offset + i];
+        }
+
+        return newVector;
+    }
+
+    compare(otherVector) {
+        if(this.size !== otherVector.size) return false;
+
+        for(let i = 0; i < this.size; i++) {
+            if(this.data[this.offset + i] !== otherVector.data[otherVector.offset + i]) {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * Return vector as a string if you must (it's slow)
+     */
+    id()  { return this.data.slice(this.offset, this.offset + this.size).join(",") }
+
+
+    /**
+     * Generate a hash for the vector
+     * Faster than id()
+     */
+    hash() {
+        let h = 0;
+        for (let i = 0; i < this.size; i++) {
+            const n = this.data[this.offset + i] || 0;
+            h = Math.imul(h ^ n, 0x45d9f3b);
+            h ^= h >>> 16;
+        }
+        return h >>> 0;
+    }
+
+    /**
+     * Return vector as a string "x,y,z"
+     * Faster than id()
+     */
+    id3() { return `${this.data[this.offset + 0]},${this.data[this.offset + 1]},${this.data[this.offset + 2]}` }
+}
+
+class VectorView extends Vector {
+    constructor(data, offset, size) {
+        super(data, offset, size);
+    }
+
+    get index() {
+        return this.offset / this.size;
+    }
+
+    at(index = 0) {
+        const offset = this.size * index;
+        if(offset + this.size > this.data.length) throw new Error("Index out of bounds");
+        this.offset = offset;
+        return this;
+    }
+
+    consolidate() {
+        const newData = [];
+
+        const hashes = new Set();
+
+        for(let i = 0; i < this.data.length / this.size; i++) {
+            this.at(i);
+            const hash = this.hash();
+
+            if(hashes.has(hash)) {
+                // Skip duplicates
+                continue;
+            }
+
+            hashes.add(hash);
+            newData.push(...this);
+        }
+
+        this.data = newData;
+        this.offset = 0;
+        return this;
+    }
+
+    reset() {
+        this.data.length = 0;
+        this.offset = 0;
     }
 }
 
@@ -1702,14 +2184,14 @@ class LayoutContainer extends Container {
     constructor(children = [], options, layoutOptions = {}) {
         super(children, options);
         this.layoutOptions = layoutOptions;
-        this.layout();
+        this.recompute();
     }
 
     /**
      * Layout the children of the container
      * @param {Object} layoutOptions Options for the layout (e.g., spacing, padding)
      */
-    layout() {
+    recompute() {
         let x = this.x, y = this.y;
 
         const layoutOptions = this.layoutOptions;
@@ -1731,17 +2213,17 @@ class LayoutContainer extends Container {
 
     appendChild(child) {
         super.appendChild(child);
-        this.layout();
+        this.recompute();
     }
 
     removeChild(child) {
         super.removeChild(child);
-        this.layout();
+        this.recompute();
     }
 
     replaceChildren(newChildren) {
         super.replaceChildren(newChildren);
-        this.layout();
+        this.recompute();
     }
 
     destroy() {
@@ -1760,10 +2242,10 @@ window.QuickSand = {
     TextureAtlas,
     Sound,
     Sprite,
-    Object3D,
+    Mesh,
     Container,
     LayoutContainer,
     Scene
 };
 
-export { GameRuntime, Scene, AssetLoader, InputHandler, StorageManager, BatchedSpriteRenderer, Texture, TextureAtlas, Sound, Sprite, Object3D, Container, LayoutContainer };
+export { GameRuntime, Scene, AssetLoader, InputHandler, StorageManager, BatchedSpriteRenderer, Renderer3D, Texture, TextureAtlas, Sound, Sprite, Mesh, Container, LayoutContainer };

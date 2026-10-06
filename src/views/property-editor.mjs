@@ -243,8 +243,8 @@ function cleanup() {
                 break;
 
             case "audio":
+                this.editorContainer.prepend(this.propertyGroups.audio);
                 this.editorContainer.appendChild(this.propertyGroups.source);
-                this.editorContainer.appendChild(this.propertyGroups.audio);
                 break;
 
             default: break;
@@ -437,7 +437,7 @@ function cleanup() {
         }
 
         const hasDefault = typeof defaultValue !== "undefined";
-        if(hasDefault || inputObject.helpModal) {
+        if((hasDefault || inputObject.helpModal) && !(inputObject.inputType === "knob")) {
             inputObject.container = LS.Create({
                 class: "input-with-reset",
                 inner: [ inputObject.container || inputObject.input ]
@@ -1143,26 +1143,28 @@ function cleanup() {
             }
         ]);
 
-        this.propertyGroups.audio = LS.Create([
+        this.propertyGroups.audio = LS.Create({ style: "--knob-spacing: 8px", inner: [
             { tag: "h3", i18n: "properties.audio", text: "Audio", class: "property-editor-header" },
-            {
-                class: "property-editor-group level-1", inner: [
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-volume-up" }, { tag: "label", i18n: "properties.volume", text: " Volume:" }] },
-                        this.#createInput("audioVolume", { type: "number", inputType: "knob", attributes: { min: 0, max: 100, step: 0.05 }, defaultValue: 100 })
-                    ],
+            this.#createInput("audioVolume", { type: "number", inputType: "knob", attributes: { min: 0, max: 100, step: 0.05, label: "Volume" }, defaultValue: 100 }),
+            this.#createInput("audioPan",    { type: "number", inputType: "knob", attributes: { min: -1, max: 1, step: 0.05, label: "Pan" },     defaultValue: 0 }),
+            this.#createInput("audioPlaybackRate", { type: "number", inputType: "knob", attributes: { min: 0.1, step: 0.1, label: "Pitch" },     defaultValue: 1 }),
+            // {
+            //     class: "property-editor-group level-1", inner: [
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-speaker" }, { tag: "label", i18n: "properties.audioPan", text: " Pan:" }] },
-                        this.#createInput("audioPan", { type: "number", inputType: "knob", attributes: { min: -1, max: 1, step: 0.05 }, defaultValue: 0 })
-                    ],
+            //                 [{ tag: "span", inner: [{ tag: "i", class: "bi-volume-up" }, { tag: "label", i18n: "properties.volume", text: " Volume:" }] },
+            //             ],
+                        
+            //             [{ tag: "span", inner: [{ tag: "i", class: "bi-speaker" }, { tag: "label", i18n: "properties.audioPan", text: " Pan:" }] },
+            //         ],
+                    
+            //         [{ tag: "span", inner: [{ tag: "i", class: "bi-alignment-baseline" }, { tag: "label", i18n: "properties.playbackRate", text: " Playback rate:" }] },
+            //                 ],
 
-                    [{ tag: "span", inner: [{ tag: "i", class: "bi-alignment-baseline" }, { tag: "label", i18n: "properties.playbackRate", text: " Playback rate:" }] },
-                        this.#createInput("audioPlaybackRate", { type: "number", inputType: "knob", attributes: { min: 0.1, step: 0.1 }, defaultValue: 1 })
-                    ],
-                ]
-            },
+            //     ]
+            // },
 
             EditorBaseClasses.createTip("audio", "TIP: For more audio effects and options, see the pipeline tab.")
-        ]);
+        ]});
 
         this.propertyGroups.video = LS.Create([
             { tag: "h3", i18n: "properties.video", text: "Video", class: "property-editor-header" },

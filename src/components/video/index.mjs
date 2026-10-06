@@ -242,7 +242,7 @@ class VideoDecoder {
 
         options.fps ??= 30;
         options.width ??= 1280;
-        options.output ??= __dirname + "/video_proxies/" + this.resource.fullPath.replace(/\.[^/.]+$/, "") + "_proxy.mp4";
+        options.output ??= __dirname + "/user/video_proxies/" + this.resource.fullPath.replace(/\.[^/.]+$/, "") + "_proxy.mp4";
 
         const spawn = require("child_process").spawn;
         const path = require("path");

@@ -84,8 +84,8 @@ class QuickSand extends FlavorBase {
 
         // When the project data has loaded
         this.project.on("project-data-loaded", async (data) => {
-            if(data.qsGameConfig) {
-                this.runtime.reinitialize(data.qsGameConfig);
+            if(this.flavorConfig.gameConfig) {
+                this.runtime.reinitialize(this.flavorConfig.gameConfig);
             }
         });
 
@@ -117,8 +117,8 @@ class QuickSand extends FlavorBase {
      * Export the project data into an object
      */
     async #exportTo(data) {
-        if(!data.savedFlavorId) data.savedFlavorId = "video-editor";
-        data.qsGameConfig = LS.Util.clone(this.runtime.options);
+        if(!data.savedFlavorId) data.savedFlavorId = "quicksand";
+        this.flavorConfig.gameConfig = LS.Util.clone(this.runtime.options);
 
         // ...
     }

@@ -7,16 +7,16 @@
 
     [data-tab-id].active {
         font-weight: 600;
-        padding-left: 30px !important;
+        padding-left: 22px !important;
     }
 
     [data-tab-id]::before {
         content: "";
         position: absolute;
-        top: 15px;
-        bottom: 15px;
+        top:    12px;
+        bottom: 12px;
         width: 5px;
-        left: 18px;
+        left: 10px;
         background: var(--accent);
         border-radius: var(--border-radius-full);
         opacity: 0;
@@ -152,8 +152,9 @@
 }
 
 .grouped-buttons :is(button, .ls-button) {
-    --padding-control-v: 12px;
-    --padding-control-h: 20px;
+    --padding-control-v: 8px;
+    --padding-control-h: 16px;
+    transition: none !important;
     text-align: left;
 }
 
@@ -168,16 +169,16 @@
 }
 
 .grouped-buttons :is(button, .ls-button):first-child {
-    border-radius: var(--border-radius-large) var(--border-radius-large) 0 0 !important;
+    border-radius: var(--border-radius-medium) var(--border-radius-medium) 0 0 !important;
 }
 
 .grouped-buttons :is(button, .ls-button):last-child {
-    border-radius: 0 0 var(--border-radius-large) var(--border-radius-large) !important;
+    border-radius: 0 0 var(--border-radius-medium) var(--border-radius-medium) !important;
     border-bottom: none !important;
 }
 
 .grouped-buttons :is(button, .ls-button):only-child {
-    border-radius: var(--border-radius-large) !important;
+    border-radius: var(--border-radius-medium) !important;
     border-bottom: none !important;
 }
 
@@ -222,7 +223,10 @@
 td.shortcut-keys {
     display: flex;
     gap: 8px;
-    padding: 8px !important;
+}
+
+.shortcut-label, .shortcut-keys {
+    padding: 4px 6px !important;
 }
 
 kbd.shortcut-key {

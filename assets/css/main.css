@@ -47,6 +47,7 @@ html:not([data-maximized]) .isNode {
     border: 1px solid var(--base-30);
     overflow: hidden;
     border-radius: 12px; /* Radius in Plasma, may be different on other platforms */
+    /* Well i guess it is actually 10px but that causes the border to be cut out which i'd argue looks worse than 2 extra pixels or roundness */
     /* Shadow should be handled natively, I guess depends on the platform; tested on KDE plasma + Wayland where it works fine. */
 }
 
@@ -176,6 +177,7 @@ html:not([data-maximized]) .isNode {
             inset: 4px 2px;
             border-radius: 6px;
             z-index: 0;
+            background: var(--surface-2);
         }
 
         i {
@@ -199,6 +201,12 @@ html:not([data-maximized]) .isNode {
 
             background: none !important;
         }
+    }
+}
+
+@media (max-width: 900px) {
+    .header-center {
+        display: none !important;
     }
 }
 

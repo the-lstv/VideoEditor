@@ -1,16 +1,15 @@
 /**
  * Main entry point.
  * This is an independent launcher.
- * It doesn't care if you are loading which flavors and how; they can be setup as needed.
+ * 
+ * It doesn't care if you are loading which flavors and how.
  * 
  * It manages:
  * - Global state
- * - Global shortcuts
- * - Menus
+ * - Shortcuts and menus
  * - Command Palette
- * - Basic main structure and logic
  * 
- * It can't contain any flavor-specific code
+ * It can't contain any flavor-specific code.
  */
 
 // Check if we're running in Electron/Node.js environment
@@ -62,10 +61,8 @@ const minimizeButton = selectOrCreate("#minimizeButton");
 const maximizeButton = selectOrCreate("#maximizeButton");
 const closeButton    = selectOrCreate("#closeButton");
 
-// We use this to composite all gl components in one context:
-LS.GL.createGlobalWebGLRenderer({
-    compositeLayerParent: appContainer
-});
+// We use this to composite gl components in one context:
+LS.GL.createGlobalWebGLRenderer({ compositeLayerParent: appContainer });
 
 /**
  * --- Global persistent application state ---
@@ -82,6 +79,11 @@ const app = globalThis.app = {
 
     GITHUB_REPO: "https://github.com/the-lstv/videoeditor",
     VERSION: new Version("2.3.0-alpha"),
+
+    /**
+     * @type {Project}
+     */
+    currentProject: null,
 
     /**
      * Enters the loading/transition shade
@@ -137,7 +139,7 @@ const app = globalThis.app = {
 
         app.iconSet = iconSet;
 
-        LS.Select(".flavor-icon, #logo").forEach(el => {
+        document.querySelectorAll(".flavor-icon, #logo").forEach(el => {
             el.src = el.id === "logo" ? iconSet.icon: iconSet.small || iconSet.favicon || iconSet.icon;
             if(animate) {
                 LS.Animation.fadeIn(el, "left");
@@ -280,7 +282,7 @@ const app = globalThis.app = {
     }
 }
 
-window.app_config = {};
+window.globalConfig = {};
 
 if(globalThis.isNode) {
     const fs = require("fs");
@@ -291,7 +293,7 @@ if(globalThis.isNode) {
 
     const configPath = path.join(__dirname, "config.jsonc");
     if (fs.existsSync(configPath)) {
-        window.app_config = LS.Util.parseJSONC(fs.readFileSync(configPath, "utf-8"));
+        window.globalConfig = LS.Util.parseJSONC(fs.readFileSync(configPath, "utf-8"));
     }
 
     document.body.classList.add("isNode");
@@ -304,19 +306,18 @@ if(globalThis.isNode) {
         document.documentElement.toggleAttribute('data-maximized', isMaximized);
     });
 } else {
-    window.app_config = LS.Util.parseURLParams();
-
     // todo: use toolbarcomponents
     const windowControls = document.querySelectorAll(".window-controls-wrapper, .window-controls");
     windowControls.forEach(el => el.remove());
 }
 
+Object.assign(window.globalConfig, LS.Util.parseURLParams());
 
-if(window.app_config?.flavor) {
-    app.dynamicLoadFlavor(window.app_config.flavor, { delay: false });
+if(window.globalConfig?.flavor) {
+    app.dynamicLoadFlavor(window.globalConfig.flavor, { delay: false });
 }
 
-const SHOW_WELCOME_SCREEN = (!window.app_config?.flavor) && window.app_config?.welcomeScreen !== false;
+const SHOW_WELCOME_SCREEN = (!window.globalConfig?.flavor) && window.globalConfig?.welcomeScreen !== false;
 
 // --- Setup welcome screen if enabled
 if(SHOW_WELCOME_SCREEN) {
@@ -338,10 +339,10 @@ LS.i18n.changeLocale(app.config.get("language") || "en");
 
 // --- Workspace initialization
 window.addEventListener('DOMContentLoaded', async () => {
-    if(window.app_config && window.app_config.flavor) {
+    if(window.globalConfig && window.globalConfig.flavor) {
         // TODO: Don't guess
         const icon = document.querySelector("#logo");
-        icon.src = "./src/flavors/" + window.app_config.flavor + "/images/icon.svg";
+        icon.src = "./src/flavors/" + window.globalConfig.flavor + "/images/icon.svg";
     }
 
     app.layoutManager.on("resize", (event, child) => {
@@ -396,19 +397,35 @@ window.addEventListener('DOMContentLoaded', async () => {
         // --- Shortcut actions
 
         app.shortcutManager.assign("GLOBAL_SAVE", () => {
-            // Temporary
-            app.currentProject.exportZip(true);
+            if(!isNode) {
+                // ! Temporary, package to a zip file and download it
+                app.currentProject.exportZip(true);
+            } else {
+                // Save regularly
+                app.currentProject.save();
+            }
         });
 
         app.shortcutManager.assign("GLOBAL_OPEN", () => {
             // Temporary
-            Project.openFromZipFile(project => {
-                // project.once('ready', () => {
-                //     if(!project) return;
 
-                    // app.currentProject.replaceWith(project);
-                    app.currentProject = project;
-                // });
+            if(!isNode) {
+                Project.openFromZipFile(project => {
+                    // project.once('ready', () => {
+                    //     if(!project) return;
+
+                        // app.currentProject.replaceWith(project);
+                        app.currentProject = project;
+                    // });
+                });
+                return;
+            }
+
+            Project.openFromFile(project => {
+                if(!project) return;
+
+                // app.currentProject.replaceWith(project);
+                app.currentProject = project;
             });
         });
 
@@ -605,25 +622,27 @@ window.addEventListener('DOMContentLoaded', async () => {
             app.currentProject.historyManager.redo();
         });
 
-
         // --- Setup settings modal
 
-        const settingsModal = settings.createModal(settingsContent);
+        const settingsModal = settings.createModal(settingsContent).modal;
 
         // --- Setup top menus
         // TODO: Load menus based on flavor
 
         const menus = {
             file: [
-                { text: "Project manager", action() {
-                    // ... Open project manager
-                } },
+                { text: "Project manager", action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN_PROJECT_MANAGER"); } },
+                { text: "File manager",    action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN_FILE_MANAGER"); } },
                 { type: "separator" },
-                { text: "New Project", action() { app.shortcutManager.triggerMapping("GLOBAL_NEW_PROJECT"); } },
-                { text: "Open Project...", action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN"); } },
-                { text: "Save Project", action() { app.shortcutManager.triggerMapping("GLOBAL_SAVE"); } },
+                { text: "New Project",     action() { app.shortcutManager.triggerMapping("GLOBAL_NEW_PROJECT"); } },
+                { text: "Open Project…",   action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN"); } },
                 { type: "separator" },
-                { text: "Render...", icon: "bi-box-arrow-right", action() {
+                { text: "Save Project",    action() { app.shortcutManager.triggerMapping("GLOBAL_SAVE"); } },
+                { text: "Save Project As", action() { app.shortcutManager.triggerMapping("GLOBAL_SAVE_AS"); } },
+                { type: "separator" },
+                { text: "Recent Projects", items: [] },
+                { type: "separator" },
+                { text: "Export…", icon: "bi-box-arrow-right", action() {
                     // ... Open export dialog
                 } },
 
@@ -646,8 +665,8 @@ window.addEventListener('DOMContentLoaded', async () => {
                 { type: "separator" },
 
                 { text: "Set editor theme", items: [
-                    { icon: "bi-sun", text: "Light", action() { LS.Color.setTheme('light'); localStorage.setItem("ls-theme", "light"); } },
-                    { icon: "bi-moon", text: "Dark", action() { LS.Color.setTheme('dark'); localStorage.setItem("ls-theme", "dark"); } },
+                    { icon: "bi-sun", text: "Light",   action() { LS.Color.setTheme('light'); localStorage.setItem("ls-theme", "light"); } },
+                    { icon: "bi-moon", text: "Dark",   action() { LS.Color.setTheme('dark'); localStorage.setItem("ls-theme", "dark"); } },
                     { icon: "bi-laptop", text: "Auto", action() { localStorage.removeItem("ls-theme"); LS.Color.setAdaptiveTheme(); } },
                     { type: "separator" },
                     { text: "More...", action() {
@@ -656,19 +675,17 @@ window.addEventListener('DOMContentLoaded', async () => {
                 ] },
 
                 { text: "Set editor accent", items: [
-                    { text: "Default", action() { LS.Color.setAccent('white'); localStorage.removeItem("ls-accent"); } },
-                    { text: "Blue", action() { LS.Color.setAccent('blue'); localStorage.setItem("ls-accent", "blue"); } },
-                    { text: "Red", action() { LS.Color.setAccent('red'); localStorage.setItem("ls-accent", "red"); } },
-                    { text: "Green", action() { LS.Color.setAccent('green'); localStorage.setItem("ls-accent", "green"); } },
-                    { text: "Purple", action() { LS.Color.setAccent('purple'); localStorage.setItem("ls-accent", "purple"); } },
-                    { text: "Orange", action() { LS.Color.setAccent('orange'); localStorage.setItem("ls-accent", "orange"); } },
-                    { text: "Pink", action() { LS.Color.setAccent('pink'); localStorage.setItem("ls-accent", "pink"); } },
-                    { text: "Teal", action() { LS.Color.setAccent('teal'); localStorage.setItem("ls-accent", "teal"); } },
-                    { text: "Yellow", action() { LS.Color.setAccent('yellow'); localStorage.setItem("ls-accent", "yellow"); } },
+                    { text: "Default", action() { LS.Color.setAccent('white');  localStorage.removeItem("ls-accent"); } },
+                    { text: "Blue",    action() { LS.Color.setAccent('blue');   localStorage.setItem("ls-accent", "blue"); } },
+                    { text: "Red",     action() { LS.Color.setAccent('red');    localStorage.setItem("ls-accent", "red"); } },
+                    { text: "Green",   action() { LS.Color.setAccent('green');  localStorage.setItem("ls-accent", "green"); } },
+                    { text: "Purple",  action() { LS.Color.setAccent('purple'); localStorage.setItem("ls-accent", "purple"); } },
+                    { text: "Orange",  action() { LS.Color.setAccent('orange'); localStorage.setItem("ls-accent", "orange"); } },
+                    { text: "Pink",    action() { LS.Color.setAccent('pink');   localStorage.setItem("ls-accent", "pink"); } },
+                    { text: "Teal",    action() { LS.Color.setAccent('teal');   localStorage.setItem("ls-accent", "teal"); } },
+                    { text: "Yellow",  action() { LS.Color.setAccent('yellow'); localStorage.setItem("ls-accent", "yellow"); } },
                     { type: "separator" },
-                    { text: "More...", action() {
-                        settings.openPage("appearance");
-                    }}
+                    { text: "More...", action() { settings.openPage("appearance"); }}
                 ] },
 
                 { type: "separator" },
@@ -698,14 +715,14 @@ window.addEventListener('DOMContentLoaded', async () => {
                 { text: "Flavor layout presets", items: getLayouts },
                 { text: "Saved layouts", items: [] },
 
-                // { type: "separator" },
+                { type: "separator" },
 
-                // { text: "Save Current Layout", action() {} },
+                { text: "Save Current Layout", action() {} },
 
-                // { type: "separator" },
+                { type: "separator" },
                 
-                // { text: "Save Current Layout To File", action() {} },
-                // { text: "Load Layout From File", action() {} },
+                { text: "Save Current Layout To File", action() {} },
+                { text: "Load Layout From File", action() {} },
             ],
 
             help: [

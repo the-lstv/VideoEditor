@@ -2,17 +2,76 @@
  * Base project class.
  * @copyright 2026 lstv.space
  * @license GPL-3.0
+ * 
+ * There is a lot to do here
  */
 
-import { HistoryManager } from "./base.mjs";
+import { HistoryManager }  from "./base.mjs";
 import { ResourceManager } from "./resources.mjs";
 
 /**
  * Abstract project class
- * 
- * It can be used for different types of editors; video editing, daw, game engine, etc.
  */
 class Project extends LS.Context {
+    /**
+     * The name of the project
+     * @type {string}
+     */
+    name = null;
+
+    /**
+     * The location of the project
+     * @type {string}
+     */
+    location = null;
+
+    /**
+     * The configuration of the project
+     * @type {Object}
+     */
+    config = {};
+
+    /**
+     * Resources used in the project
+     * @type {ResourceManager}
+     */
+    resources = new ResourceManager(this);
+
+    /**
+     * History manager for undo/redo
+     * @type {HistoryManager}
+     */
+    historyManager = new HistoryManager(this);
+
+    /**
+     * The views currently connected to this project
+     * @type {Map<string, LS.View>}
+     */
+    connectedViews = new Map();
+
+    /**
+     * Whether the project has been loaded
+     * @type {boolean}
+     */
+    loaded = false;
+
+    /**
+     * Whether the project has been initialized
+     * @type {boolean}
+     */
+    initialized = false;
+
+    /**
+     * Promise that resolves when the project has finished loading and initializing
+     * @type {Promise<void>}
+     */
+    loadPromise = null;
+
+    /**
+     * Create a new project instance.
+     * @param {Object} data - The data to initialize the project with.
+     * @param {string} flavor - The flavor to use for the project.
+     */
     constructor(data, flavor) {
         super();
 
@@ -33,19 +92,8 @@ class Project extends LS.Context {
             console.warn("Another project is already loaded, and at this moment it is sadly not possible to open multiple projects simultaneously. Destroying the existing project.", app.currentProject);
             app.currentProject.destroy(true);
         }
+
         app.currentProject = this;
-
-        // The views currently connected to this project
-        this.connectedViews = new Map();
-
-        // Resources used in the project
-        this.resources = new ResourceManager(this);
-
-        // History manager for undo/redo
-        this.historyManager = new HistoryManager(this);
-
-        this.config = {};
-        this.initialized = false;
 
         this.loadPromise = this.init(data);
     }
@@ -171,6 +219,103 @@ class Project extends LS.Context {
         return asString? JSON.stringify(data): data;
     }
 
+    async save() {
+        // ! Todo
+
+        const fs = require("fs");
+        const electron = require("electron");
+
+        if(!this.location) {
+            // Ask the user for a location to save the project
+
+            this.config.name ??= "new-project";
+
+            const projectnameInput   = LS.Create("input.ls-modal-input[placeholder='Project name']", { value: this.config.name });
+            const locationElement    = LS.Create({ tag: "span", text: __dirname + "/user/projects/" });
+            const projectnameElement = LS.Create({ tag: "span", text: this.config.name });
+
+            const modal = new LS.Modal({
+                closeable: false,
+                ephemeral: true,
+            }, {
+                title: "Save",
+                content: [
+                    { emmet: "label{Name}", inner: projectnameInput },
+                    { tag: "br" },
+                    { text: "Location" },
+                    { inner: [locationElement, projectnameElement], style: "font-size: smaller; color: var(--surface-10); padding-top: 8px;" },
+                    { tag: "br" },
+                    { emmet: "button{Choose location}", onclick: async () => {
+                        const result = await electron.ipcRenderer.invoke('select-directory', 'export');
+                        if (result) {
+                            this.location = result;
+                            locationElement.textContent = this.location;
+                        } else {
+                            console.error('No location selected for saving the project');
+                            return;
+                        }
+                    } }
+                ],
+
+                buttons: [{ label: "Cancel", class: "elevated" }, { label: "Save", onClick: async () => {
+                    if(!this.location) {
+                        this.location = __dirname + "/user/projects/";
+                    }
+
+                    if(await fs.promises.access(this.location + "/" + this.config.name + "/project.json").then(() => true).catch(() => false)) {
+                        const overwrite = await new LS.Modal({
+                            closeable: false,
+                            ephemeral: true,
+                        }, {
+                            title: "Overwrite?",
+                            content: "A project with this name already exists. Do you want to overwrite it?",
+                            buttons: [
+                                { label: "Cancel", class: "elevated" },
+                                { label: "Overwrite", onClick: async () => {
+                                    await this.saveToLocation();
+                                    modal.destroy();
+                                    overwrite.destroy();
+                                } }
+                            ]
+                        }).open();
+                    } else {
+                        await this.saveToLocation();
+                        modal.destroy();
+                    }
+                }}]
+            }).open();
+
+            projectnameInput.addEventListener("input", () => {
+                this.config.name = projectnameInput.value || "new-project";
+                projectnameElement.textContent = this.config.name;
+            });
+
+            return;
+        }
+
+        await this.saveToLocation();
+    }
+
+    async saveToLocation(location = null) {
+        const data = this.export();
+
+        // Let other parts of the application handle saving
+        this.emit("save", [data, this]);
+
+        // todo: get filesystem provider, eg. for vfs
+        const fs = require("fs");
+
+        location ??= this.location;
+
+        const path = this.location + "/" + this.config.name;
+        await fs.promises.mkdir    (path, { recursive: true });
+        await fs.promises.writeFile(path + "/project.json", JSON.stringify(data));
+    }
+
+    saveBackup() {
+        // ! Todo
+    }
+
     /**
      * Packages the project as a zip file.
      * This is mainly useful for small projects only in the browser where native file access or directory access is not possible.
@@ -267,8 +412,31 @@ class Project extends LS.Context {
         input.click();
     }
 
+    static openFromFile(callback) {
+        app.ipc.invoke('select-file', {
+            filters: [
+                { name: 'Project Files', extensions: ['json', 'zip'] },
+            ],
+
+            defaultPath: __dirname + "/user/projects"
+        }).then(filePath => {
+            if(!filePath) return callback(null);
+
+            // ! tempoarary
+            app.currentProject && app.currentProject.destroy(true);
+
+            try {
+                const project = new Project(LS.Util.parseJSONC(require("fs").readFileSync(filePath, "utf-8")));
+                project.location = require("path").dirname(filePath);
+                if(callback) callback(project);
+            } catch (error) {
+                console.error("Error opening project file:", error);
+                callback(null, error);
+            }
+        });
+    }
+
     // static repairProjectData(data) {}
-    // static backup(project) {}
 
     /**
      * Destroys the project and optionally all connected views
