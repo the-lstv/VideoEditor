@@ -1666,12 +1666,12 @@ function cleanup() {
             }
         });
 
-        aidResizerEntry.handler.on("start", (event) => {
+        aidResizerEntry.on("start", (event) => {
             const project = this.#getProject();
             preview = project?.connectedViews.get("videoPreview");
         });
 
-        aidResizerEntry.handler.on("resize", (side, width, height, leftOffset, topOffset, state) => {
+        aidResizerEntry.on("resize", (side, width, height, leftOffset, topOffset, state) => {
             if(!this.currentTarget) return;
 
             if(preview) {
@@ -1691,7 +1691,7 @@ function cleanup() {
             }
         });
         
-        aidResizerEntry.handler.on("end", () => {
+        aidResizerEntry.on("end", () => {
             if(!this.currentTarget) return;
             this.updateAidPosition();
         });

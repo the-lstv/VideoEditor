@@ -85,6 +85,32 @@ const app = globalThis.app = {
      */
     currentProject: null,
 
+    locales: [
+        { value: "en", name: "English" },
+        { value: "cs", name: "Čeština (Czech)" },
+        // { value: "de", name: "Deutsch (German)" },
+        // { value: "es", name: "Español (Spanish) (Auto-Translated!)" },
+        // { value: "fr", name: "Français (French) (Auto-Translated!)" },
+        // { value: "zh", name: "中文 (Mandarin Chinese) (Auto-Translated!)" },
+    ],
+
+    // Globally recognized list of flavors
+    flavorList: [
+        // Classic flavors
+        { name: "Video Editor", value: "video-editor", icon: "bi-camera-reels-fill" },
+        { name: "Digital Audio Workstation", value: "merge", icon: "bi-music-note-beamed" },
+        { name: "Game Engine", value: "quicksand", icon: "bi-dpad-fill" },
+        
+        // To be added
+        { name: "Slides", value: "slides", icon: "bi-easel2-fill" },
+        
+        // Planned
+        { name: "Graphics editor", value: "light", icon: "bi-vector-pen" },
+        { name: "Image editor", value: "image-editor", icon: "bi-image" },
+
+        { name: "Glitter Playground", value: "glitter-playground", icon: "bi-code-slash" },
+    ],
+
     /**
      * Enters the loading/transition shade
      */
@@ -690,22 +716,32 @@ window.addEventListener('DOMContentLoaded', async () => {
 
                 { type: "separator" },
 
-                { text: "Set editor language", items: [
-                        { code: "en", text: "English" },
-                        { code: "cs", text: "Čeština (Czech)" },
-                        // { code: "de", text: "Deutsch (German)" },
-                        // { code: "es", text: "Español (Spanish) (Auto-Translated!)" },
-                        // { code: "fr", text: "Français (French) (Auto-Translated!)" },
-                        // { code: "zh", text: "中文 (Mandarin Chinese) (Auto-Translated!)" },
-                    ].map(lang => ({
-                        text: lang.text,
+                { text: "Switch flavor", items: () => app.flavorList.map(flavor => ({
+                    text: flavor.name,
+                    icon: flavor.icon,
+                    type: "radio",
+                    group: "flavor",
+                    checked: app.flavorInstance?.constructor?.name === flavor.value,
+
+                    action() {
+                        app.dynamicLoadFlavor(flavor.value, { delay: 250 }).catch(e => {
+                            console.error("Failed to load flavor:", e);
+                            LS.Modal.alert("Failed to load flavor: " + e.message);
+                        });
+                    }
+                })) },
+
+                { type: "separator" },
+
+                { text: "Set editor language", items: () => app.locales.map(lang => ({
+                        text: lang.name,
                         type: "radio",
                         group: "language",
-                        checked: LS.i18n.locale === lang.code,
+                        checked: LS.i18n.locale === lang.value,
 
                         action() {
-                            LS.i18n.changeLocale(lang.code);
-                            app.config.set("language", lang.code);
+                            LS.i18n.changeLocale(lang.value);
+                            app.config.set("language", lang.value);
                         },
                     }))
                 }

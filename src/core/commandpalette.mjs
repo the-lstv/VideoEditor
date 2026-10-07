@@ -116,17 +116,22 @@ export default function initCommandPalette(app, paletteOverlay) {
                 {
                     name: "language",
                     type: "list",
-                    list: [
-                        { name: "English", value: "en" },
-                        { name: "Čeština (Czech)", value: "cs" },
-                        { name: "Volunteer to translate", value: "volunteer", icon: "bi-people" },
-                        // { name: "Deutsch (German) (Auto-Translated!)", value: "de" },
-                        // { name: "Español (Spanish) (Auto-Translated!)", value: "es" },
-                        // { name: "Français (French) (Auto-Translated!)", value: "fr" },
-                        // { name: "中文 (Mandarin Chinese) (Auto-Translated!)", value: "zh" }
-                    ]
+                    list: app.locales
                 }
             ]
+        },
+
+        {
+            name: "config",
+            alias: ["settings"],
+            icon: "bi-gear",
+            description: "Quickly navigate settings"
+        },
+
+        {
+            name: "logs",
+            icon: "bi-file-earmark-text",
+            description: "Show logs",
         },
 
         {
@@ -146,13 +151,7 @@ export default function initCommandPalette(app, paletteOverlay) {
             },
 
             inputs: [
-                { name: "flavor", type: "list", list: [
-                    // { name: "Default", value: "default" },
-                    { name: "Video Editor", value: "video-editor", icon: "bi-camera-reels" },
-                    { name: "Merge DAW", value: "merge", icon: "bi-music-note-list" },
-                    { name: "QuickSand", value: "quicksand", icon: "bi-flower1" },
-                    { name: "Glitter Playground", value: "glitter-playground", icon: "bi-code-slash" },
-                ] }
+                { name: "flavor", type: "list", list: app.flavorList }
             ]
         },
 
