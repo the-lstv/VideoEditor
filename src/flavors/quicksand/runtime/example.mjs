@@ -83,6 +83,54 @@ game.init().then(async () => {
 
     // Finally, we can resume the runtime, which will start the render loop and enable input.
     game.resume();
+
+
+    // --- Rendering text with LS.GL.WebGLTextEngine
+    const textEngine = new LS.GL.WebGLTextEngine({
+        renderer: game.renderer,
+        fontName: "UbuntuMono/softmask",
+
+        // The type of the font (softmask, sdf, msdf, mtsdf)
+        // See the docs to learn more about the differences between these types
+        type: "softmask",
+
+        // How many characters can be rendered at once
+        bufferSize: 512,
+
+        // Remove if you want to have per-character coloring
+        staticColor: [255, 255, 255, 255],
+    });
+
+    // Wait for the font to load
+    await textEngine.loadPromise;
+
+    // Create a text block
+    // This is a "block" of text that we can write to. It takes a chunk of the total buffer size.
+    // Keep in mind that the buffer has "slots" and each slot holds a character.
+    const text = textEngine.createText(512);
+
+    // We can then write text to it in various ways. This does not need to be done every frame.
+    // One way is to write a full string of text:
+    text.writeTextAt("Hello world!", /*start*/0, /*length*/null, /*x*/0, /*y*/0, /*r*/null, /*g*/null, /*b*/null, /*a*/null, /*size*/16);
+
+    // Or we can write individual characters to specific slots.
+    (async () => {
+        const typerText = new TextEncoder().encode("Hello World! This is a test of the text engine."); // (it doesn't have to be encoded, but it is better to provide character codes instead of strings when you can. the engine converts text to character codes anyway.)
+
+        let x = 50, y = 100;
+        for(let i = 0; i < 512; i++) {
+            // Note: I do +12 here so we don't overwrite the previous text written with writeTextAt; you can write to any slot you want, but writing to existing slots will overwrite them.
+            x += text.setChar(i + 12, x, y, typerText[i] || 0);
+            await new Promise(resolve => setTimeout(resolve, 50)); // Add some delay
+        }
+    })();
+
+    // Finally, we can render the text whenever we want with text.render().
+    game.renderer.addRenderable({
+        renderCallback: (delta, now) => {
+            text.render();
+        }
+    });
 });
 
 // Optimization test; skip rebuilding the buffers if the sprite didnt change

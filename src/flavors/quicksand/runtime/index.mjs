@@ -13,6 +13,27 @@
  * It is designed to efficiently work for both 2D and 3D graphics.
  * 
  * You can use the QuickSand editor to create games with a visual editor, or you can use the QuickSand runtime to create games programmatically.
+ * 
+ * 
+ * 
+ * What QuickSand currently supports:
+ * - 2D sprites
+ * - 3D meshes (in progress)
+ * - Custom shaders
+ * - Audio file playback (for sfx and music) via SoundBox
+ * - Input handling (keyboard, mouse, controller/gamepad)
+ * - Asset management (images, audio, etc.)
+ * - Basic storage management for persistent data
+ * - Static text (via Canvas2D to texture)
+ * - Dynamic text via LS.GL.WebGLTextEngine (MSDF, MTSDF, SDF, or Softmask)
+ * 
+ * When to use dynamic vs static text rendering:
+ * - Use static text rendering for text that doesn't change often and doesn't scale (eg. UI labels), as it is more efficient (generated once, then rendered as any other standard texture). Bonus: You can generate a text texture atlas with multiple text entries easily with TextureAtlas.fromTextList({ key: "value" }) to reduce the amount of texture switches. The QuickSand builder can also pre-generate text textures to save time at runtime. Downside: Uses more memory the more text you render, doesn't support per-character styling, and text can't be updated or resized after rendering.
+ * - Use dynamic text rendering for text that changes frequently. Individual characters can be changed, colored or moved independently each frame. Additionally, with font formats like MTSDF, you can scale the text without losing quality and keeping anti-aliasing, of course at some performance cost. Downside is that it requires converting your font to a special format first.
+ * QuickSand's dynamic text rendering is designed to be very efficient and performant and is designed for large amounts of text, but static text rendering is still more efficient for text that doesn't change.
+ * 
+ * Note: QuickSand is a low-level engine, and as such it assumes you have an understanding of how graphics rendering works and how to use it effectively, for which it provides more advanced features and control.
+ * If you aren't familiar with graphics programming, it is recommended to use the QuickSand editor to create your game visually.
  */
 
 /**
