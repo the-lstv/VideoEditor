@@ -324,7 +324,7 @@ class AssetLoader extends LS.EventEmitter {
  * For more advanced input handling or gestures, consider using LS.Util.TouchHandle
  */
 class InputHandler {
-    keyboard = new Map();
+    keyboard = {};
     mouse = [0, 0, false, false, false, false, false, false];
     controller = null;
 
@@ -376,11 +376,11 @@ class InputHandler {
         const options = { signal: this.signal.signal };
 
         target.addEventListener("keydown", (e) => {
-            this.keyboard.set(e.code, true);
+            this.keyboard[e.code] = true;
         }, options);
 
         target.addEventListener("keyup", (e) => {
-            this.keyboard.set(e.code, false);
+            this.keyboard[e.code] = false;
         }, options);
 
         target.addEventListener("mousemove", (e) => {
@@ -407,8 +407,8 @@ class InputHandler {
         }
 
         if(clearState) {
-            for(const key of this.keyboard.keys()) {
-                this.keyboard.set(key, false);
+            for(const key of Object.keys(this.keyboard)) {
+                this.keyboard[key] = false;
             }
     
             for(let i = 2; i < this.mouse.length; i++) {
@@ -648,8 +648,27 @@ class GameRuntime extends LS.Context {
         return new Scene(this);
     }
 
-    sleep(ms) {
-        return new Promise(resolve => setTimeout(resolve, ms));
+    sleep(ms, signal = null) {
+        return new Promise((resolve) => {
+            let timeout;
+            if (signal) {
+                if (signal.aborted) {
+                    resolve();
+                    return;
+                }
+
+                signal.addEventListener('abort', () => {
+                    clearTimeout(timeout);
+                    resolve();
+                }, { once: true });
+
+                if(ms < 0) {
+                    return;
+                }
+            }
+
+            timeout = setTimeout(resolve, ms);
+        });
     }
 
     /**
@@ -716,13 +735,13 @@ class GameRuntime extends LS.Context {
      * } });
      */
     async typeText(textBlock, text, options = {}) {
-        let { x: ix, y: iy, index, maxIndex, maxWidth, delay, callback, color, size, style, weight, culling, signal, lineHeight } = options;
+        let { x: ix, y: iy, index, clear, maxIndex, maxWidth, delay, callback, color, size, style, weight, culling, signal, skipSignal, hang, lineHeight } = options;
 
         index      ??= 0;
         ix         ??= 0;
         iy         ??= 0;
         maxWidth   ??= this.renderer.width;
-        delay      ??= 50;
+        delay      ??= 35;
         lineHeight ??= textBlock.engine?.lineHeight || 1.2;
 
         color    ??= [255, 255, 255, 255];
@@ -730,18 +749,72 @@ class GameRuntime extends LS.Context {
         style    ??= null;
         weight   ??= null;
 
+
         // Disable culling if you scroll or transform text
-        culling  ??= true;
-        signal   ??= null;
+        culling    ??= true;
+        signal     ??= null;
+        skipSignal ??= null;
+        hang       ??= false;
+        clear      ??= true;
+
+        if(clear) {
+            textBlock.clear();
+        }
 
         const textIsText   = typeof text !== "number";
         const textIsString = textIsText && typeof text === "string";
 
         maxIndex ??= textIsText? Math.min(text.length + index, textBlock.size - index): textBlock.size - index;
 
+        let state = 0, arg = "", command = 0; // 0 = normal, 1 = waiting for argument
         let x = ix, y = iy;
+
         for(let i = 0; text === -1? true: (i < (textIsText? text.length: text)); i++) {
             let code = textIsString? text.charCodeAt(i): textIsText? text[i]: 0;
+
+            if(state === 1) {
+                if(code === 59) { // 59 = ;
+                    state = 0;
+
+                    switch(command) {
+                        case 119: // Wait
+                            const waitTime = parseInt(arg);
+                            if(!isNaN(waitTime) && waitTime > 0) await this.sleep(waitTime, skipSignal);
+                            break;
+                        case 100: // Delay
+                            const delayTime = parseInt(arg);
+                            if(!isNaN(delayTime) && delayTime >= 0) delay = delayTime;
+                            break;
+                        case 99: // Color
+                            color = LS.Color.parse(arg);
+                            break;
+                        case 115: // Size
+                            const sizeValue = parseFloat(arg);
+                            if(!isNaN(sizeValue) && sizeValue > 0) size = sizeValue;
+                            break;
+                        case 120: // X position
+                            const xValue = parseFloat(arg);
+                            if(!isNaN(xValue)) x = xValue;
+                            break;
+                        case 121: // Y position
+                            const yValue = parseFloat(arg);
+                            if(!isNaN(yValue)) y = yValue;
+                            break;
+                        case 114: // Reset
+                            x = ix;
+                            y = iy;
+                            color = [255, 255, 255, 255];
+                            size = textBlock.engine?.defaultFontSize || 16;
+                            style = null;
+                            weight = null;
+                            lineHeight = textBlock.engine?.lineHeight || 1.2;
+                            break;
+                    }
+                } else {
+                    arg += String.fromCharCode(code);
+                }
+                continue;
+            }
 
             if(callback) {
                 const result = callback(code, i + index, x, y, delay, i);
@@ -762,6 +835,34 @@ class GameRuntime extends LS.Context {
                     if(result.code       !== undefined) code       = result.code;
                 }
             }
+            // Command syntax: \<command><arg>; (eg. \w1000; = wait 1000ms), or just \<command> for commands without arguments.
+            if(code === 92) {
+                const nextCode = textIsString? text.charCodeAt(i + 1): textIsText? text[i + 1]: 0;
+                switch(nextCode) {
+                    case 119: // \w - Wait command
+                    case 100: // \d - Delay command
+                    case 99 : // \c - Color command
+                    case 115: // \s - Size command
+                    case 120: // \x - X position command
+                    case 121: // \y - Y position command
+                    case 114: // \r - Reset command
+                        command = nextCode;
+                        state = 1;
+                        arg = "";
+                        i++;
+                        continue;
+
+                    case 110: // \n - Newline
+                        code = 10;
+                        i++;
+                        break;
+
+                    case 92: // \\ - Escape
+                        code = 92;
+                        i++;
+                        break;
+                }
+            }
 
             if(code === 0 || i + index >= maxIndex || (culling && y > this.renderer.height) || (signal && signal.aborted)) {
                 break;
@@ -769,8 +870,8 @@ class GameRuntime extends LS.Context {
 
             x += textBlock.setChar(i + index, x, y, code, color[0], color[1], color[2], color[3], size, style, weight);
 
-            if(delay > 0) {
-                await this.sleep(delay);
+            if(delay > 0 && !signal?.aborted && !skipSignal?.aborted) {
+                await this.sleep(delay, skipSignal);
             }
 
             if(code === 10 || x >= maxWidth - ix) {
@@ -778,6 +879,49 @@ class GameRuntime extends LS.Context {
                 y += size * lineHeight;
             }
         }
+
+        if(hang) {
+            await this.sleep(-1, skipSignal);
+        }
+    }
+
+    /**
+     * @template T
+     * @typedef {Promise<T> & {
+     *   abort: () => void,
+     *   skip: () => void
+     * }} AbortablePromise
+     */
+
+    /**
+     * Same as typeText(), but returns a Promise object with abort and skip methods to control the typing process easier.
+     * @param {*} textBlock 
+     * @param {*} text 
+     * @param {*} options 
+     * @returns {AbortablePromise<void>} A Promise that resolves when typing is complete, with abort and skip methods.
+     * 
+     * @example
+     * const typingPromise = this.typeTextWithAbort(textBlock, "Hello, world!", { delay: 100 });
+     * 
+     * // To skip and immediately display the full text:
+     * typingPromise.skip();
+     * 
+     * // To abort typing entirely:
+     * typingPromise.abort();
+     */
+    typeWithAbort(textBlock, text, options = {}) {
+        const controller = new AbortController();
+        options.signal = controller.signal;
+
+        const skipController = new AbortController();
+        options.skipSignal = skipController.signal;
+
+        /** @type {AbortablePromise<void>} */
+        const promise = this.typeText(textBlock, text, options);
+        promise.abort = () => controller.abort();
+        promise.skip  = () => skipController.abort();
+
+        return promise;
     }
 }
 
@@ -1120,6 +1264,38 @@ class Sound {
     }
 }
 
+function createMatrix({
+    x = 0, y = 0, z = 0,
+    rx = 0, ry = 0, rz = 0,
+    sx = 1, sy = 1, sz = 1
+} = {}, out = new Float32Array(16)) {
+    const cx = Math.cos(rx), sX = Math.sin(rx);
+    const cy = Math.cos(ry), sY = Math.sin(ry);
+    const cz = Math.cos(rz), sZ = Math.sin(rz);
+
+    // Rotation order: Rz * Ry * Rx
+    out[0] = cz * cy * sx;
+    out[1] = sZ * cy * sx;
+    out[2] = -sY * sx;
+    out[3] = 0;
+
+    out[4] = (cz * sY * sX - sZ * cx) * sy;
+    out[5] = (sZ * sY * sX + cz * cx) * sy;
+    out[6] = cy * sX * sy;
+    out[7] = 0;
+
+    out[8] = (cz * sY * cx + sZ * sX) * sz;
+    out[9] = (sZ * sY * cx - cz * sX) * sz;
+    out[10] = cy * cx * sz;
+    out[11] = 0;
+
+    out[12] = x;
+    out[13] = y;
+    out[14] = z;
+    out[15] = 1;
+    return out;
+}
+
 /**
  * Draws 2D sprites with batching, reducing the number of draw calls when possible. Possible to switch sprite shaders.
  * For best performance, put sprites that share the same texture next to eachother, as every texture switch causes a new draw call and removes the possibilty of reusing buffers.
@@ -1166,18 +1342,19 @@ class BatchedSpriteRenderer extends LS.GL.Renderable {
  
             vao: true,
             bind: {
-                iMatrix:  { type: "mat4", size: batchSize },
-                iSize:    { cellSize: 2,  type: "float", size: batchSize },
-                iColor:   { cellSize: 4,  type: "ubyte", size: batchSize, normalized: true },
-                iUVRect:  { cellSize: 4,  type: "float", size: batchSize },
+                iUVRect:   { cellSize: 4,  type: "f32", size: batchSize },
+                iSize:     { cellSize: 2,  type: "f32", size: batchSize },
+                iPosition: { cellSize: 3,  type: "f32", size: batchSize },
+                iColor:    { cellSize: 4,  type: "u8",  size: batchSize, normalized: true },
+                iMatrix:   { cellSize: 16, type: "mat4", size: batchSize },
                 ...binds
             },
 
             frag: frag || `#version 300 es
 precision mediump float;
 
-in vec2 v_texCoord;
-in vec4 v_color;
+in vec2 vTexCoord;
+in vec4 vColor;
 
 out vec4 fragColor;
 
@@ -1186,24 +1363,25 @@ uniform sampler2D uTexture;
 uniform float uOpacity;
 
 void main() {
-    vec4 texColor = texture(uTexture, v_texCoord);
-    fragColor = texColor * v_color;
+    vec4 texColor = texture(uTexture, vTexCoord);
+    fragColor = texColor * vColor;
     fragColor.a *= uOpacity;
 }`,
             vert: vert || `#version 300 es
 
 ${LS.GL.utils.quad}
 
-in vec4 iUVRect;
-in vec4 iColor;
-in vec2 iSize;
-in mat4 iMatrix;
+layout(location = 0) in vec4 iUVRect;
+layout(location = 1) in vec4 iColor;
+layout(location = 2) in vec2 iSize;
+layout(location = 3) in vec3 iPosition;
+layout(location = 4) in mat4 iMatrix;
 
 uniform mat4 uProjection;
 uniform vec2 uOffset;
 
-out  vec2 v_texCoord;
-out  vec4 v_color;
+out  vec2 vTexCoord;
+out  vec4 vColor;
 
 void main() {
     vec2 quadCoord = positions[gl_VertexID] * 0.5 + 0.5;
@@ -1213,8 +1391,8 @@ void main() {
 
     gl_Position = uProjection * iMatrix * vec4(p, 1.0);
 
-    v_texCoord = iUVRect.xy + quadCoord * iUVRect.zw;
-    v_color = iColor;
+    vTexCoord = iUVRect.xy + quadCoord * iUVRect.zw;
+    vColor = iColor;
 }`
         });
 
@@ -1240,6 +1418,7 @@ void main() {
         const uvRectData = buffers.iUVRect.data;
         const sizeData   = buffers.iSize.data;
         const matrixData = buffers.iMatrix.data;
+        // const offsetData = buffers.iPosition.data;
 
         let currentContainer = container, parentI = 0, parent = null;
         let offsetX = 0, offsetY = 0, rotationX = 0, rotationY = 0, rotationZ = 0;
@@ -1299,16 +1478,29 @@ void main() {
 
             atlas = glTexture;
 
-            // offsetData[high * 2 + 0] = data[0]  + offsetX;
-            // offsetData[high * 2 + 1] = data[1]  + offsetY;
-    
+            // offsetData[high * 3 + 0] = data[0]  + offsetX;
+            // offsetData[high * 3 + 1] = data[1]  + offsetY;
+            // offsetData[high * 3 + 2] = data[2]  + offsetZ;
+
             // rotateData[high * 3 + 0] = data[10] + rotationX;
             // rotateData[high * 3 + 1] = data[11] + rotationY;
             // rotateData[high * 3 + 2] = data[12] + rotationZ;
 
+            createMatrix({
+                x: data[0]  + offsetX,
+                y: data[1]  + offsetY,
+                z: data[2],
+                rx: data[10] + rotationX,
+                ry: data[11] + rotationY,
+                rz: data[12] + rotationZ,
+                sx: data[14],
+                sy: data[15],
+                sz: data[16]
+            }, matrixData.subarray(high * 16, high * 16 + 16));
+
             sizeData  [high * 2 + 0] = child.width;
             sizeData  [high * 2 + 1] = child.height;
-    
+
             colorData [high * 4 + 0] = data[6];
             colorData [high * 4 + 1] = data[7];
             colorData [high * 4 + 2] = data[8];
@@ -1380,114 +1572,7 @@ void main() {
 /**
  * Renderer capable of rendering 3D objects.
  */
-class Renderer3D extends LS.GL.Renderable {
-    constructor(lsgli, { frag = null, vert = null, uniforms = null, attributes = null, binds = null, batchSize = 2048 } = {}) {
-        super({
-            version: 0,
-
-            parent: lsgli,
-
-            uniforms:   ["uProjection", "uOffset", "uTexture", "uOpacity",   ...(uniforms || [])  ],
-            attributes: ["iOffset", "iSize", "iUVRect", "iColor", "iRotate", ...(attributes || [])],
- 
-            vao: true,
-            bind: {
-                iOffset:  { cellSize: 2, type: "float", size: batchSize },
-                iRotate:  { cellSize: 3, type: "float", size: batchSize },
-                iSize:    { cellSize: 2, type: "float", size: batchSize },
-                iColor:   { cellSize: 4, type: "ubyte", size: batchSize, normalized: true },
-                iUVRect:  { cellSize: 4, type: "float", size: batchSize },
-                ...binds
-            },
-
-            frag: frag || `#version 300 es
-precision mediump float;
-
-in vec2 v_texCoord;
-in vec4 v_color;
-
-out vec4 fragColor;
-
-uniform sampler2D uTexture;
-
-uniform float uOpacity;
-
-void main() {
-    vec4 texColor = texture(uTexture, v_texCoord);
-    fragColor = texColor * v_color;
-    fragColor.a *= uOpacity;
-}`,
-            vert: vert || `#version 300 es
-
-${LS.GL.utils.quad}
-
-in vec2 iOffset;
-in vec3 iRotate;
-in vec4 iUVRect;
-in vec4 iColor;
-in vec2 iSize;
-
-uniform mat4 uProjection;
-uniform vec2 uOffset;
-
-out  vec2 v_texCoord;
-out  vec4 v_color;
-
-mat3 rotationXYZ(vec3 r) {
-    float cx = cos(r.x);
-    float sx = sin(r.x);
-    float cy = cos(r.y);
-    float sy = sin(r.y);
-    float cz = cos(r.z);
-    float sz = sin(r.z);
-
-    mat3 Rx = mat3(
-        1.0, 0.0, 0.0,
-        0.0, cx,  -sx,
-        0.0, sx,   cx
-    );
-
-    mat3 Ry = mat3(
-         cy, 0.0, sy,
-        0.0, 1.0, 0.0,
-        -sy, 0.0, cy
-    );
-
-    mat3 Rz = mat3(
-        cz, -sz, 0.0,
-        sz,  cz, 0.0,
-        0.0, 0.0, 1.0
-    );
-
-    return Rz * Ry * Rx;
-}
-
-void main() {
-    vec2 quadCoord = positions[gl_VertexID] * 0.5 + 0.5;
-    vec2 local = (quadCoord - 0.5) * iSize;
-
-    vec3 p = rotationXYZ(iRotate) * vec3(local, 0.0);
-
-    p.xy += iOffset + 0.5 * iSize + uOffset;
-
-    gl_Position = uProjection * vec4(p, 1.0);
-
-    v_texCoord = iUVRect.xy + quadCoord * iUVRect.zw;
-    v_color = iColor;
-}`
-        });
-    }
-
-    render(container, x = container.data[0], y = container.data[1], opacity = container.opacity, _skipSetup = false) {
-        if(!container || !container.children || container.children.length === 0 || (opacity !== null && opacity <= 0)) return;
-        
-
-    }
-
-    draw() {
-
-    }
-}
+class Renderer3D extends LS.GL.Renderable {}
 
 class Sprite {
     /**
