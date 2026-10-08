@@ -1046,3 +1046,48 @@ ls-knob[preset=numeric]:active {
 .ls-command-palette-wrapper {
     box-shadow: 0 10px 60px 0 rgb(0 0 0 / 60%);
 }
+
+
+
+
+
+
+
+
+
+
+
+/* SLIDES (TODO: MOVE) */
+.presentation-container {
+    overflow: hidden;
+    height: 100%;
+    width: 100%;
+    overflow: hidden !important;
+    background-color: #000 !important;
+}
+
+.presentation-viewport {
+    transform: translate(50%, 50%);
+    height: 100%;
+    width: 100%;
+}
+
+.presentation-content {
+    position: relative;
+
+    /* Slide */
+    .ls-tab-content {
+        position: absolute;
+        overflow: hidden;
+        height: 100%;
+        width: 100%;
+        inset: 0;
+    }
+
+    user-select: none;
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+
+    img { pointer-events: none; }
+}

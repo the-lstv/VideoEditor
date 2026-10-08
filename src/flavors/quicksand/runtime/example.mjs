@@ -1,6 +1,6 @@
 // QuickSand example
 
-import * as QuickSand from "../engine/runtime.mjs";
+import * as QuickSand from "./index.mjs";
 
 // Create a new game instance
 const game = new QuickSand.GameRuntime({
@@ -58,31 +58,45 @@ game.init().then(async () => {
     // QuickSand is a lower-level engine, so we also need to create a sprite renderer (something that will draw the sprites to the screen)
     // There are various options available, as QuickSand allows you to directly create custom WebGL renderables.
 
-    // BatchedSpriteRenderer is very efficient (uses a single drawcall to draw everything), but requires that all sprites use the same layer, texture and shader.
-    // SpriteRenderer is a higher-level renderer. You can use different types based on your use case to get the best performance/feature balance.
+    // BatchedSpriteRenderer is efficient, but highly preffers that all sprites use the same layer, texture and shader.
+    // You can use different types based on your use case to get the best performance/feature balance.
+    // Keep in mind that renderers are expensive, so reuse them whenever you can.
     const spriteRenderer = new QuickSand.BatchedSpriteRenderer(game.renderer, { batchSize: 2 });
 
     // Playing audio is built in with LS.SoundBox
     game.soundbox.play("mew");
     // There is of course a whole lot more this can do; see LS.SoundBox
 
-    // And for simplicity, we will add a simple renderable, which runs a callback every frame
-    game.renderer.addRenderable({
-        renderCallback: (delta, now) => {
 
-            // Move the player to the mouse position
-            player.setPosition(game.input.mouse);
+    // Scenes are fully optional but provide simpler resource isolation.
+    const scene = game.createScene();
+    scene.onFrame((delta, now) => {
+        // Move the player to the mouse position
+        player.setPosition(game.input.mouse);
 
-            // Changing the texture is also straightforward
-            // (Optionally, you can also add a new named region and the update that region's values, eg. for animated tiles, etc.)
-            player.texture = atlas.regions.walk;
-            // Render the container with the sprite renderer
-            spriteRenderer.render(container);
-        }
+        // Changing the texture is also straightforward
+        // (Optionally, you can also add a new named region and the update that region's values, eg. for animated tiles, etc.)
+        player.texture = atlas.regions.walk;
+
+        // Render the container with the sprite renderer
+        spriteRenderer.render(container);
     });
 
+    // Scenes can be enabled or disabled.
+    scene.enable();
+
     // Finally, we can resume the runtime, which will start the render loop and enable input.
+    // You can control the render loop yourself (game.renderer.frameScheduler -> LS.Util.FrameScheduler) but this is the simplest way to get started.
+    // It also allows you to monitor or limit the framerate & controls the global time, so you can implement custom timing logic.
     game.resume();
+
+    // We can link resources to the scene for easier cleanup.
+    scene.assignResource(spriteRenderer, container, player);
+    setTimeout(() => {
+        // After 5 seconds, we can destroy the scene and all its resources.
+        scene.destroy();
+    }, 5000);
+
 
 
     // --- Rendering text with LS.GL.WebGLTextEngine
@@ -94,19 +108,19 @@ game.init().then(async () => {
         // See the docs to learn more about the differences between these types
         type: "softmask",
 
-        // How many characters can be rendered at once
+        // How many characters can be rendered at once. You can think of this as the total "memory" size.
         bufferSize: 512,
 
         // Remove if you want to have per-character coloring
         staticColor: [255, 255, 255, 255],
     });
 
-    // Wait for the font to load
+    // Wait for the font to load. One font can be loaded at a time per engine instance.
     await textEngine.loadPromise;
 
     // Create a text block
-    // This is a "block" of text that we can write to. It takes a chunk of the total buffer size.
-    // Keep in mind that the buffer has "slots" and each slot holds a character.
+    // This is a "block" of text that we can write to. It allocates a chunk of the total buffer size.
+    // (Note that the buffer is where you store characters, but you can render however many times you want, so if you need to render more (up to infinity), you can overwrite the data and render again, though of course at a performance cost.)
     const text = textEngine.createText(512);
 
     // We can then write text to it in various ways. This does not need to be done every frame.
@@ -114,18 +128,12 @@ game.init().then(async () => {
     text.writeTextAt("Hello world!", /*start*/0, /*length*/null, /*x*/0, /*y*/0, /*r*/null, /*g*/null, /*b*/null, /*a*/null, /*size*/16);
 
     // Or we can write individual characters to specific slots.
-    (async () => {
-        const typerText = new TextEncoder().encode("Hello World! This is a test of the text engine."); // (it doesn't have to be encoded, but it is better to provide character codes instead of strings when you can. the engine converts text to character codes anyway.)
 
-        let x = 50, y = 100;
-        for(let i = 0; i < 512; i++) {
-            // Note: I do +12 here so we don't overwrite the previous text written with writeTextAt; you can write to any slot you want, but writing to existing slots will overwrite them.
-            x += text.setChar(i + 12, x, y, typerText[i] || 0);
-            await new Promise(resolve => setTimeout(resolve, 50)); // Add some delay
-        }
-    })();
+    // There is also a very extensive typer utility:
+    this.typeText(text, "Hello, world!", { x: 10, y: 32, delay: 100, index: 12 });
+    // There's a lot more it can do, check out the docs for more.
 
-    // Finally, we can render the text whenever we want with text.render().
+    // We can render the text whenever we want with text.render().
     game.renderer.addRenderable({
         renderCallback: (delta, now) => {
             text.render();
@@ -133,7 +141,7 @@ game.init().then(async () => {
     });
 });
 
-// Optimization test; skip rebuilding the buffers if the sprite didnt change
+// Optimization; skip rebuilding the buffers if the sprite didnt change
 // const diff = sub(game.input.mouse, lastMouse);
 
 // if(diff[0] !== 0 || diff[1] !== 0 || container.opacity < 0.1) {

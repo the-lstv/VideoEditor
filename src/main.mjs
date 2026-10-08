@@ -733,18 +733,17 @@ window.addEventListener('DOMContentLoaded', async () => {
 
                 { type: "separator" },
 
-                { text: "Set editor language", items: () => app.locales.map(lang => ({
-                        text: lang.name,
-                        type: "radio",
-                        group: "language",
-                        checked: LS.i18n.locale === lang.value,
+                { text: "Set editor language", icon: "bi-translate", items: () => app.locales.map(lang => ({
+                    text: lang.name,
+                    type: "radio",
+                    group: "language",
+                    checked: LS.i18n.locale === lang.value,
 
-                        action() {
-                            LS.i18n.changeLocale(lang.value);
-                            app.config.set("language", lang.value);
-                        },
-                    }))
-                }
+                    action() {
+                        LS.i18n.changeLocale(lang.value);
+                        app.config.set("language", lang.value);
+                    },
+                })) }
             ],
 
             layout: [

@@ -25,11 +25,11 @@
  * - Asset management (images, audio, etc.)
  * - Basic storage management for persistent data
  * - Static text (via Canvas2D to texture)
- * - Dynamic text via LS.GL.WebGLTextEngine (MSDF, MTSDF, SDF, or Softmask)
+ * - Dynamic text rendering via LS.GL.WebGLTextEngine (MSDF, MTSDF, SDF, or Softmask)
  * 
  * When to use dynamic vs static text rendering:
  * - Use static text rendering for text that doesn't change often and doesn't scale (eg. UI labels), as it is more efficient (generated once, then rendered as any other standard texture). Bonus: You can generate a text texture atlas with multiple text entries easily with TextureAtlas.fromTextList({ key: "value" }) to reduce the amount of texture switches. The QuickSand builder can also pre-generate text textures to save time at runtime. Downside: Uses more memory the more text you render, doesn't support per-character styling, and text can't be updated or resized after rendering.
- * - Use dynamic text rendering for text that changes frequently. Individual characters can be changed, colored or moved independently each frame. Additionally, with font formats like MTSDF, you can scale the text without losing quality and keeping anti-aliasing, of course at some performance cost. Downside is that it requires converting your font to a special format first.
+ * - Use dynamic text rendering for text that changes frequently or needs special effects. Individual characters can be changed, colored or moved independently each frame. Additionally, with font formats like MTSDF, you can scale the text without losing quality and keeping anti-aliasing, of course at some performance cost. Downside is that it requires converting your font to a special format first.
  * QuickSand's dynamic text rendering is designed to be very efficient and performant and is designed for large amounts of text, but static text rendering is still more efficient for text that doesn't change.
  * 
  * Note: QuickSand is a low-level engine, and as such it assumes you have an understanding of how graphics rendering works and how to use it effectively, for which it provides more advanced features and control.
@@ -476,7 +476,7 @@ class StorageManager {
     }
 }
 
-class GameRuntime extends LS.EventEmitter {
+class GameRuntime extends LS.Context {
     /**
      * @type {AssetLoader}
      */
@@ -508,18 +508,6 @@ class GameRuntime extends LS.EventEmitter {
         super();
 
         this.options = options;
-    }
-
-    animate(sprite, keyframes, options = {}) {
-        return LS.Animation2.animate(sprite, keyframes, options);
-    }
-
-    animationTimeline(animations, options = {}) {
-        return new LS.Animation2.Timeline(animations, options);
-    }
-
-    createScene() {
-        return new Scene(this);
     }
 
     async init(){
@@ -644,6 +632,152 @@ class GameRuntime extends LS.EventEmitter {
 
     requestFrame() {
         this.renderer.render();
+    }
+
+    // --- Utilities
+
+    animate(target, keyframes, options = {}) {
+        return LS.Animation2.animate(target, keyframes, options);
+    }
+
+    animationTimeline(animations, options = {}) {
+        return new LS.Animation2.Timeline(animations, options);
+    }
+
+    createScene() {
+        return new Scene(this);
+    }
+
+    sleep(ms) {
+        return new Promise(resolve => setTimeout(resolve, ms));
+    }
+
+    /**
+     * Very comprehensive utility for typing out text into a text block with a delay between each character & callback for dynamic changes.
+     * 
+     * @param {LS.GL.WebGLTextEngine.Text} textBlock - The text block to type into.
+     * @param {string|number|Array<number|string>|Uint8Array|Uint16Array|Uint32Array} text - Text to type (can be as an array of codes), or the number of characters to type if you provide your own via the callback. If a character is 0 (NULL), it will stop.
+     * @param {Object} options - The options for the typing animation.
+     * @param {number} [options.x=0] - The starting x position for the text.
+     * @param {number} [options.y=0] - The starting y position for the text.
+     * @param {number} [options.index=0] - The starting index in the text block to type into.
+     * @param {number} [options.maxIndex=textBlock.size] - The maximum index in the text block to type into.
+     * @param {number} [options.maxWidth=this.renderer.width] - The maximum width for the text before wrapping to the next line.
+     * @param {number} [options.delay=50] - The delay in milliseconds between each character.
+     * @param {function} [options.callback] - A callback function that is called for each character typed. It receives the character code, index, x, y, delay, and i as arguments and can return an object to modify the typing behavior.
+     * @param {Array} [options.color=[255, 255, 255, 255]] - The color of the text in RGBA 0-255 format.
+     * @param {number} [options.size=null] - The size of the text.
+     * @param {string} [options.style=null] - The style enum of the text.
+     * @param {string} [options.weight=null] - The weight of the text.
+     * @param {boolean} [options.culling=true] - Whether to stop rendering characters that are outside the visible area.
+     * @param {number} [options.lineHeight=1.2] - The line height multiplier for the text.
+     * @param {AbortSignal} [options.signal=null] - An abort signal
+     * @returns {Promise}
+     * 
+     * @example
+     * await this.typeText(textBlock, "Hello, world!");
+     * 
+     * @example
+     * await this.typeText(textBlock, "Hello, world!", { x: 10, y: 10, delay: 100, color: [255, 0, 0, 255], callback(code, index, x, y, delay) {
+     *     if(code === 32) { // Space character
+     *         return { delay: 200 };
+     *     }
+     * } });
+     * 
+     * @example
+     * // You can also capture the character information for later changes or animation.
+     * 
+     * const chars = [];
+     * this.typeText(text, "Hello world!", { x: 50, y: 50, size: 45, callback(code, index, x, y, delay, i) {
+     *     if(i >= 6) chars.push({ index, x, y, code, color: new LS.Color("#f00").hueShift(chars.length * 30) });
+     * } });
+     * 
+     * // The below example draws a gradient animation + shaking on the "world!" part of the text.
+     * function animate(chars) {
+     *     // Note: updateChar requires x, y, charCode and size to be all specified due to statelessness of the text engine (since it needs them to update eachother but doesn't store them)
+     *     for(const char of chars) {
+     *         text.updateChar(char.index, {
+     *             x: char.x + Math.floor(Math.random() * 2 - 1),
+     *             y: char.y + Math.floor(Math.random() * 2 - 1),
+     *             charCode: char.code,
+     *             color: char.color,
+     *             size: 45,
+     *         });
+     *
+     *         char.color.hueShift(1);
+     *     }
+     * }
+     * 
+     * @example
+     * // If you want to type out a specific number of characters, you can provide a number, and use the callback to provide the character codes:
+     * const myText = "Hello World!\u0000";
+     * await this.typeText(textBlock, -1, { callback(code, index, x, y, delay, i) {
+     *     return { code: myText.charCodeAt(i) };
+     * } });
+     */
+    async typeText(textBlock, text, options = {}) {
+        let { x: ix, y: iy, index, maxIndex, maxWidth, delay, callback, color, size, style, weight, culling, signal, lineHeight } = options;
+
+        index      ??= 0;
+        ix         ??= 0;
+        iy         ??= 0;
+        maxWidth   ??= this.renderer.width;
+        delay      ??= 50;
+        lineHeight ??= textBlock.engine?.lineHeight || 1.2;
+
+        color    ??= [255, 255, 255, 255];
+        size     ??= textBlock.engine?.defaultFontSize || 16;
+        style    ??= null;
+        weight   ??= null;
+
+        // Disable culling if you scroll or transform text
+        culling  ??= true;
+        signal   ??= null;
+
+        const textIsText   = typeof text !== "number";
+        const textIsString = textIsText && typeof text === "string";
+
+        maxIndex ??= textIsText? Math.min(text.length + index, textBlock.size - index): textBlock.size - index;
+
+        let x = ix, y = iy;
+        for(let i = 0; text === -1? true: (i < (textIsText? text.length: text)); i++) {
+            let code = textIsString? text.charCodeAt(i): textIsText? text[i]: 0;
+
+            if(callback) {
+                const result = callback(code, i + index, x, y, delay, i);
+                if(result === false) {
+                    break;
+                } else if(typeof result === "object") {
+                    if(result.skip) continue;
+                    if(result.x          !== undefined) x          = result.x;
+                    if(result.y          !== undefined) y          = result.y;
+                    if(result.delay      !== undefined) delay      = result.delay;
+                    if(result.index      !== undefined) index      = result.index;
+                    if(result.callback   !== undefined) callback   = result.callback;
+                    if(result.color      !== undefined) color      = result.color;
+                    if(result.size       !== undefined) size       = result.size;
+                    if(result.style      !== undefined) style      = result.style;
+                    if(result.weight     !== undefined) weight     = result.weight;
+                    if(result.lineHeight !== undefined) lineHeight = result.lineHeight;
+                    if(result.code       !== undefined) code       = result.code;
+                }
+            }
+
+            if(code === 0 || i + index >= maxIndex || (culling && y > this.renderer.height) || (signal && signal.aborted)) {
+                break;
+            }
+
+            x += textBlock.setChar(i + index, x, y, code, color[0], color[1], color[2], color[3], size, style, weight);
+
+            if(delay > 0) {
+                await this.sleep(delay);
+            }
+
+            if(code === 10 || x >= maxWidth - ix) {
+                x = ix;
+                y += size * lineHeight;
+            }
+        }
     }
 }
 
@@ -970,7 +1104,7 @@ class TextureAtlas {
             yOffset += h;
         }
 
-        document.body.appendChild(canvas);
+        // document.body.appendChild(canvas);
 
         return atlas;
     }
@@ -1028,15 +1162,14 @@ class BatchedSpriteRenderer extends LS.GL.Renderable {
             parent: lsgli,
 
             uniforms:   ["uProjection", "uOffset", "uTexture", "uOpacity",   ...(uniforms || [])  ],
-            attributes: ["iOffset", "iSize", "iUVRect", "iColor", "iRotate", ...(attributes || [])],
+            attributes: ["iSize", "iUVRect", "iColor", "iMatrix", ...(attributes || [])],
  
             vao: true,
             bind: {
-                iOffset:  { cellSize: 2, type: "float", size: batchSize },
-                iRotate:  { cellSize: 3, type: "float", size: batchSize },
-                iSize:    { cellSize: 2, type: "float", size: batchSize },
-                iColor:   { cellSize: 4, type: "ubyte", size: batchSize, normalized: true },
-                iUVRect:  { cellSize: 4, type: "float", size: batchSize },
+                iMatrix:  { type: "mat4", size: batchSize },
+                iSize:    { cellSize: 2,  type: "float", size: batchSize },
+                iColor:   { cellSize: 4,  type: "ubyte", size: batchSize, normalized: true },
+                iUVRect:  { cellSize: 4,  type: "float", size: batchSize },
                 ...binds
             },
 
@@ -1061,11 +1194,10 @@ void main() {
 
 ${LS.GL.utils.quad}
 
-in vec2 iOffset;
-in vec3 iRotate;
 in vec4 iUVRect;
 in vec4 iColor;
 in vec2 iSize;
+in mat4 iMatrix;
 
 uniform mat4 uProjection;
 uniform vec2 uOffset;
@@ -1073,44 +1205,13 @@ uniform vec2 uOffset;
 out  vec2 v_texCoord;
 out  vec4 v_color;
 
-mat3 rotationXYZ(vec3 r) {
-    float cx = cos(r.x);
-    float sx = sin(r.x);
-    float cy = cos(r.y);
-    float sy = sin(r.y);
-    float cz = cos(r.z);
-    float sz = sin(r.z);
-
-    mat3 Rx = mat3(
-        1.0, 0.0, 0.0,
-        0.0, cx,  -sx,
-        0.0, sx,   cx
-    );
-
-    mat3 Ry = mat3(
-         cy, 0.0, sy,
-        0.0, 1.0, 0.0,
-        -sy, 0.0, cy
-    );
-
-    mat3 Rz = mat3(
-        cz, -sz, 0.0,
-        sz,  cz, 0.0,
-        0.0, 0.0, 1.0
-    );
-
-    return Rz * Ry * Rx;
-}
-
 void main() {
     vec2 quadCoord = positions[gl_VertexID] * 0.5 + 0.5;
-    vec2 local = (quadCoord - 0.5) * iSize;
+    vec3 p = vec3((quadCoord - 0.5) * iSize, 0.0);
 
-    vec3 p = rotationXYZ(iRotate) * vec3(local, 0.0);
+    p.xy += 0.5 * iSize + uOffset;
 
-    p.xy += iOffset + 0.5 * iSize + uOffset;
-
-    gl_Position = uProjection * vec4(p, 1.0);
+    gl_Position = uProjection * iMatrix * vec4(p, 1.0);
 
     v_texCoord = iUVRect.xy + quadCoord * iUVRect.zw;
     v_color = iColor;
@@ -1137,16 +1238,19 @@ void main() {
         const buffers    = this.buffers;
         const colorData  = buffers.iColor.data;
         const uvRectData = buffers.iUVRect.data;
-        const offsetData = buffers.iOffset.data;
         const sizeData   = buffers.iSize.data;
-        const rotateData = buffers.iRotate.data;
+        const matrixData = buffers.iMatrix.data;
 
-        let currentContainer = container, parentI = 0, parent = null, offsetX = 0, offsetY = 0;
+        let currentContainer = container, parentI = 0, parent = null;
+        let offsetX = 0, offsetY = 0, rotationX = 0, rotationY = 0, rotationZ = 0;
 
         for(let i = 0; i < currentContainer.children.length + (parent ? 1 : 0); i++) {
             if(i >= currentContainer.children.length) {
                 offsetX -= currentContainer.data[0];
                 offsetY -= currentContainer.data[1];
+                rotationX -= currentContainer.data[10];
+                rotationY -= currentContainer.data[11];
+                rotationZ -= currentContainer.data[12];
 
                 currentContainer = parent;
                 i = parentI;
@@ -1168,6 +1272,9 @@ void main() {
 
                 offsetX += child.data[0];
                 offsetY += child.data[1];
+                rotationX += child.data[10];
+                rotationY += child.data[11];
+                rotationZ += child.data[12];
                 continue;
             }
 
@@ -1192,15 +1299,15 @@ void main() {
 
             atlas = glTexture;
 
-            offsetData[high * 2 + 0] = data[0] + offsetX;
-            offsetData[high * 2 + 1] = data[1] + offsetY;
+            // offsetData[high * 2 + 0] = data[0]  + offsetX;
+            // offsetData[high * 2 + 1] = data[1]  + offsetY;
+    
+            // rotateData[high * 3 + 0] = data[10] + rotationX;
+            // rotateData[high * 3 + 1] = data[11] + rotationY;
+            // rotateData[high * 3 + 2] = data[12] + rotationZ;
 
             sizeData  [high * 2 + 0] = child.width;
             sizeData  [high * 2 + 1] = child.height;
-    
-            rotateData[high * 3 + 0] = data[10];
-            rotateData[high * 3 + 1] = data[11];
-            rotateData[high * 3 + 2] = data[12];
     
             colorData [high * 4 + 0] = data[6];
             colorData [high * 4 + 1] = data[7];
@@ -1244,11 +1351,10 @@ void main() {
 
         // -- Upload changed buffers
         if(high) {
-            buffers.iOffset.updateWithStride (low, high);
+            buffers.iMatrix.updateWithStride (low, high);
             buffers.iSize.updateWithStride   (low, high);
             buffers.iColor.updateWithStride  (low, high);
             buffers.iUVRect.updateWithStride (low, high);
-            buffers.iRotate.updateWithStride (low, high);
         }
 
         // -- Atlas texture
@@ -1258,7 +1364,6 @@ void main() {
 
         // -- Uniforms
         if(x !== null || y !== null) gl.uniform2f(uniforms.uOffset, x || 0, y || 0);
-        // if(opacity !== null)         gl.uniform1f(uniforms.uOpacity, opacity);
         gl.uniform1f(uniforms.uOpacity, 1);
 
         // -- Projection matrix
@@ -1566,9 +1671,9 @@ class Sprite {
             [width, height, depth] = width;
         }
 
-        if(typeof width === "number")  this.data[3] = width;
+        if(typeof width  === "number") this.data[3] = width;
         if(typeof height === "number") this.data[4] = height;
-        if(typeof depth === "number")  this.data[5] = depth;
+        if(typeof depth  === "number") this.data[5] = depth;
     }
 
     setRotation(x, y, z) {
