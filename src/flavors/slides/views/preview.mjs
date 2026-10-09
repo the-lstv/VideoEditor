@@ -84,6 +84,8 @@ class PreviewView extends LS.View {
         this.container.querySelector(".preview-source-target").appendChild(source);
     }
 
+    togglePlay() { }
+
     getContainedCoords() {
         const canvasWidth = this.sourceElement.offsetWidth;
         const canvasHeight = this.sourceElement.offsetHeight;

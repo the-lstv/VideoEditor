@@ -89,10 +89,14 @@ class Slides extends FlavorBase {
             if(view.attachedTo == null) {
                 view.attachedTo = this;
             }
-            
+
             switch(view.constructor.name) {
                 case "slidesPreviewPanel":
                     view.setSource(this.runtime);
+                    break;
+
+                case "slidesList":
+                    view.setTarget(this.runtime);
                     break;
             }
         });
@@ -129,7 +133,7 @@ class Slides extends FlavorBase {
                     { type: 'slot', view: 'AssetManagerView', resize: { width: 350 } },
                     { type: 'slot', view: 'PreviewView' },
                     { type: 'slot', view: 'PropertyEditorView', resize: { width: 350 } }
-                ], resize: { height: "60%" } },
+                ], resize: { height: "80%" } },
 
                 { type: 'slot', view: 'SlidesView' }
             ]

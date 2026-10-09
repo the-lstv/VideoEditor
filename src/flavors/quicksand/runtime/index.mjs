@@ -323,22 +323,26 @@ class AssetLoader extends LS.EventEmitter {
  * Basic input handler for web browsers (keyboard, mouse, controller/gamepad).
  * For more advanced input handling or gestures, consider using LS.Util.TouchHandle
  */
-class InputHandler {
+class InputHandler extends LS.EventEmitter {
     keyboard = {};
     mouse = [0, 0, false, false, false, false, false, false];
     controller = null;
 
     enabled = false;
 
+    /**
+     * @param {Engine} parent - The engine instance that this input handler is associated with.
+     */
     constructor(parent) {
-        this.parent = parent;
-        this.mapping = new Map();
+        super();
+        this.parent  = parent;
+
+        // i need to think of a better system at some point
+        this.keyMap = {};
     }
 
-    map(map) {
-        for(const [key, value] of Object.entries(map)) {
-            this.mapping.set(key, value);
-        }
+    map(key, action) {
+        this.keyMap[key] = action;
     }
 
     transformCoordinates(x, y, out = []) {
@@ -356,11 +360,11 @@ class InputHandler {
         const renderedWidth  = width * scale;
         const renderedHeight = height * scale;
 
-        // Letterbox/pillarbox offset inside the DOM rect.
+        // Letterbox/pillarbox offset inside the DOM rect
         const offsetX = (rect.width  - renderedWidth)  * 0.5;
         const offsetY = (rect.height - renderedHeight) * 0.5;
 
-        // Client -> fitted canvas coordinates.
+        // Fit canvas coordinates
         out[0] = (x - rect.left - offsetX) / scale;
         out[1] = (y - rect.top  - offsetY) / scale;
 
@@ -377,27 +381,63 @@ class InputHandler {
 
         target.addEventListener("keydown", (e) => {
             this.keyboard[e.code] = true;
-        }, options);
+            this.quickEmit("keydown", e.code);
 
+            const action = this.keyMap[e.code];
+            if(action) {
+                this.quickEmit(action, e.code);
+            }
+        }, options);
+        
         target.addEventListener("keyup", (e) => {
             this.keyboard[e.code] = false;
+            this.quickEmit("keyup", e.code);
+
+            const action = this.keyMap[e.code];
+            if(action) {
+                this.quickEmit(action + ":up", e.code);
+            }
         }, options);
 
-        target.addEventListener("mousemove", (e) => {
+        target.addEventListener("pointermove", (e) => {
             this.transformCoordinates(e.clientX, e.clientY, this.mouse);
+            this.quickEmit("pointermove", this.mouse[0], this.mouse[1]);
         }, { signal: this.signal.signal, passive: true, });
 
-        target.addEventListener("mousedown", (e) => {
+        target.addEventListener("pointerdown", (e) => {
             this.mouse[e.button + 2] = true;
+            this.quickEmit("pointerdown", e.button, this.mouse[0], this.mouse[1]);
         }, options);
 
         target.addEventListener("contextmenu", (e) => {
             e.preventDefault();
         }, options);
 
-        target.addEventListener("mouseup", (e) => {
+        target.addEventListener("pointerup", (e) => {
             this.mouse[e.button + 2] = false;
+            this.quickEmit("pointerup", e.button, this.mouse[0], this.mouse[1]);
         }, options);
+
+        // --- Gamepad support (work in progress)
+
+        target.addEventListener("gamepadconnected", (e) => {
+            this.controller = e.gamepad;
+            this.quickEmit("gamepadconnected", e.gamepad);
+        }, options);
+
+        target.addEventListener("gamepaddisconnected", (e) => {
+            this.controller = null;
+            this.quickEmit("gamepaddisconnected", e.gamepad);
+        }, options);
+        const gamepadHandler = (e) => {
+            const gamepads = navigator.getGamepads();
+            if(!gamepads) return;
+
+            for(const gamepad of gamepads) {
+                if(!gamepad) continue;
+                this.controller = gamepad;
+            }
+        };
     }
 
     disable(clearState = true) {
