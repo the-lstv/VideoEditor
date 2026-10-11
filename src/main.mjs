@@ -15,6 +15,8 @@
 // Check if we're running in Electron/Node.js environment
 globalThis.isNode = typeof process !== "undefined" && process.versions != null && process.versions.node != null;
 
+/// <reference path="/www/ls/dist/ls.d.ts" />
+
 // --- Core imports
 import StatusBar from "./core/statusbar.mjs";
 import ConfigStore from "./core/configstore.mjs";

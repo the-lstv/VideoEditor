@@ -48,6 +48,7 @@ class SlidesView extends LS.View {
         this.container.querySelectorAll("[data-id]").forEach(el => {
             if(el.dataset.id === newId) {
                 el.classList.add("active");
+                el.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
             } else {
                 el.classList.remove("active");
             }
@@ -63,12 +64,6 @@ class SlidesView extends LS.View {
 
         this.render();
         this.target.tabs.set(newSlide);
-
-        // Scroll to the new slide
-        const newSlideEl = this.tabsList.querySelector(`[data-id="${newSlide}"]`);
-        if(newSlideEl) {
-            newSlideEl.scrollIntoView({ behavior: "smooth", block: "nearest", inline: "nearest" });
-        }
     }
     
     render() {
