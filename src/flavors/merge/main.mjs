@@ -123,7 +123,7 @@ class MergeDaw extends FlavorBase {
 
         // Cache event references that are emitted frequently (small benefit but skips event lookup)
         // In general this doesn't do much BUT in high-perf scenarios any detail matters so why not do it
-        this.__seekEventRef = this.prepareEvent('seek');
+        this.__seekEventRef = this.configureEvent('seek');
 
         // ! ---- todo: move elsewhere
         // Initialize editor GUI with views for audio editing

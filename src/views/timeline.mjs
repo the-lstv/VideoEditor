@@ -145,7 +145,7 @@ class TimelineView extends LS.View {
 
         this.loadPromise = this.timeline.loadPromise;
 
-        const seekEventRef = this.prepareEvent("seek");
+        const seekEventRef = this.configureEvent("seek");
         this.timeline.on('seek', time => {
             this.quickEmit(seekEventRef, time);
         });

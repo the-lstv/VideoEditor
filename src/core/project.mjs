@@ -105,7 +105,7 @@ class Project extends LS.Context {
         await this.loadFrom(data || {});
 
         // Now do whatever else somethings wants done
-        this.prepareEvent("initializing", {
+        this.configureEvent("initializing", {
             await: true
         });
 
