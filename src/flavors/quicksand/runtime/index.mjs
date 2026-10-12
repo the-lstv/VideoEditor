@@ -298,37 +298,44 @@ class GameRuntime extends LS.Context {
         if(this.initialized) return;
         this.initialized = true;
 
-        if(typeof this.options.renderer === "string") {
-            if(this.options.renderer === "LS.GL.WebGLRenderer") {
-                this.options.renderer = LSGL.WebGLRenderer;
+        const options = this.options;
+        options.assets ??= {};
+
+        const directory = options.assetDirectory || "./";
+
+        if(typeof options.renderer === "string") {
+            if(options.renderer === "LS.GL.WebGLRenderer") {
+                options.renderer = LSGL.WebGLRenderer;
             } else {
-                throw new Error("Unknown or unsupported renderer type: " + this.options.renderer);
+                throw new Error("Unknown or unsupported renderer type: " + options.renderer);
             }
         }
 
         if(!this.renderer) {
-            this.renderer = typeof this.options.renderer === "function" ? new this.options.renderer(this.options.rendererOptions) : this.options.renderer || new LSGL.WebGLRenderer(this.options.rendererOptions);
-            delete this.options.renderer;
-            delete this.options.rendererOptions;
+            this.renderer = typeof options.renderer === "function" ? new options.renderer(options.rendererOptions) : options.renderer || new LSGL.WebGLRenderer(options.rendererOptions);
+            // delete options.renderer;
+            // delete options.rendererOptions;
     
             this.renderer.options.preRender = this.frameCallback.bind(this);
-        } else {
-            this.renderer.setOptions(this.options.rendererOptions);
+        } else if(options.rendererOptions) {
+            // TODO: reset
+            this.renderer.setOptions(options.rendererOptions);
         }
 
-        const soundbox = this.options.soundbox;
+        const soundbox = options.soundbox;
         if(soundbox) {
-            this.soundbox = soundbox instanceof LS.SoundBox? soundbox: new LS.SoundBox(typeof soundbox === "object"? soundbox: this.options.soundboxOptions || {}, null, this.options.nameScope || null);
-            delete this.options.soundbox;
+            this.soundbox = (soundbox instanceof LS.SoundBox)? soundbox: new LS.SoundBox(typeof soundbox === "object"? soundbox: options.soundboxOptions || {}, null, options.nameScope || null, directory);
+            // delete options.soundbox;
         }
+        // delete options.soundbox;
 
-        this.assets = new LSGL.AssetLoader(this.options.assets || {}, null, this.options.nameScope || null);
-        delete this.options.assets;
-        delete this.options.nameScope;
+        this.assets = new LSGL.AssetLoader(options.assets, null, options.nameScope || null, directory);
+        // delete options.assets;
+        // delete options.nameScope;
 
-        if(this.options.input) {
-            this.input.map(this.options.input);
-            delete this.options.input;
+        if(options.input) {
+            this.input.map(options.input);
+            // delete options.input;
         }
     }
 

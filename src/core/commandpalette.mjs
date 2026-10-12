@@ -183,6 +183,15 @@ export default function initCommandPalette(app, paletteOverlay) {
         },
 
         {
+            name: "unload-project",
+            icon: "bi-file-earmark-x",
+            description: "Unload the current project",
+            onCalled() {
+                app.shortcutManager.triggerMapping("GLOBAL_UNLOAD_PROJECT");
+            }
+        },
+
+        {
             name: "open-project",
             icon: "bi-folder2-open",
             description: "Open an existing project",

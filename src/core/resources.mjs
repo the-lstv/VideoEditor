@@ -11,9 +11,11 @@
  */
 
 import Project from "./project.mjs";
-import { VideoDecoder } from "../components/video/index.mjs";
 
-import * as THREE from "three";
+// import { VideoDecoder } from "../components/video/index.mjs";
+// import * as THREE from "three";
+
+let VideoDecoder, THREE;
 
 const MAX_EMBED_RESOURCE_SIZE = 50 * 1024 * 1024; // 50 MB
 
@@ -48,7 +50,7 @@ const RESOURCE_MIME_TYPES = {
     default: "application/octet-stream"
 };
 
-const textureLoader = new THREE.TextureLoader();
+let textureLoader;
 
 let fs, nodePath, electron;
 if(typeof require !== "undefined") {
@@ -128,6 +130,14 @@ class Resource {
             return this.assets.texture;
         }
 
+        if(!textureLoader) {
+            // TODO: Three.js is being replaced with LSGL
+            if(!THREE) {
+                THREE = await import("three");
+            }
+            textureLoader = new THREE.TextureLoader();
+        }
+
         // Create a new texture for this resource
         const texture = await textureLoader.loadAsync(this.getURI());
         this.assets.texture = texture;
@@ -140,7 +150,11 @@ class Resource {
         return texture;
     }
 
-    getVideoDecoder() {
+    async getVideoDecoder() {
+        if(!VideoDecoder) {
+            VideoDecoder = await import("../components/video/index.mjs").then(module => module.VideoDecoder);
+        }
+
         if(this.assets.videoDecoder) {
             return this.assets.videoDecoder;
         }
@@ -156,7 +170,7 @@ class Resource {
     }
 
     async getVideoMetadata(estimateFPS = false, extractTags = false, extractAudioInfo = false) {
-        const decoder = this.getVideoDecoder();
+        const decoder = await this.getVideoDecoder();
         return await decoder.getMetadata(estimateFPS, extractTags, extractAudioInfo);
     }
 
@@ -180,7 +194,7 @@ class Resource {
         return (this.assets.dimensions = { width: texture.image.width, height: texture.image.height });
     }
 
-    getAudioBuffer() {
+    async getAudioBuffer() {
         if(this.type !== "audio") {
             throw new Error("Resource.getAudioBuffer: resource is not an audio file");
         }

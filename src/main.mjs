@@ -449,11 +449,34 @@ window.addEventListener('DOMContentLoaded', async () => {
                 return;
             }
 
-            Project.openFromFile(project => {
-                if(!project) return;
+            Project.openFromFile((project, error) => {
+                if(error || !project) {
+                    LS.Modal.alert("There was an error opening your project: " + (error || "Unknown error") + ". Please make sure it is a valid project file.");
+                    return;
+                }
 
                 // app.currentProject.replaceWith(project);
                 app.currentProject = project;
+            });
+        });
+
+        app.shortcutManager.assign("GLOBAL_UNLOAD_PROJECT", () => {
+            if(!app.currentProject) {
+                LS.Toast.show("No project is currently loaded.");
+                return;
+            }
+            
+            LS.Modal.buildEphemeral({
+                title: "Unload project",
+                content: { html: "Are you sure you want to unload the current project? Unsaved changes will be lost." },
+                buttons: [
+                    { label: "Cancel" },
+                    { label: "Unload", onClick: () => {
+                        app.currentProject.destroy(true);
+                        app.currentProject = null;
+                    }
+                }
+            ]
             });
         });
 

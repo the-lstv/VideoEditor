@@ -101,15 +101,15 @@ class Project extends LS.Context {
     async init(data) {
         if(this.initialized) return;
 
-        // Load project data
-        await this.loadFrom(data || {});
-
         // Now do whatever else somethings wants done
         this.configureEvent("initializing", {
             await: true
         });
 
         await this.emit("initializing", [this]);
+
+        // Load project data
+        await this.loadFrom(data || {});
 
         this.initialized = true;
         this.completed('ready');
@@ -243,7 +243,7 @@ class Project extends LS.Context {
                     { emmet: "label{Name}", inner: projectnameInput },
                     { tag: "br" },
                     { text: "Location" },
-                    { inner: [locationElement, projectnameElement], style: "font-size: smaller; color: var(--surface-10); padding-top: 8px;" },
+                    { inner: [locationElement, projectnameElement], style: "font-size: smaller; color: var(--surface-10); padding-top: 8px; white-space: pre-wrap; word-break: break-word" },
                     { tag: "br" },
                     { emmet: "button{Choose location}", onclick: async () => {
                         const result = await electron.ipcRenderer.invoke('select-directory', 'export');
@@ -263,7 +263,7 @@ class Project extends LS.Context {
                     }
 
                     if(await fs.promises.access(this.location + "/" + this.config.name + "/project.json").then(() => true).catch(() => false)) {
-                        const overwrite = await new LS.Modal({
+                        const overwrite = new LS.Modal({
                             closeable: false,
                             ephemeral: true,
                         }, {
@@ -307,9 +307,8 @@ class Project extends LS.Context {
 
         location ??= this.location;
 
-        const path = this.location + "/" + this.config.name;
-        await fs.promises.mkdir    (path, { recursive: true });
-        await fs.promises.writeFile(path + "/project.json", JSON.stringify(data));
+        await fs.promises.mkdir    (location, { recursive: true });
+        await fs.promises.writeFile(location + "/project.json", JSON.stringify(data));
     }
 
     saveBackup() {
@@ -431,6 +430,11 @@ class Project extends LS.Context {
                 if(callback) callback(project);
             } catch (error) {
                 console.error("Error opening project file:", error);
+
+                if(error.message.includes("Unexpected token")) {
+                    error = "The project file doesn't seem to be valid JSON";
+                }
+
                 callback(null, error);
             }
         });
@@ -444,6 +448,10 @@ class Project extends LS.Context {
      */
     destroy(destroyViews = false) {
         if(this.destroyed) return;
+
+        if(app.flavorInstance) {
+            app.flavorInstance.destroy();
+        }
 
         // TODO: Proper destruction
 

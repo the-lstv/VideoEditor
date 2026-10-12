@@ -79,9 +79,9 @@ class Slides extends FlavorBase {
 
         // When the project data has loaded
         this.project.on("project-data-loaded", async (data) => {
-            if(this.flavorConfig.config) {
-                this.runtime.reinitialize(this.flavorConfig.config);
-            }
+            // if(this.flavorConfig.config) {
+            //     this.runtime.reinitialize(this.flavorConfig.config);
+            // }
         });
 
         // When a view connects to the project

@@ -3,7 +3,6 @@
  */
 
 import FlavorBase from "../../core/flavor.mjs";
-import ThreeRendererAdapter from "../../components/graphics/ThreeJS/index.mjs";
 
 // --- Views
 import { AssetManagerView } from "../../views/asset-manager.mjs";
@@ -39,6 +38,8 @@ class QuickSand extends FlavorBase {
     };
 
     async #init() {
+        if(this.destroyed) throw new Error("Flavor has been destroyed");
+
         /**
          * The GameRuntime accepts options that configure the entire game environment, which this interface constructs
          */
@@ -48,8 +49,6 @@ class QuickSand extends FlavorBase {
 
         // --- ! Debug
         globalThis.game = this.runtime;
-
-        console.log("QuickSand runtime initialized");
     }
 
     /**
@@ -84,9 +83,14 @@ class QuickSand extends FlavorBase {
 
         // When the project data has loaded
         this.project.on("project-data-loaded", async (data) => {
-            if(this.flavorConfig.gameConfig) {
-                this.runtime.reinitialize(this.flavorConfig.gameConfig);
-            }
+            this.flavorConfig.gameConfig ??= {};
+            this.flavorConfig.gameConfig.renderer ??= "LS.GL.WebGLRenderer";
+
+            this.flavorConfig.gameConfig.assetDirectory = this.project.location;
+
+            this.runtime.reinitialize(this.flavorConfig.gameConfig);
+
+            console.log("QuickSand flavor initialized with game config:", this.flavorConfig.gameConfig);
         });
 
         // When a view connects to the project
@@ -94,7 +98,7 @@ class QuickSand extends FlavorBase {
             if(view.attachedTo == null) {
                 view.attachedTo = this;
             }
-            
+
             switch(view.constructor.name) {
                 case "gamePreviewPanel":
                     view.setSource(this.runtime);
@@ -169,6 +173,11 @@ class QuickSand extends FlavorBase {
         if(this.destroyed) return;
 
         this.runtime.destroy();
+
+        this.runtime = null;
+        globalThis.game = null;
+
+        console.log("QuickSand flavor destroyed");
 
         super.destroy();
     }
