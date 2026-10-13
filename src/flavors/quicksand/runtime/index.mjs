@@ -556,7 +556,7 @@ class GameRuntime extends LS.Context {
 
         maxIndex ??= textIsText? Math.min(text.length + index, textBlock.size - index): textBlock.size - index;
 
-        let state = 0, arg = "", command = 0; // 0 = normal, 1 = waiting for argument
+        let state = 0, arg = "", namedGroup = "", command = 0; // 0 = normal, 1 = waiting for argument
         let x = ix, y = iy;
 
         for(let i = 0; text === -1? true: (i < (textIsText? text.length: text)); i++) {
@@ -567,30 +567,33 @@ class GameRuntime extends LS.Context {
                     state = 0;
 
                     switch(command) {
-                        case 119: // Wait
+                        case 119: // Wait (w)
                             const waitTime = parseInt(arg);
                             if(!isNaN(waitTime) && waitTime > 0) await this.sleep(waitTime, skipSignal);
                             break;
-                        case 100: // Delay
+                        case 100: // Delay (d)
                             const delayTime = parseInt(arg);
                             if(!isNaN(delayTime) && delayTime >= 0) delay = delayTime;
                             break;
-                        case 99: // Color
+                        case 99: // Color (c)
                             color = LS.Color.parse(arg);
                             break;
-                        case 115: // Size
+                        case 115: // Size (s)
                             const sizeValue = parseFloat(arg);
                             if(!isNaN(sizeValue) && sizeValue > 0) size = sizeValue;
                             break;
-                        case 120: // X position
+                        case 120: // X position (x)
                             const xValue = parseFloat(arg);
                             if(!isNaN(xValue)) x = xValue;
                             break;
-                        case 121: // Y position
+                        case 121: // Y position (y)
                             const yValue = parseFloat(arg);
                             if(!isNaN(yValue)) y = yValue;
                             break;
-                        case 114: // Reset
+                        case 103: // Group (g)
+                            namedGroup = arg;
+                            break;
+                        case 114: // Reset (r)
                             x = ix;
                             y = iy;
                             color = [255, 255, 255, 255];
@@ -616,6 +619,7 @@ class GameRuntime extends LS.Context {
                     case 115: // \s - Size command
                     case 120: // \x - X position command
                     case 121: // \y - Y position command
+                    case 103: // \g - Group command
                     case 114: // \r - Reset command
                         command = nextCode;
                         state = 1;
@@ -636,7 +640,7 @@ class GameRuntime extends LS.Context {
             }
 
             if(callback) {
-                const result = callback(code, i + index, x, y, delay, i);
+                const result = callback(code, i + index, x, y, delay, i, namedGroup);
                 if(result === false) {
                     break;
                 } else if(typeof result === "object") {
