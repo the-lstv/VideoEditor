@@ -434,8 +434,8 @@ class GameRuntime extends LS.Context {
         return new LS.Animation2.Timeline(animations, options);
     }
 
-    createScene() {
-        return new LSGL.Scene(this);
+    createScene(options = {}) {
+        return new LSGL.Scene(this, options);
     }
 
     sleep(ms, signal = null) {
