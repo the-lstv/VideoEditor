@@ -462,7 +462,7 @@ class GameRuntime extends LS.Context {
     }
 
     /**
-     * Very comprehensive utility for typing out text into a text block with a delay between each character & callback for dynamic changes.
+     * A very comprehensive utility for typing out text into a text block with a delay between each character & callback for dynamic changes.
      * 
      * @param {typeof LS.GL.WebGLTextEngine.TextBlock} textBlock - The text block to type into.
      * @param {string|number|Array<number|string>|Uint8Array|Uint16Array|Uint32Array} text - Text to type (can be as an array of codes), or the number of characters to type if you provide your own via the callback. If a character is 0 (NULL), it will stop.
@@ -481,6 +481,10 @@ class GameRuntime extends LS.Context {
      * @param {boolean} [options.culling=true] - Whether to stop rendering characters that are outside the visible area.
      * @param {number} [options.lineHeight=1.2] - The line height multiplier for the text.
      * @param {AbortSignal} [options.signal=null] - An abort signal
+     * @param {AbortSignal} [options.skipSignal=null] - An abort signal that skips the typing animation and immediately types the rest of the text.
+     * @param {boolean} [options.hang=false] - Whether to hang the typing animation indefinitely after finishing.
+     * @param {Array<Object>} [options.animation=null] - Optional array of keyframes for animating each character after it is typed. Supported properties are x, y, r, g, b, a, size, style, weight, ox (offset x), oy (offset y).
+     * @param {Object} [options.animationOptions={}] - Options for the animation, such as duration and easing.
      * @returns {Promise}
      * 
      * @example
@@ -525,7 +529,7 @@ class GameRuntime extends LS.Context {
      * } });
      */
     async typeText(textBlock, text, options = {}) {
-        let { x: ix, y: iy, index, clear, maxIndex, maxWidth, delay, callback, color, size, style, weight, culling, signal, skipSignal, hang, lineHeight } = options;
+        let { x: ix, y: iy, index, clear, maxIndex, maxWidth, delay, callback, color, size, style, weight, culling, signal, skipSignal, hang, lineHeight, animation, animationOptions } = options;
 
         index      ??= 0;
         ix         ??= 0;
@@ -534,7 +538,7 @@ class GameRuntime extends LS.Context {
         delay      ??= 35;
         lineHeight ??= textBlock.engine?.lineHeight || 1.2;
 
-        color    ??= [255, 255, 255, 255];
+        color    = LS.Color.parse(color ?? [255, 255, 255, 255]);
         size     ??= textBlock.engine?.defaultFontSize || 16;
         style    ??= null;
         weight   ??= null;
@@ -546,6 +550,9 @@ class GameRuntime extends LS.Context {
         skipSignal ??= null;
         hang       ??= false;
         clear      ??= true;
+
+        animation ??= null;
+        animationOptions ??= {};
 
         if(clear) {
             textBlock.clear();
@@ -663,7 +670,20 @@ class GameRuntime extends LS.Context {
                 break;
             }
 
+            const ogX = x;
             x += textBlock.setChar(i + index, x, y, code, color[0], color[1], color[2], color[3], size, style, weight);
+
+            if(animation) {
+                const idx = i + index;
+                const object = { char: code, x: ogX, y, r: color[0], g: color[1], b: color[2], a: color[3], size, style, weight, ox: 0, oy: 0 };
+
+                this.animate((key, value) => {
+                    if(signal?.aborted || skipSignal?.aborted) return;
+
+                    object[key] = value;
+                    textBlock.setChar(idx, object.x + object.ox, object.y + object.oy, object.char, object.r, object.g, object.b, object.a, object.size, object.style, object.weight);
+                }, animation, { duration: 1000, ...animationOptions, signal });
+            }
 
             if(delay > 0 && !signal?.aborted && !skipSignal?.aborted) {
                 await this.sleep(delay, skipSignal);
