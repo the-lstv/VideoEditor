@@ -11,6 +11,7 @@
  */
 
 import Project from "./project.mjs";
+import { RootFs } from "./kernel/fs.mjs";
 
 // import { VideoDecoder } from "../components/video/index.mjs";
 // import * as THREE from "three";
@@ -52,10 +53,9 @@ const RESOURCE_MIME_TYPES = {
 
 let textureLoader;
 
-let fs, nodePath, electron;
+let fs, electron;
 if(typeof require !== "undefined") {
     fs = require("fs");
-    nodePath = require("path");
     electron = require("electron");
 }
 
@@ -98,7 +98,7 @@ class Resource {
         if(this.folderName) {
             const folder = this.resourceManager.projectFolders.get(this.folderName);
             if(folder) {
-                return nodePath.join(folder.path, this.path);
+                return RootFs.join(folder.path, this.path);
             } else {
                 console.warn("Resource.fullPath: folder not found for resource", this);
                 return this.path;
@@ -334,7 +334,7 @@ class ResourceManager extends LS.EventEmitter {
             if(folderName) {
                 const folder = this.projectFolders.get(folderName);
                 if(folder) {
-                    return this.getResourceByPath(nodePath.join(folder.path, path.path));
+                    return this.getResourceByPath(RootFs.join(folder.path, path.path));
                 }
             } else {
                 return this.getResourceByPath(path.path);
@@ -348,10 +348,10 @@ class ResourceManager extends LS.EventEmitter {
             const folderName = path.slice(2, path.indexOf("/", 2));
             const folder = this.projectFolders.get(folderName);
 
-            return folder ? this.getResourceByPath(nodePath.join(folder.path, relativePath)) : null;
+            return folder ? this.getResourceByPath(RootFs.join(folder.path, relativePath)) : null;
         }
 
-        path = nodePath.normalize(path);
+        path = RootFs.normalize(path);
 
         // Search by absolute path
         for(const resource of this.resources.values()) {
@@ -368,7 +368,7 @@ class ResourceManager extends LS.EventEmitter {
      */
     getProjectFolderForPath(path) {
         if(typeof path !== "string" || !path) return null;
-        if(typeof nodePath === "undefined") return null;
+        if(typeof RootFs === "undefined") return null;
 
         const normalizedPath = ResourceManager.normalizePath(path, true);
         let bestMatch = null;
@@ -377,8 +377,8 @@ class ResourceManager extends LS.EventEmitter {
             if(!folder?.path) continue;
 
             const folderPath = ResourceManager.normalizePath(folder.path, true);
-            const relativePath = nodePath.relative(folderPath, normalizedPath).replace(/\\/g, "/");
-            const isInsideFolder = relativePath === "" || (!relativePath.startsWith("..") && !nodePath.isAbsolute(relativePath));
+            const relativePath = RootFs.relative(folderPath, normalizedPath).replace(/\\/g, "/");
+            const isInsideFolder = relativePath === "" || (!relativePath.startsWith("..") && !RootFs.isAbsolute(relativePath));
 
             if(!isInsideFolder) continue;
 
@@ -468,7 +468,7 @@ class ResourceManager extends LS.EventEmitter {
             const filePath = typeof file === "string" ? file : file?.path || file?.fullPath || file?.name;
             if(!filePath) continue;
 
-            const normalizedPath = typeof nodePath !== "undefined" ? ResourceManager.normalizePath(filePath, true) : filePath;
+            const normalizedPath = typeof RootFs !== "undefined" ? ResourceManager.normalizePath(filePath, true) : filePath;
             const folderInfo = this.getProjectFolderForPath(normalizedPath);
             const resource = this.addResource({
                 path: folderInfo?.path || normalizedPath,
@@ -572,7 +572,7 @@ class ResourceManager extends LS.EventEmitter {
                 return;
             }
 
-            let folderName = nodePath.basename(folderPath);
+            let folderName = RootFs.basename(folderPath);
 
             if(this.projectFolders.has(folderName)) {
                 // If a folder with the same name already exists, append a number to the name

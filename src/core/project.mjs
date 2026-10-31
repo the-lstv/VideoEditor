@@ -9,6 +9,8 @@
 import { HistoryManager }  from "./base.mjs";
 import { ResourceManager } from "./resources.mjs";
 
+import { RootFs } from "./kernel/fs.mjs";
+
 /**
  * Abstract project class
  */
@@ -220,10 +222,7 @@ class Project extends LS.Context {
     }
 
     async save() {
-        // ! Todo
-
-        const fs = require("fs");
-        const electron = require("electron");
+        if(typeof __dirname === "undefined") globalThis.__dirname = "/home/user/.editor";
 
         if(!this.location) {
             // Ask the user for a location to save the project
@@ -246,7 +245,7 @@ class Project extends LS.Context {
                     { inner: [locationElement, projectnameElement], style: "font-size: smaller; color: var(--surface-10); padding-top: 8px; white-space: pre-wrap; word-break: break-word" },
                     { tag: "br" },
                     { emmet: "button{Choose location}", onclick: async () => {
-                        const result = await electron.ipcRenderer.invoke('select-directory', 'export');
+                        const result = await require("electron").ipcRenderer.invoke('select-directory', 'export');
                         if (result) {
                             this.location = result;
                             locationElement.textContent = this.location;
@@ -262,7 +261,7 @@ class Project extends LS.Context {
                         this.location = __dirname + "/user/projects/";
                     }
 
-                    if(await fs.promises.access(this.location + "/" + this.config.name + "/project.json").then(() => true).catch(() => false)) {
+                    if(await app.fileSystem.access(this.location + "/" + this.config.name + "/project.json").then(() => true).catch(() => false)) {
                         const overwrite = new LS.Modal({
                             closeable: false,
                             ephemeral: true,
@@ -302,13 +301,10 @@ class Project extends LS.Context {
         // Let other parts of the application handle saving
         this.emit("save", [data, this]);
 
-        // todo: get filesystem provider, eg. for vfs
-        const fs = require("fs");
-
         location ??= this.location;
 
-        await fs.promises.mkdir    (location, { recursive: true });
-        await fs.promises.writeFile(location + "/project.json", JSON.stringify(data));
+        await app.fileSystem.mkdir    (location, { recursive: true });
+        await app.fileSystem.writeFile(location + "/project.json", JSON.stringify(data));
     }
 
     saveBackup() {
@@ -348,7 +344,6 @@ class Project extends LS.Context {
 
                 if(callback) callback();
             }
-
         });
 
         const project = new fflate.ZipDeflate("project.json", {
@@ -426,7 +421,7 @@ class Project extends LS.Context {
 
             try {
                 const project = new Project(LS.Util.parseJSONC(require("fs").readFileSync(filePath, "utf-8")));
-                project.location = require("path").dirname(filePath);
+                project.location = RootFs.dirname(filePath);
                 if(callback) callback(project);
             } catch (error) {
                 console.error("Error opening project file:", error);

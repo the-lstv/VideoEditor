@@ -611,6 +611,7 @@ pre.log-message {
     align-items: flex-start;
     justify-content: flex-start;
     gap: 6px;
+    margin: 16px;
 }
 
 .editor-tip button {

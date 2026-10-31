@@ -18,6 +18,8 @@ globalThis.isNode = typeof process !== "undefined" && process.versions != null &
 /// <reference path="/www/ls/dist/ls.d.ts" />
 
 // --- Core imports
+import { RootFs, TmpFs, ProcFs, SysFs, DEFAULT_FS_DATA } from "./core/kernel/fs.mjs";
+
 import StatusBar from "./core/statusbar.mjs";
 import ConfigStore from "./core/configstore.mjs";
 import Project from "./core/project.mjs";
@@ -102,7 +104,7 @@ const app = globalThis.app = {
         { name: "Video Editor", value: "video-editor", icon: "bi-camera-reels-fill" },
         { name: "Digital Audio Workstation", value: "merge", icon: "bi-music-note-beamed" },
         { name: "Game Engine", value: "quicksand", icon: "bi-dpad-fill" },
-        
+
         // To be added
         { name: "Slides", value: "slides", icon: "bi-easel2-fill" },
         
@@ -307,19 +309,27 @@ const app = globalThis.app = {
         } else {
             window.open(url, "_blank");
         }
-    }
+    },
+    
+    fileSystem: new RootFs(true)
 }
+
+app.fileSystem.mount(RootFs.PATH_SEPARATOR, (new TmpFs()).setData(DEFAULT_FS_DATA));
+app.fileSystem.mount("/tmp",  new TmpFs());
+app.fileSystem.mount("/dev",  new TmpFs());
+app.fileSystem.mount("/run",  (new TmpFs()).setData([["/lock", {}]]));
+app.fileSystem.mount("/proc", new ProcFs());
+app.fileSystem.mount("/sys",  new SysFs());
 
 window.globalConfig = {};
 
 if(globalThis.isNode) {
     const fs = require("fs");
-    const path = require("path");
     const electron = require("electron");
 
     app.ipc = electron.ipcRenderer;
 
-    const configPath = path.join(__dirname, "config.jsonc");
+    const configPath = RootFs.join(__dirname, "config.jsonc");
     if (fs.existsSync(configPath)) {
         window.globalConfig = LS.Util.parseJSONC(fs.readFileSync(configPath, "utf-8"));
     }
@@ -425,13 +435,14 @@ window.addEventListener('DOMContentLoaded', async () => {
         // --- Shortcut actions
 
         app.shortcutManager.assign("GLOBAL_SAVE", () => {
-            if(!isNode) {
-                // ! Temporary, package to a zip file and download it
-                app.currentProject.exportZip(true);
-            } else {
-                // Save regularly
-                app.currentProject.save();
-            }
+            app.currentProject.save();
+            // if(!isNode) {
+            //     // ! Temporary, package to a zip file and download it
+            //     app.currentProject.exportZip(true);
+            // } else {
+            //     // Save regularly
+            //     app.currentProject.save();
+            // }
         });
 
         app.shortcutManager.assign("GLOBAL_OPEN", () => {
@@ -780,7 +791,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 { text: "Save Current Layout", action() {} },
 
                 { type: "separator" },
-                
+
                 { text: "Save Current Layout To File", action() {} },
                 { text: "Load Layout From File", action() {} },
             ],

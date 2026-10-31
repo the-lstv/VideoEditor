@@ -26,6 +26,7 @@ Features and capabilities (work in progress):
 - Support for a wide variety of formats and codecs
 - Subtitle editing, keying, rotoscoping, etc.*
 - Advanced audio editing and signal processing features, MIDI support, VST plugin support, and more!*
+- Operates with a virtual unix-like filesystem, which makes cross-platform file management easier & available on the web.
 - Much more!
 
 \* = planned features that are not yet fully implemented.

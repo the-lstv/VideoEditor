@@ -183,7 +183,7 @@ const dragState = new class DragState extends LS.Util.FrameScheduler {
  * @returns {HTMLElement|null} The tip element or null if the user has hidden the tip.
  */
 function createTip(id, text, target = null) {
-    if(localStorage.getItem("hideTip_" + id)) {
+    if(app.config.has("hiddenTips." + id)) {
         return null;
     }
 
@@ -191,15 +191,11 @@ function createTip(id, text, target = null) {
         parent: target,
         inner: [
             { emmet: "button.small.square.clear>i.bi-x-lg", onclick() {
-                localStorage.setItem("hideTip_" + id, "true");
-                hint.remove();
+                app.config.set("hiddenTips." + id, true);
+                this.parentElement.remove();
             }},
 
-            {
-                tag: "span",
-                i18n: "tips." + id,
-                text
-            }
+            { tag: "span", i18n: "tips." + id, text }
         ]
     });
 }

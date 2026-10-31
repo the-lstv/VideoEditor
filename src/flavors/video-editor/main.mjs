@@ -131,8 +131,8 @@ class VideoEditor extends FlavorBase {
 
         // The frame scheduler is responsible for scheduling frames to be rendered
         this.frameScheduler = new LS.Util.FrameScheduler((delta) => {
-            if(delta > 0 && this.timelineInstance) {
-                this.timelineInstance.setSeek(this.timelineInstance.seek + delta);
+            if(delta > 0 && this.timelineInstance && this.playing) {
+                this.timelineInstance.setSeek(this.timelineInstance.seek + delta, true, false);
             }
 
             this.renderAtTime(this.timelineInstance.seek || 0);
@@ -227,11 +227,11 @@ class VideoEditor extends FlavorBase {
                     this.timelineInstance = view.timeline;
                     this.setTimeline(this.currentTimeline || "main");
 
-                    this.addExternalEventListener(this.timelineInstance, 'seek', () => {
+                    this.addExternalEventListener(this.timelineInstance, 'seek', (value, _updateEngineTime) => {
                         if(this.destroyed) return console.error("Timeline emitted seek event for a destroyed instance! This is a bug!", this);
+                        this.quickEmit(this.__seekEventRef, value);
 
-                        this.quickEmit(this.__seekEventRef, view.timeline.seek);
-                        this.render();
+                        if (_updateEngineTime !== false)  this.render();
                     });
 
                     this.addExternalEventListener(this.timelineInstance, 'duration-changed', (duration) => {
@@ -702,7 +702,7 @@ class VideoEditor extends FlavorBase {
             if(!isResource) {
                 data.isExternal = true;
                 data.type = null; // :shrug:
-                data.id = null; // :shrug:
+                data.id = null;   // :shrug:
             }
 
             const resource = isResource? data: this.project.resources.addResource(data);

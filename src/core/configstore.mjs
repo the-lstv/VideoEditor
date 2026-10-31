@@ -6,18 +6,21 @@
 
 /**
  * Rough polyfill implementation of ConfigStore class
- * Temporarily using localStorage; in the future, this should be swapped
+ * TODO: Temporarily using localStorage; in the future, this should be swapped
  */
 class ConfigStore {
+    storage = localStorage;
+    prefix  = "config-";
+
     constructor() {
         this.store = new Map();
 
         // Load existing config from localStorage
-        for (const key in localStorage) {
-            if (key.startsWith('config-')) {
-                const configKey = key.substring(7);
+        for (const key in this.storage) {
+            if (key.startsWith(this.prefix)) {
+                const configKey = key.substring(this.prefix.length);
                 try {
-                    const value = JSON.parse(localStorage.getItem(key));
+                    const value = JSON.parse(this.storage.getItem(key));
                     this.store.set(configKey, value);
                 } catch (e) {
                     console.warn(`ConfigStore: Failed to parse config item ${configKey}`, e);
@@ -29,9 +32,9 @@ class ConfigStore {
     // The storage class can implement whatever it needs to await when initalizing here
     async open() {}
 
-    set(key, value) {
+    set(key, value = true) {
         this.store.set(key, value);
-        localStorage.setItem(`config-${key}`, JSON.stringify(value));
+        this.storage.setItem(`${this.prefix}${key}`, JSON.stringify(value));
     }
 
     get(key, defaultValue = null) {
@@ -44,15 +47,15 @@ class ConfigStore {
 
     delete(key) {
         this.store.delete(key);
-        localStorage.removeItem(`config-${key}`);
+        this.storage.removeItem(`${this.prefix}${key}`);
     }
 
     clear() {
         this.store.clear();
         // Remove all config items from localStorage
-        for (const key in localStorage) {
-            if (key.startsWith('config-')) {
-                localStorage.removeItem(key);
+        for (const key in this.storage) {
+            if (key.startsWith(this.prefix)) {
+                this.storage.removeItem(key);
             }
         }
     }
@@ -62,10 +65,8 @@ class ConfigStore {
         for (const [key, value] of this.store.entries()) {
             exported[key] = value;
         }
-        if (asString) {
-            return JSON.stringify(exported);
-        }
-        return exported;
+
+        if (asString) return JSON.stringify(exported); return exported;
     }
 
     import(data) {

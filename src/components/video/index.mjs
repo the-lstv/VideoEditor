@@ -28,6 +28,8 @@ import {
     Quality
 } from "mediabunny";
 
+import { RootFs } from "../../core/kernel/fs.mjs";
+
 // We can just set ._factor to get anything i guess, no need to overcomplicate it
 // The getters seem to recalculate it every time anyway
 const SHARED_QUALITY = new Quality(1);
@@ -245,15 +247,13 @@ class VideoDecoder {
         options.output ??= __dirname + "/user/video_proxies/" + this.resource.fullPath.replace(/\.[^/.]+$/, "") + "_proxy.mp4";
 
         const spawn = require("child_process").spawn;
-        const path = require("path");
-        const fs = require("fs");
 
         const progress = typeof options.progress === "function" ? options.progress : null;
         const cancelHook = typeof options.cancelHook === "function" ? options.cancelHook : null;
 
-        const outputDir = path.dirname(options.output);
-        if (!fs.existsSync(outputDir)) {
-            fs.mkdirSync(outputDir, { recursive: true });
+        const outputDir = RootFs.dirname(options.output);
+        if (!await app.fileSystem.exists(outputDir)) {
+            await app.fileSystem.mkdir(outputDir, { recursive: true });
         }
 
         const ffmpegArgs = [
@@ -291,9 +291,9 @@ class VideoDecoder {
             } catch {}
         };
 
-        const cancel = () => {
+        const cancel = async () => {
             kill("SIGKILL");
-            fs.unlink(options.output, () => {});
+            await app.fileSystem.unlink(options.output, () => {});
         };
 
         if (cancelHook) {

@@ -322,6 +322,8 @@ class GameRuntime extends LS.Context {
             this.renderer.setOptions(options.rendererOptions);
         }
 
+        this.renderer.framebufferRenderer ??= new LS.GL.FramebufferRenderer(this.renderer);
+
         const soundbox = options.soundbox;
         if(soundbox) {
             this.soundbox = (soundbox instanceof LS.SoundBox)? soundbox: new LS.SoundBox(typeof soundbox === "object"? soundbox: options.soundboxOptions || {}, null, options.nameScope || null, directory);

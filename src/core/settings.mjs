@@ -323,15 +323,15 @@ class Settings {
 
                 LS.Create("br"),
 
-                {
-                    tag: "label", class: "ls-switch", inner: [
-                        { tag: "input", type: "checkbox", checked: LS.Color.theme === "light", onchange: (e) => {
-                            LS.Color.theme = e.target.checked ? "light" : "dark";
-                        } },
-                        { tag: "span" },
-                        "Enable animations"
-                    ]
-                },
+                // {
+                //     tag: "label", class: "ls-switch", inner: [
+                //         { tag: "input", type: "checkbox", checked: LS.Color.theme === "light", onchange: (e) => {
+                //             LS.Color.theme = e.target.checked ? "light" : "dark";
+                //         } },
+                //         { tag: "span" },
+                //         "Enable animations"
+                //     ]
+                // },
 
                 new LS.Range({
                     min: 0,

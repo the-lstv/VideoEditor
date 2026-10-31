@@ -66,7 +66,6 @@ class TimelineView extends LS.View {
                                             { tag: "ul", style: "padding-left: 20px", inner: [
                                                 { tag: "li", inner: ["To add items, drag them from the media library onto the timeline."] },
                                                 { tag: "li", inner: ["To move items, drag them within the timeline or use Shift + Arrow keys."] },
-                                                { tag: "li", inner: ["When moving items, they are by default snapped to a grid (which is customizable in the settings). You can hold ", { tag: "code", inner: "Alt" }, " to enable free movement, or ", { tag: "code", inner: "Shift" }, " to snap to one second."] },
                                                 { tag: "li", inner: ["Click an item to select it."] },
                                                 { tag: "li", inner: ["Hold Ctrl to select multiple items."] },
                                                 { tag: "li", inner: ["To quickly copy items, grag items while pressing ", { tag: "code", inner: "Shift" }, "."] },
@@ -82,6 +81,7 @@ class TimelineView extends LS.View {
                                                 { tag: "li", inner: ["Selecting clips: ",  { tag: "code", inner: "Ctrl + Drag" } ] },
                                                 { tag: "li", inner: ["Jump to start/end: ",  { tag: "code", inner: "Home / End" } ] },
                                                 { tag: "li", inner: ["Next/previous frame: ",  { tag: "code", inner: "Shift + Arrows" } ] },
+                                                { tag: "li", inner: ["By default, movements are snapped to the grid. Hold ", { tag: "code", inner: "Alt" }, " to enable free movement, or ", { tag: "code", inner: "Shift" }, " to snap to a fixed unit."] },
                                             ] },
                                             { tag: "h3", inner: "Tools:" },
                                             { tag: "ul", style: "padding-left: 20px", inner: [
@@ -95,7 +95,7 @@ class TimelineView extends LS.View {
                                         ],
 
                                         buttons: [{ label: "Don't show again", class: "elevated", onclick: (event) => {
-                                            localStorage.setItem("hideTimelineHelp", "true");
+                                            app.config.set("hiddenTips.timelineHelp", true);
                                             LS.Modal.closeFromElement(event.target);
                                             btnEvent.target.remove();
                                         }}, { label: "Close" }]
