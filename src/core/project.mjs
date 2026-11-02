@@ -221,25 +221,87 @@ class Project extends LS.Context {
         return asString? JSON.stringify(data): data;
     }
 
-    async save() {
+    static randomName() {
+        const adjectives = [
+            "Swift", "Neon", "Crimson", "Silent", "Lunar", "Cyber", "Fuzzy", "Vivid",
+            "Glitchy", "Quantum", "Fractal", "Shattered", "Prismatic", "Static",
+            "Hyper", "Zero", "Binary", "Pixelated", "Chromatic", "Noisy", "Psycho",
+            "Turbo", "Aero", "Sonic", "Electric", "Holo", "Infra", "Ultra", "Nano",
+            "Mega", "Giga", "Omega", "Rapid", "Frozen", "Burning", "Radiant", "Dark",
+            "Void", "Spectral", "Phase", "Echoing", "Warped", "Distorted", "Jagged",
+            "Sharp", "Blazing", "Icy", "Molten", "Toxic", "Viral", "Encrypted",
+            "Obsidian", "Aurora", "Shiny", "Cursed", "Blessed", "Chaotic", "Lucid",
+            "Mystic", "Phantom", "Ethereal", "Celestial", "Galactic", "Stellar",
+            "Cosmic", "Astral", "Temporal", "Spatial", "Dimensional", "Virtual",
+            "Augmented", "Synthetic", "Organic", "Mechanical", "Robotic", "Alien",
+            "Mutant", "Hybrid", "Sentient", "Artificial", "Digital", "Analog",
+            "Retro", "Futuristic", "Postmodern", "Minimalist", "Maximalist",
+            "Abstract", "Concrete", "Surreal", "Realistic"
+        ];
+
+        const nouns = [
+            "Falcon", "Pixel", "Nova", "Echo", "Shadow", "Circuit", "Pulse", "Glitch",
+            "Fragment", "Spectrum", "Core", "Drive", "Signal", "Frame", "Loop",
+            "Phase", "Drop", "Blast", "Surge", "Wave", "Stream", "Flow", "Beat",
+            "Rhythm", "Synth", "Bass", "Kick", "Snare", "Lead", "Pad", "Drone",
+            "Sample", "Track", "Mix", "Layer", "Chain", "Patch", "Bit", "Byte",
+            "Packet", "Node", "Port", "Link", "Grid", "Mesh", "Axis", "Vector",
+            "Pulsewave", "Overdrive", "Underflow", "Overflow", "Crash", "Stack",
+            "Buffer", "Kernel", "Thread", "Process", "Cluster", "Shard", "Crystal",
+            "Prism", "Mirror", "Lens", "Scope", "Ray", "Beam", "Flash", "Spark",
+            "Bolt", "Storm", "Tempest", "Cyclone", "Vortex", "Tornado", "Quake",
+            "Tremor", "Rift", "Abyss", "Void", "Eclipse", "Aurora", "Comet",
+            "Meteor", "Asteroid", "Planet", "Star", "Galaxy", "Universe", "Dimension",
+            "Reality", "Dream", "Nightmare", "Vision", "Illusion", "Phantom",
+            "Specter", "Wraith", "Shade", "Spirit", "Soul", "Entity", "Being",
+            "Creature", "Monster", "Beast", "Dragon", "Phoenix", "Griffin",
+            "Unicorn", "Pegasus", "Centaur", "Minotaur", "Sphinx"
+        ];
+
+        return (
+            adjectives[Math.floor(Math.random() * adjectives.length)] +
+            nouns[Math.floor(Math.random() * nouns.length)] +
+            Math.floor(Math.random() * 1000)
+        );
+    }
+
+    static SAVE_MODAL_SHOWN = false;
+
+    /**
+     * User-facing save function.
+     */
+    async save(newLocation = false) {
         if(typeof __dirname === "undefined") globalThis.__dirname = "/home/user/.editor";
 
-        if(!this.location) {
+        if(newLocation || !this.location) {
             // Ask the user for a location to save the project
 
-            this.config.name ??= "new-project";
+            if(Project.SAVE_MODAL_SHOWN) return;
+
+            this.config.name ??= Project.randomName();
 
             const projectnameInput   = LS.Create("input.ls-modal-input[placeholder='Project name']", { value: this.config.name });
             const locationElement    = LS.Create({ tag: "span", text: __dirname + "/user/projects/" });
             const projectnameElement = LS.Create({ tag: "span", text: this.config.name });
 
             const modal = new LS.Modal({
-                closeable: false,
+                // closeable: false,
                 ephemeral: true,
             }, {
-                title: "Save",
+                title: "Save project" + (newLocation? " as" : ""),
                 content: [
-                    { emmet: "label{Name}", inner: projectnameInput },
+                    { emmet: "label{Name}", inner: {
+                        class: "ls-text-input-container",
+                        inner: [projectnameInput, {
+                            class: "ls-text-input-bar",
+                            inner: { emmet: "button[aria-label='Random name'].elevated>i.bi-dice-5-fill", onclick: () => {
+                                const randomName = Project.randomName();
+                                this.config.name = randomName;
+                                projectnameInput.value = randomName;
+                                projectnameElement.textContent = randomName;
+                            } }
+                        }]
+                    } },
                     { tag: "br" },
                     { text: "Location" },
                     { inner: [locationElement, projectnameElement], style: "font-size: smaller; color: var(--surface-10); padding-top: 8px; white-space: pre-wrap; word-break: break-word" },
@@ -256,7 +318,7 @@ class Project extends LS.Context {
                     } }
                 ],
 
-                buttons: [{ label: "Cancel", class: "elevated" }, { label: "Save", onClick: async () => {
+                buttons: [{ label: "Cancel", class: "elevated" }, { label: "Save as .zip", class: "outline" }, { label: "Save", onClick: async () => {
                     if(!this.location) {
                         this.location = __dirname + "/user/projects/";
                     }
@@ -284,6 +346,11 @@ class Project extends LS.Context {
                 }}]
             }).open();
 
+            Project.SAVE_MODAL_SHOWN = true;
+            modal.once("destroy", () => {
+                Project.SAVE_MODAL_SHOWN = false;
+            });
+
             projectnameInput.addEventListener("input", () => {
                 this.config.name = projectnameInput.value || "new-project";
                 projectnameElement.textContent = this.config.name;
@@ -296,19 +363,47 @@ class Project extends LS.Context {
     }
 
     async saveToLocation(location = null) {
+        location ??= this.location;
+
+        if(!location) {
+            LS.Toast.show("Project.saveToLocation: Project location is not set. Cannot save.");
+            return;
+        }
+
         const data = this.export();
 
         // Let other parts of the application handle saving
         this.emit("save", [data, this]);
 
-        location ??= this.location;
-
         await app.fileSystem.mkdir    (location, { recursive: true });
+        await app.fileSystem.mkdir    (location + "/assets");
+        await app.fileSystem.mkdir    (location + "/backups");
         await app.fileSystem.writeFile(location + "/project.json", JSON.stringify(data));
     }
 
-    saveBackup() {
-        // ! Todo
+    async saveBackup(location = null) {
+        location ??= this.location;
+
+        if(!location) {
+            LS.Toast.show("Project.saveBackup: Project location is not set. Cannot save backup.");
+            return;
+        }
+
+        const exists = await app.fileSystem.exists(location + "/backups");
+        if(!exists) {
+            await app.fileSystem.mkdir(location + "/backups", { recursive: true });
+        }
+
+        const data = this.export();
+
+        // Let other parts of the application handle saving
+        this.emit("save", [data, this]);
+        
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const backupFileName = `backup-${timestamp}.json`;
+        const backupFilePath = `${this.location}/backups/${backupFileName}`;
+
+        await app.fileSystem.writeFile(backupFilePath, JSON.stringify(data));
     }
 
     /**

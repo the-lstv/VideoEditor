@@ -78,8 +78,23 @@ const app = globalThis.app = {
 
     // Layout & shortcuts
     layoutManager:   new LS.Multipane(layoutContainer),
-    shortcutManager: new LS.ShortcutManager(),
     statusBar:       new StatusBar(statusBarContainer),
+    shortcutManager: new LS.ShortcutManager({
+        flagGetter(key) {
+            if(key === "ROOT_FOCUS") {
+                return !LS.Modal.top && !LS.Menu.someOpen();
+            }
+
+            if(key === "CONTEXT_MENU_OPEN") {
+                return LS.Menu.someOpen();
+            }
+
+            if(key === "MODAL_OPEN") {
+                return !!LS.Modal.top;
+            }
+            return false;
+        }
+    }),
 
     GITHUB_REPO: "https://github.com/the-lstv/videoeditor",
     VERSION: new Version("2.3.0-alpha"),
@@ -395,15 +410,20 @@ window.addEventListener('DOMContentLoaded', async () => {
             GLOBAL_PAUSE: 'space',
             GLOBAL_SEEK_HOME: 'home',
             GLOBAL_SEEK_END: 'end',
-            GLOBAL_FULLSCREEN_VIEW: 'f',
+            GLOBAL_FULLSCREEN_VIEW: { shortcut: 'f', flags: ["ROOT_FOCUS"] },
             GLOBAL_FULLSCREEN_WINDOW: ['f11'],
             GLOBAL_NEXT_FRAME: 'shift+right',
             GLOBAL_PREVIOUS_FRAME: 'shift+left',
             GLOBAL_SAVE: 'ctrl+s',
+            GLOBAL_SAVE_AS: 'ctrl+shift+s',
+            GLOBAL_BACKUP: 'ctrl+shift+b',
             GLOBAL_OPEN: 'ctrl+o',
             GLOBAL_PROJECT_MANAGER: 'ctrl+shift+o',
-            GLOBAL_PROJECT_MANAGER: 'ctrl+shift+o',
             GLOBAL_NEW_PROJECT: 'ctrl+n',
+            GLOBAL_HEADER_MENU_FILE: 'alt+f',
+            GLOBAL_HEADER_MENU_OPTIONS: 'alt+o',
+            GLOBAL_HEADER_MENU_LAYOUT: 'alt+l',
+            GLOBAL_HEADER_MENU_HELP: 'alt+h',
             GLOBAL_FOCUS_HEADER: 'alt',
             GLOBAL_EXPORT_MENU: 'ctrl+e',
             GLOBAL_NEW_WINDOW: 'ctrl+shift+n',
@@ -415,15 +435,14 @@ window.addEventListener('DOMContentLoaded', async () => {
             OPEN_PREFERENCES: 'ctrl+,',
             UNDO: 'ctrl+z',
             REDO: [ 'ctrl+shift+z', 'ctrl+y' ],
-            TIMELINE_TOOL_SELECT: 'v',
-            TIMELINE_TOOL_SLICE: 'c',
-            TIMELINE_TOOL_PREVIEW: 'p',
-            TIMELINE_TOOL_GROUP: 'g',
-            TIMELINE_TOOL_ERASE: 'e',
-            TIMELINE_TOOL_PAINT: 'b',
-            TIMELINE_TOOL_SLIDE: 's',
-            TIMELINE_TOOL_RIPPLE: 'r',
-
+            TIMELINE_TOOL_SELECT:  { shortcut: 'v', flags: ["ROOT_FOCUS"] },
+            TIMELINE_TOOL_SLICE:   { shortcut: 'c', flags: ["ROOT_FOCUS"] },
+            TIMELINE_TOOL_PREVIEW: { shortcut: 'p', flags: ["ROOT_FOCUS"] },
+            TIMELINE_TOOL_GROUP:   { shortcut: 'g', flags: ["ROOT_FOCUS"] },
+            TIMELINE_TOOL_ERASE:   { shortcut: 'e', flags: ["ROOT_FOCUS"] },
+            TIMELINE_TOOL_PAINT:   { shortcut: 'b', flags: ["ROOT_FOCUS"] },
+            TIMELINE_TOOL_SLIDE:   { shortcut: 's', flags: ["ROOT_FOCUS"] },
+            TIMELINE_TOOL_RIPPLE:  { shortcut: 'r', flags: ["ROOT_FOCUS"] },
 
             DEBUG_TOGGLE_DEVTOOLS: 'ctrl+shift+i',
             DEBUG_HARD_RELOAD: 'ctrl+shift+r',
@@ -436,13 +455,14 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         app.shortcutManager.assign("GLOBAL_SAVE", () => {
             app.currentProject.save();
-            // if(!isNode) {
-            //     // ! Temporary, package to a zip file and download it
-            //     app.currentProject.exportZip(true);
-            // } else {
-            //     // Save regularly
-            //     app.currentProject.save();
-            // }
+        });
+
+        app.shortcutManager.assign("GLOBAL_SAVE_AS", () => {
+            app.currentProject.save(true);
+        });
+
+        app.shortcutManager.assign("GLOBAL_BACKUP", () => {
+            app.currentProject.saveBackup();
         });
 
         app.shortcutManager.assign("GLOBAL_OPEN", () => {
@@ -533,7 +553,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         app.shortcutManager.assign("GLOBAL_FULLSCREEN_VIEW", () => {
             if(app.focusedPreview) {
-                app.focusedPreview.toggleFullscreen();
+                app.focusedPreview?.toggleFullscreen?.();
             }
         });
 
@@ -567,17 +587,28 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         app.shortcutManager.assign("GLOBAL_OPEN_COMMAND_PALETTE", () => {
             if(!app.pallette) {
-                LS.Toast.show("Command palette is not available in this flavor or is still loading.");
+                LS.Toast.show("Command palette is not currently available :(");
                 return;
             }
+
             app.pallette.open();
         });
 
         app.shortcutManager.assign("UNDO", () => {
+            if(!app.currentProject) {
+                LS.Toast.show("No project is currently open");
+                return;
+            }
+
             app.currentProject.historyManager.undo();
         });
 
         app.shortcutManager.assign("REDO", () => {
+            if(!app.currentProject) {
+                LS.Toast.show("No project is currently open");
+                return;
+            }
+
             app.currentProject.historyManager.redo();
         });
 
@@ -585,14 +616,14 @@ window.addEventListener('DOMContentLoaded', async () => {
             settingsModal.toggle();
         });
 
-        app.shortcutManager.assign("TIMELINE_TOOL_SELECT",  () => { app.flavorInstance.timelineInstance.tool = "select"  });
-        app.shortcutManager.assign("TIMELINE_TOOL_SLICE",   () => { app.flavorInstance.timelineInstance.tool = "slice"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { app.flavorInstance.timelineInstance.tool = "preview" });
-        app.shortcutManager.assign("TIMELINE_TOOL_GROUP",   () => { app.flavorInstance.timelineInstance.tool = "group"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_ERASE",   () => { app.flavorInstance.timelineInstance.tool = "erase"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_PAINT",   () => { app.flavorInstance.timelineInstance.tool = "paint"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_SLIDE",   () => { app.flavorInstance.timelineInstance.tool = "slide"   });
-        app.shortcutManager.assign("TIMELINE_TOOL_RIPPLE",  () => { app.flavorInstance.timelineInstance.tool = "ripple"  });
+        app.shortcutManager.assign("TIMELINE_TOOL_SELECT",  () => { const timeline = app.flavorInstance.timelineInstance; timeline && (timeline.tool = "select" ) });
+        app.shortcutManager.assign("TIMELINE_TOOL_SLICE",   () => { const timeline = app.flavorInstance.timelineInstance; timeline && (timeline.tool = "slice"  ) });
+        app.shortcutManager.assign("TIMELINE_TOOL_PREVIEW", () => { const timeline = app.flavorInstance.timelineInstance; timeline && (timeline.tool = "preview") });
+        app.shortcutManager.assign("TIMELINE_TOOL_GROUP",   () => { const timeline = app.flavorInstance.timelineInstance; timeline && (timeline.tool = "group"  ) });
+        app.shortcutManager.assign("TIMELINE_TOOL_ERASE",   () => { const timeline = app.flavorInstance.timelineInstance; timeline && (timeline.tool = "erase"  ) });
+        app.shortcutManager.assign("TIMELINE_TOOL_PAINT",   () => { const timeline = app.flavorInstance.timelineInstance; timeline && (timeline.tool = "paint"  ) });
+        app.shortcutManager.assign("TIMELINE_TOOL_SLIDE",   () => { const timeline = app.flavorInstance.timelineInstance; timeline && (timeline.tool = "slide"  ) });
+        app.shortcutManager.assign("TIMELINE_TOOL_RIPPLE",  () => { const timeline = app.flavorInstance.timelineInstance; timeline && (timeline.tool = "ripple" ) });
 
         app.shortcutManager.assign("DEBUG_TOGGLE_DEVTOOLS", () => {
             if(isNode) {
@@ -693,18 +724,19 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         const menus = {
             file: [
-                { text: "Project manager", action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN_PROJECT_MANAGER"); } },
-                { text: "File manager",    action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN_FILE_MANAGER"); } },
+                { text: "Project &manager", action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN_PROJECT_MANAGER"); } },
+                { text: "&File manager",    action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN_FILE_MANAGER"); } },
                 { type: "separator" },
-                { text: "New Project",     action() { app.shortcutManager.triggerMapping("GLOBAL_NEW_PROJECT"); } },
-                { text: "Open Project…",   action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN"); } },
+                { text: "&New Project",     action() { app.shortcutManager.triggerMapping("GLOBAL_NEW_PROJECT"); } },
+                { text: "&Open Project…",   action() { app.shortcutManager.triggerMapping("GLOBAL_OPEN"); } },
                 { type: "separator" },
-                { text: "Save Project",    action() { app.shortcutManager.triggerMapping("GLOBAL_SAVE"); } },
-                { text: "Save Project As", action() { app.shortcutManager.triggerMapping("GLOBAL_SAVE_AS"); } },
+                { text: "&Save Project",    action() { app.shortcutManager.triggerMapping("GLOBAL_SAVE"); } },
+                { text: "Save Project &As", action() { app.shortcutManager.triggerMapping("GLOBAL_SAVE_AS"); } },
+                { text: "Make &Backup",     action() { app.shortcutManager.triggerMapping("GLOBAL_BACKUP"); } },
                 { type: "separator" },
-                { text: "Recent Projects", items: [] },
+                { text: "&Recent Projects", items: [] },
                 { type: "separator" },
-                { text: "Export…", icon: "bi-box-arrow-right", action() {
+                { text: "&Export…", icon: "bi-box-arrow-right", action() {
                     // ... Open export dialog
                 } },
 
@@ -714,19 +746,19 @@ window.addEventListener('DOMContentLoaded', async () => {
             ],
 
             options: [
-                { text: "Preferences", action() {
+                { text: "&Preferences", action() {
                     app.shortcutManager.triggerMapping("OPEN_PREFERENCES");
                 }, icon: "bi-sliders" },
 
                 { type: "separator" },
 
-                { text: "Open command palette", icon: "bi-command", action() {
+                { text: "Open &command palette", icon: "bi-command", action() {
                     app.shortcutManager.triggerMapping("GLOBAL_OPEN_COMMAND_PALETTE");
                 } },
 
                 { type: "separator" },
 
-                { text: "Set editor theme", items: [
+                { text: "Set editor &theme", items: [
                     { icon: "bi-sun", text: "Light",   action() { LS.Color.setTheme('light'); localStorage.setItem("ls-theme", "light"); } },
                     { icon: "bi-moon", text: "Dark",   action() { LS.Color.setTheme('dark'); localStorage.setItem("ls-theme", "dark"); } },
                     { icon: "bi-laptop", text: "Auto", action() { localStorage.removeItem("ls-theme"); LS.Color.setAdaptiveTheme(); } },
@@ -736,7 +768,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                     }}
                 ] },
 
-                { text: "Set editor accent", items: [
+                { text: "Set editor &accent", items: [
                     { text: "Default", action() { LS.Color.setAccent('white');  localStorage.removeItem("ls-accent"); } },
                     { text: "Blue",    action() { LS.Color.setAccent('blue');   localStorage.setItem("ls-accent", "blue"); } },
                     { text: "Red",     action() { LS.Color.setAccent('red');    localStorage.setItem("ls-accent", "red"); } },
@@ -752,7 +784,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
                 { type: "separator" },
 
-                { text: "Switch flavor", items: () => app.flavorList.map(flavor => ({
+                { text: "&Switch flavor", items: () => app.flavorList.map(flavor => ({
                     text: flavor.name,
                     icon: flavor.icon,
                     type: "radio",
@@ -769,7 +801,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
                 { type: "separator" },
 
-                { text: "Set editor language", icon: "bi-translate", items: () => app.locales.map(lang => ({
+                { text: "Set editor &language", icon: "bi-translate", items: () => app.locales.map(lang => ({
                     text: lang.name,
                     type: "radio",
                     group: "language",
@@ -783,38 +815,38 @@ window.addEventListener('DOMContentLoaded', async () => {
             ],
 
             layout: [
-                { text: "Flavor layout presets", items: getLayouts },
-                { text: "Saved layouts", items: [] },
+                { text: "Flavor layout &presets", items: getLayouts },
+                { text: "&Saved layouts", items: [] },
 
                 { type: "separator" },
 
-                { text: "Save Current Layout", action() {} },
+                { text: "Save &Current Layout", action() {} },
 
                 { type: "separator" },
 
-                { text: "Save Current Layout To File", action() {} },
-                { text: "Load Layout From File", action() {} },
+                { text: "Save Current Layout To &File", action() {} },
+                { text: "&Load Layout From File", action() {} },
             ],
 
             help: [
-                { text: "Report bug", action() {
+                { text: "Report &bug", action() {
                     app.openExternal(app.GITHUB_REPO + "/issues?q=state%3Aopen%20label%3Abug");
                 } },
 
-                { text: "Request feature", action() {
+                { text: "Request &feature", action() {
                     app.openExternal(app.GITHUB_REPO + "/issues?q=state%3Aopen%20label%3Aenhancement");
                 } },
 
                 { type: "separator" },
 
-                // { text: "Tutorials", action() {
+                // { text: "&Tutorials", action() {
                 //     // ! todo
                 //     app.openExternal("https://example.com/tutorials");
                 // } },
 
                 // { type: "separator" },
 
-                { text: "About", icon: "bi-stars", action() {
+                { text: "&About", icon: "bi-stars", action() {
                     app.aboutDialog();
                 } }
             ]
@@ -825,11 +857,13 @@ window.addEventListener('DOMContentLoaded', async () => {
             const menuItems = menus[menuTitle] || [];
 
             if(menuItems.length > 0) {
-                new LS.Menu({
+                const menu = new LS.Menu({
                     adjacentElement: menuCategoryElement,
                     items: menuItems,
                     group: "ls-editor-header-menu"
                 });
+
+                app.shortcutManager.assign("GLOBAL_HEADER_MENU_" + menuTitle.toUpperCase(), () => { console.log(menuTitle); menu.open() });
             }
         }
 

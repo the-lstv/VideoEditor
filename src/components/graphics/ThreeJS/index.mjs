@@ -147,7 +147,7 @@ class ThreeRendererAdapter extends RendererAdapter {
 
                 const renderer = new AcceleratedTextRenderer({
                     threeRenderer: this.renderer,
-                    fontSrc: item.data.fontSrc || "assets/fonts/JetBrainsMono",
+                    fontName: item.data.fontName || "assets/fonts/JetBrainsMono",
                     cols: item.data.cols || 120,
                     rows: item.data.rows || 40,
                     fontSize: item.data.textStyleFontSize || 24,

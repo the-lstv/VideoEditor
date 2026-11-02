@@ -442,7 +442,7 @@ ls-box ul li {
 
 .property-editor-input {
     --padding-input-h: 6px;
-    --padding-control-v: 6px;
+    --padding-control-v: 4px;
 }
 
 .property-editor-container input[type="number"] {
@@ -1048,6 +1048,26 @@ ls-knob[preset=numeric]:active {
     box-shadow: 0 10px 60px 0 rgb(0 0 0 / 60%);
 }
 
+.ls-text-input-bar {
+    right: 5px;
+    top: 5px;
+    bottom: 5px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    --padding-control-h: 12px;
+    --padding-control-v: 4px;
+    font-size: small;
+}
+
+.ls-text-input-bar, .ls-text-input-label {
+    position: absolute;
+}
+
+.ls-text-input-container {
+    position: relative;
+    display: block;
+}
 
 
 

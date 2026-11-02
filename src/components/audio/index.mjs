@@ -166,6 +166,8 @@ function keyboardMidi(engine) {
 }
 
 function getEnginePath() {
+    if(!isNode) return { path: null, name: null, exists: false };
+
     const isElectron = typeof process.versions.electron !== 'undefined';
     const fs = require('fs');
 

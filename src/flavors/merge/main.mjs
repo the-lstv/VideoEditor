@@ -93,7 +93,7 @@ class MergeDaw extends FlavorBase {
             await AudioEngine.userInitializeEngine();
         } catch(e) {
             console.error("MergeDaw: Failed to initialize audio engine:", e);
-            return e.message || e.toString() || "Unknown error";
+            // return e.message || e.toString() || "Unknown error";
         }
         return true;
     }
