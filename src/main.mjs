@@ -96,6 +96,26 @@ const app = globalThis.app = {
         }
     }),
 
+    soundBox: new LS.SoundBox({
+        volume: 0.5,
+        srcPrefix: "assets/sounds/",
+        sounds: {
+            // System
+            "system:blip":            { src: "blip.ogg" },
+            "system:notification":    { src: "notification.mp3" },
+            "system:click":           { src: "click_desk.ogg" },
+            "system:click_container": { src: "click_container.ogg" },
+            "system:error":           { src: "error.ogg", fallback: ["system:notification"] },
+            "system:success":         { src: "export_done.mp3" },
+            "system:startup":         { src: "startup.ogg" },
+            "system:timer":           { src: "timer.ogg", fallback: ["system:notification"] },
+            "system:logoff":          { src: "logoff.ogg" },
+            "system:login":           { src: "login.ogg" },
+            "system:lock":            { src: "lock.ogg" },
+            "system:unlock":          { src: "unlock.ogg" },
+        }
+    }),
+
     GITHUB_REPO: "https://github.com/the-lstv/videoeditor",
     VERSION: new Version("2.3.0-alpha"),
 
@@ -312,7 +332,7 @@ const app = globalThis.app = {
      */
     newWindow() {
         if(isNode) {
-            app.ipc.send("new-window");
+            app.ipcSend("new-window");
         } else {
             window.open(window.location.href, "_blank");
         }
@@ -320,24 +340,30 @@ const app = globalThis.app = {
 
     openExternal(url) {
         if(isNode) {
-            app.ipc.send("open-external", url);
+            app.ipcSend("open-external", url);
         } else {
             window.open(url, "_blank");
         }
     },
     
-    fileSystem: new RootFs(true)
+    fileSystem: new RootFs(true),
+
+    ipcSend() {
+        return app.ipc? app.ipc.send(...arguments): /* todo (via lstv.space desktop API) */0;
+    },
+
+    ipcInvoke() {
+        return app.ipc? app.ipc.invoke(...arguments): /* todo (via lstv.space desktop API) */0;
+    }
 }
 
-app.fileSystem.mount(RootFs.PATH_SEPARATOR, (new TmpFs()).setData(DEFAULT_FS_DATA));
-app.fileSystem.mount("/tmp",  new TmpFs());
-app.fileSystem.mount("/dev",  new TmpFs());
-app.fileSystem.mount("/run",  (new TmpFs()).setData([["/lock", {}]]));
-app.fileSystem.mount("/proc", new ProcFs());
-app.fileSystem.mount("/sys",  new SysFs());
+LS.on("toast", () => {
+    app.soundBox.play("system:notification");
+});
 
 window.globalConfig = {};
 
+// --- Initialization for Node.js/Electron environment
 if(globalThis.isNode) {
     const fs = require("fs");
     const electron = require("electron");
@@ -358,11 +384,35 @@ if(globalThis.isNode) {
     electron.ipcRenderer.invoke('is-maximized').then(isMaximized => {
         document.documentElement.toggleAttribute('data-maximized', isMaximized);
     });
-} else {
-    // todo: use toolbarcomponents
-    const windowControls = document.querySelectorAll(".window-controls-wrapper, .window-controls");
-    windowControls.forEach(el => el.remove());
+
+    // Mount the host filesystem
+    const { NodeFs, RemoteFsServer } = await import("./core/kernel/nodefs.mjs");
+    app.fileSystem.mount(RootFs.PATH_SEPARATOR, new NodeFs());
 }
+
+// --- Initialization for web environment
+else {
+    // todo: hook to lstv.space desktop APIs to enable window controls on the web as well
+    if(globalThis.context) {
+        context.window.on("layout-adjusted", () => {
+            document.documentElement.toggleAttribute('data-maximized', context.window.isMaximized);
+        });
+    } else {
+        // Window controls are not supported here
+        // todo: use toolbarcomponents
+        const windowControls = document.querySelectorAll(".window-controls-wrapper, .window-controls");
+        windowControls.forEach(el => el.remove());
+    }
+
+    // Mount an in-memory filesystem
+    app.fileSystem.mount(RootFs.PATH_SEPARATOR, (new TmpFs()).setData(DEFAULT_FS_DATA));
+}
+
+app.fileSystem.mount("/tmp",  new TmpFs());
+app.fileSystem.mount("/dev",  new TmpFs());
+app.fileSystem.mount("/run",  (new TmpFs()).setData([["/lock", {}]]));
+app.fileSystem.mount("/proc", new ProcFs());
+app.fileSystem.mount("/sys",  new SysFs());
 
 Object.assign(window.globalConfig, LS.Util.parseURLParams());
 
@@ -391,7 +441,8 @@ LS.i18n.loadLocale({ code: "en", translations: {} });
 LS.i18n.changeLocale(app.config.get("language") || "en");
 
 // --- Workspace initialization
-window.addEventListener('DOMContentLoaded', async () => {
+// LS ready event is guaranted to be called even in the occurence of a delay
+LS.once("ready", async () => {
     if(window.globalConfig && window.globalConfig.flavor) {
         // TODO: Don't guess
         const icon = document.querySelector("#logo");
@@ -626,15 +677,11 @@ window.addEventListener('DOMContentLoaded', async () => {
         app.shortcutManager.assign("TIMELINE_TOOL_RIPPLE",  () => { const timeline = app.flavorInstance.timelineInstance; timeline && (timeline.tool = "ripple" ) });
 
         app.shortcutManager.assign("DEBUG_TOGGLE_DEVTOOLS", () => {
-            if(isNode) {
-                app.ipc.send("toggle-devtools");
-            }
+            app.ipcSend("toggle-devtools");
         });
 
         app.shortcutManager.assign("DEBUG_HARD_RELOAD", () => {
-            if(isNode) {
-                app.ipc.send("hard-reload");
-            }
+            app.ipcSend("hard-reload");
         });
 
         app.shortcutManager.assign("DEBUG_RELOAD", () => {
@@ -691,19 +738,15 @@ window.addEventListener('DOMContentLoaded', async () => {
 
         // --- Setup window control buttons
         minimizeButton.addEventListener('click', () => {
-            if(isNode) {
-                app.ipc.send("minimize-window");
-            }
+            app.ipcSend("minimize-window");
         });
 
         maximizeButton.addEventListener('click', () => {
-            if(isNode) {
-                app.ipc.send("maximize-window");
-            }
+            app.ipcSend("maximize-window");
         });
 
         closeButton.addEventListener('click', () => {
-            window.close();
+            app.ipcSend("close-window");
         });
 
         // --- Setup undo/redo buttons
@@ -741,7 +784,7 @@ window.addEventListener('DOMContentLoaded', async () => {
                 } },
 
                 ...isNode? [{ type: "separator" }, { text: "Exit", action() {
-                    window.close();
+                    app.ipcSend("close-window");
                 } }] : [],
             ],
 

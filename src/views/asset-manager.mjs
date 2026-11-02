@@ -14,6 +14,11 @@ class AssetManagerView extends LS.View {
             icon: "bi-box"
         },
 
+        scenes: {
+            name: "Scenes",
+            icon: "bi-layout-three-columns"
+        },
+
         folders: {
             name: "File browser",
             icon: "bi-folder",
@@ -68,7 +73,7 @@ class AssetManagerView extends LS.View {
         ]);
 
         const tree = this.tree = new LS.Tree({
-            rowHeight: 32, // Tempoarary
+            rowHeight: 28, // Tempoarary
 
             loadData: async (node) => {
                 console.log(node, this.parent);

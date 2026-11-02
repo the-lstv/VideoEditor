@@ -307,12 +307,12 @@ class Project extends LS.Context {
                     { inner: [locationElement, projectnameElement], style: "font-size: smaller; color: var(--surface-10); padding-top: 8px; white-space: pre-wrap; word-break: break-word" },
                     { tag: "br" },
                     { emmet: "button{Choose location}", onclick: async () => {
-                        const result = await require("electron").ipcRenderer.invoke('select-directory', 'export');
+                        const result = await app.ipcInvoke('select-directory', 'export');
                         if (result) {
                             this.location = result;
                             locationElement.textContent = this.location;
                         } else {
-                            console.error('No location selected for saving the project');
+                            LS.Toast.show('No location selected for saving the project');
                             return;
                         }
                     } }
@@ -502,20 +502,20 @@ class Project extends LS.Context {
     }
 
     static openFromFile(callback) {
-        app.ipc.invoke('select-file', {
+        app.ipcInvoke('select-file', {
             filters: [
                 { name: 'Project Files', extensions: ['json', 'zip'] },
             ],
 
             defaultPath: __dirname + "/user/projects"
-        }).then(filePath => {
+        }).then(async filePath => {
             if(!filePath) return callback(null);
 
             // ! tempoarary
             app.currentProject && app.currentProject.destroy(true);
 
             try {
-                const project = new Project(LS.Util.parseJSONC(require("fs").readFileSync(filePath, "utf-8")));
+                const project = new Project(LS.Util.parseJSONC(await app.fileSystem.readFile(filePath, "utf-8")));
                 project.location = RootFs.dirname(filePath);
                 if(callback) callback(project);
             } catch (error) {

@@ -2,10 +2,12 @@ import { Enums } from "./enums.mjs";
 
 /**
  * Performant & full-featured filesystem abstraction for Linux.JS 2.0/lstv.space kernel.
- * @copyright admin@lstv.space
  * 
- * This is a Linux-like filesystem abstraction that aims to replicate the behavior of a typical Linux filesystem.
- * It is a part of a larger project which aims to bring a lightweight Linux environment to the web, but can be used standalone to get a FS API.
+ * @copyright lstv.space
+ * All rights reserved.
+ * 
+ * This is a Linux/Unix-like filesystem abstraction that aims to replicate the behavior of a typical filesystem.
+ * It's a part of a larger project which aims to bring a lightweight Linux environment to the web.
  * It comes with it's own optimized filesystem and path utilities.
  * 
  * 
@@ -313,9 +315,22 @@ class RootFs {
     static ENCODING = {
         binary: 0,
         utf8: 1,
+        "utf-8": 1
     }
 
-    static PATH_SEPARATOR = "/";
+    static __pathSeparator = "/";
+    static get PATH_SEPARATOR() {
+        return this.__pathSeparator;
+    }
+
+    static set PATH_SEPARATOR(value) {
+        if (typeof value !== "string" || value.length !== 1) {
+            throw new TypeError("PATH_SEPARATOR must be a single character string.");
+        }
+        this.__pathSeparator = value;
+        this.PATH_SEPARATOR_CODE = value.charCodeAt(0);
+    }
+
     static PATH_SEPARATOR_CODE = 47;
 
     // --- Utility methods for path manipulation ---
@@ -334,19 +349,21 @@ class RootFs {
         const parts = [];
         const len = path.length;
 
+        const sep = this.PATH_SEPARATOR_CODE;
+
         const fc = path.charCodeAt(0);
-        if (isAbsolute === null) isAbsolute = fc === this.PATH_SEPARATOR_CODE || fc === 92;
-        
+        if (isAbsolute === null) isAbsolute = fc === sep || fc === 92;
+
         if(len === 0) {
             return returnParts? parts: (isAbsolute? this.PATH_SEPARATOR: ".");
         }
-        
+
         let cleanParts = 0;
         let sStart = 0, seqBroken = false;
         for (let i = 0; i < len; i++) {
             const char = path.charCodeAt(i);
 
-            const isSeparator = char === this.PATH_SEPARATOR_CODE || char === 92;
+            const isSeparator = char === sep || char === 92;
             const isEnd = !isSeparator && (i === len - 1);
 
             if (isSeparator || isEnd) {
@@ -360,7 +377,7 @@ class RootFs {
                     // Go up ("..")
                     if(dCount === 2) {
                         parts.pop();
-                        cleanParts--
+                        cleanParts--;
                     }
 
                     // Otherwise do nothing
@@ -445,6 +462,7 @@ class RootFs {
         return normalized.substring(0, lastSepIndex);
     }
 
+    // unoptimized
     static relative(from, to) {
         const fromParts = RootFs.normalize(from, true, true, true);
         const toParts = RootFs.normalize(to, true, true, true);
@@ -479,11 +497,11 @@ class RootFs {
      * Ensures that a path has a trailing path separator.
      * @param {string} npath The path to ensure has a trailing separator.
      * @param {boolean} isAbsolute Whether the path is absolute.
-     * @param {boolean} normalize Whether to normalize the path.
+     * @param {boolean} normalize Whether to normalize the path (true by default).
      * @returns {string} The path with a trailing separator.
      */
     static ensureTrailing(npath, isAbsolute = null, normalize = true) {
-        npath = RootFs.normalize(npath, isAbsolute);
+        npath = normalize? RootFs.normalize(npath, isAbsolute): npath;
         if (!npath.endsWith(RootFs.PATH_SEPARATOR)) {
             return npath + RootFs.PATH_SEPARATOR;
         }
@@ -708,6 +726,10 @@ class RootFs {
         }
     }
 
+    async readdir() {
+        return await this.readDir(...arguments);
+    }
+
     /**
      * Read from a file descriptor. If the file descriptor is invalid, an error will be thrown.
      * @param {*} fd File descriptor to read from
@@ -756,7 +778,7 @@ class RootFs {
      * @param {*} dir Path to the file to read
      * @param {*} encoding ENUM RootFs.ENCODING or binary/utf8
      * @param {*} options More read options
-     * @returns {string|Uint8Array|ArrayBuffer} File content
+     * @returns {Promise<string|Uint8Array|ArrayBuffer>} File content
      */
     async readFile(dir, encoding, options = {}) {
         const fd = await this.open(dir);
@@ -776,12 +798,12 @@ class RootFs {
      * @returns {*} Number of bytes written
      */
     async writeFile(dir, newData, options = {}) {
-        const fd = await this.open(dir, Enums.O_WRONLY | Enums.O_CREAT | Enums.O_TRUNC);
+        const fd = await this.open(dir, Enums.O_WRONLY | Enums.O_CREAT | Enums.O_TRUNC, options.mode ?? (Enums.S_IFREG | 0o644));
         return await this.write(fd, newData, options.start ?? 0, options.nbytes ?? -1, options.close ?? true);
     }
 
     async appendFile(dir, newData, options = {}) {
-        const fd = await this.open(dir, Enums.O_WRONLY | Enums.O_APPEND | Enums.O_CREAT);
+        const fd = await this.open(dir, Enums.O_WRONLY | Enums.O_APPEND | Enums.O_CREAT, options.mode ?? (Enums.S_IFREG | 0o644));
         return await this.write(fd, newData, options.start ?? 0, options.nbytes ?? -1, options.close ?? true);
     }
 
@@ -790,15 +812,34 @@ class RootFs {
         return await fd._fs.close(fd);
     }
 
-    async exists(dir) {
+    async exists(dir, mode = Enums.O_RDONLY) {
         try {
-            const fd = await this.open(dir, Enums.O_RDONLY);
+            const fd = await this.open(dir, mode);
             await this.close(fd);
             return true;
         } catch(e) {
             if(e.message.startsWith(Enums.errCode(Enums.errno.ENOENT))) {
                 return false;
             }
+            throw e;
+        }
+    }
+
+    /**
+     * !todo
+     * Node.js compatible access()
+     * 
+     * @param {string} dir Directory
+     * @param {number | undefined} mode Mode
+     * @param {function} callback Optional callback, otherwise use as a promise.
+     */
+    async access(dir, mode = undefined, callback = null) {
+        try {
+            const fd = await this.open(dir, mode ?? Enums.O_RDONLY);
+            await this.close(fd);
+            if(callback) callback();
+        } catch(e) {
+            if(callback) return callback(e);
             throw e;
         }
     }
@@ -831,12 +872,15 @@ class RootFs {
         return result;
     }
 
-    async mkdir(dir, mode = 0o777) {
-        const fd = await this.open(dir, Enums.O_WRONLY | Enums.O_CREAT);
+    async mkdir(dir, { mode = 0o777, recursive = false } = {}) {
+        const fd = await this.open(dir, Enums.O_WRONLY | Enums.O_CREAT, mode);
         const result = await fd._fs.mkdir(fd, mode);
         await this.close(fd);
         return result;
     }
+
+    // :shrug:
+    get promises() { return this; }
 
     // todo
     destroy() {
@@ -910,6 +954,8 @@ class TmpFs {
         const type = Stats.typeOf(data? data.mode: mode);
         const isFile = type !== Enums.S_IFDIR;
 
+        console.log(`opening ${ndir} type ${type}, can read: ${flags & Enums.O_RDONLY}, can write: ${flags & Enums.O_WRONLY}, can read/write: ${flags & Enums.O_RDWR}`);
+
         const accessMode = flags & Enums.O_ACCMODE;
         const canRead =  accessMode === Enums.O_RDONLY ||
                          accessMode === Enums.O_RDWR;
@@ -923,7 +969,9 @@ class TmpFs {
                 return Enums.errno.ENOENT;
             }
 
-            this.create(ndir, mode);
+            data = this.create(ndir, mode);
+
+            console.log(`Created new file ${ndir} with mode ${mode.toString(8)}`);
         } else {
             /*
              * O_CREAT | O_EXCL must fail if the path already exists.
@@ -957,6 +1005,7 @@ class TmpFs {
             data,
             flags,
             ndir,
+            mode,
             offset: (flags & Enums.O_APPEND) && isFile
                 ? data.contents.length
                 : 0,
@@ -1002,9 +1051,7 @@ class TmpFs {
         }
 
         if(!fd.data.mode) {
-            // throw new FsError(Enums.errno.EINVAL);
-            // todo: this should be normalized beforehand
-            fd.data.mode = Enums.S_IFDIR | 0o555;
+            throw new FsError(Enums.errno.EINVAL);
         }
 
         const type = Stats.typeOf(fd.data.mode);
@@ -1033,7 +1080,7 @@ class TmpFs {
         };
 
         this.fs.set(ndir, data);
-        return 0;
+        return data;
     }
 
     /**
@@ -1187,7 +1234,7 @@ class TmpFs {
         }
 
         const writeSize = Math.min(nbytes, newData.length);
-        const actualBytes = first; // todo
+        const actualBytes = writeSize; // todo
 
         /*
          * Normalize input according to the file's representation.
@@ -1201,7 +1248,10 @@ class TmpFs {
                 throw new FsError(Enums.errno.EINVAL);
             }
 
+            const sourceEnd = writeSize; // !            
             const requiredLength = first + actualBytes;
+
+            console.log(`first: ${first}, actualBytes: ${actualBytes}, writeSize: ${writeSize}, newData.length: ${newData.length}, sourceEnd: ${sourceEnd}, data.contents.length: ${data.contents.length}, requiredLength: ${requiredLength}`);
 
             if (requiredLength > data.contents.length) {
                 const newContents = new Uint8Array(requiredLength);
@@ -1534,3 +1584,61 @@ for(const fs of [TmpFs, MemFs, LocalStorageFs, RemoteFs, IndexedDbFs, WasmFs, Pr
 globalThis.RootFs = RootFs;
 
 export { Stats, Dirent, FsError, RootFs, DEFAULT_FS_DATA, TmpFs, MemFs, LocalStorageFs, RemoteFs, IndexedDbFs, WasmFs, ProcFs, SysFs, NullFs, HttpFs }
+
+
+
+// Benchmark Node.js path.normalize against our own implementation
+const path = require("path");
+const testPaths = [
+    "/foo/bar//baz/asdf/quux/..",
+    "C:\\temp\\\\foo\\bar\\..\\",
+    "./a/b/../../c/",
+    "/a/b/c/../../../",
+    "a/b/c/../../..",
+    "a/b/c/../../../d/e/f",
+    "/a/b/c/../../../../d/e/f",
+    "////a//b//c//..//..//d//e//f",
+    "C:/Users/../Windows/System32/drivers/etc/hosts",
+    "C:\\Users\\..\\Windows\\System32\\drivers\\etc\\hosts"
+];
+
+console.log("Benchmarking path.normalize vs RootFs.normalize...");
+
+const results = {};
+
+for(const testPath of testPaths) {
+    console.log(`\nTest path: ${testPath}`);
+    
+    // warm up
+    for(let i = 0; i < 10000; i++) {
+        path.normalize(testPath);
+        RootFs.normalize(testPath);
+    }
+
+    const startNode = performance.now();
+    for(let i = 0; i < 100000; i++) {
+        path.normalize(testPath);
+    }
+    const endNode = performance.now();
+
+    const startRootFs = performance.now();
+    for(let i = 0; i < 100000; i++) {
+        RootFs.normalize(testPath);
+    }
+    const endRootFs = performance.now();
+    
+    const nodeTime = endNode - startNode;
+    const rootFsTime = endRootFs - startRootFs;
+
+    console.log(`Node.js path.normalize time: ${nodeTime.toFixed(2)} ms`);
+    console.log(`RootFs.normalize time: ${rootFsTime.toFixed(2)} ms`);
+    console.log(`Speedup: ${(nodeTime / rootFsTime).toFixed(2)}x`);
+
+    results[testPath] = {
+        nodeTime,
+        rootFsTime,
+        speedup: nodeTime / rootFsTime
+    };
+}
+
+console.table(results);

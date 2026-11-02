@@ -240,6 +240,7 @@ class VideoDecoder {
     async generateProxy(options = {}) {
         if (!isNode) {
             throw new Error("VideoDecoder.generateProxy: Proxy generation is currently not supported in the browser.");
+            // Technically there is a WASM port
         }
 
         options.fps ??= 30;

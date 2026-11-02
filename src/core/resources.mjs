@@ -53,12 +53,6 @@ const RESOURCE_MIME_TYPES = {
 
 let textureLoader;
 
-let fs, electron;
-if(typeof require !== "undefined") {
-    fs = require("fs");
-    electron = require("electron");
-}
-
 class Resource {
     constructor(options, resourceManager) {
         if(!(resourceManager instanceof ResourceManager)) {
@@ -204,7 +198,7 @@ class Resource {
 
     async readAsArrayBuffer() {
         if(this.isExternal) {
-            return await fs.promises.readFile(this.fullPath);
+            return await app.fileSystem.readFile(this.fullPath);
         }
 
         // For embedded resources
@@ -213,7 +207,7 @@ class Resource {
 
     async readAsText() {
         if(this.isExternal) {
-            return await fs.promises.readFile(this.fullPath, "utf-8");
+            return await app.fileSystem.readFile(this.fullPath, "utf-8");
         }
 
         // For embedded resources
@@ -396,30 +390,24 @@ class ResourceManager extends LS.EventEmitter {
 
     async listDirectory(name, path) {
         console.log("ResourceManager.listDirectory: listing directory", name, path);
-        
-        if(isNode) {
-            const folder = this.projectFolders.get(name);
 
-            if(!folder) {
-                console.warn("ResourceManager.listDirectory: folder not found", name);
-                return [];
-            }
+        const folder = this.projectFolders.get(name);
 
-            const fullPath = path ? ResourceManager.normalizePath(folder.path + "/" + path, true) : folder.path;
-            const entries = await fs.promises.readdir(fullPath, { withFileTypes: true });
-
-            return entries.map(entry => ({
-                name: entry.name,
-                path: fullPath + "/" + entry.name,
-                relativePath: fullPath.replace(folder.path, "") + "/" + entry.name,
-                isDirectory: entry.isDirectory(),
-                mimeType: entry.isDirectory() ? null : RESOURCE_MIME_TYPES[entry.name.split(".").pop()] || RESOURCE_MIME_TYPES.default
-            }));
-        } else {
-            // Currently not implemented, later could use the some blah blah file api i really don't know
-            console.warn("ResourceManager.listDirectory: listing directories is not supported in this environment at this time.");
+        if(!folder) {
+            console.warn("ResourceManager.listDirectory: folder not found", name);
             return [];
         }
+
+        const fullPath = path ? ResourceManager.normalizePath(folder.path + "/" + path, true) : folder.path;
+        const entries = await app.fileSystem.readDir(fullPath, { withFileTypes: true });
+
+        return entries.map(entry => ({
+            name: entry.name,
+            path: fullPath + "/" + entry.name,
+            relativePath: fullPath.replace(folder.path, "") + "/" + entry.name,
+            isDirectory: entry.isDirectory(),
+            mimeType: entry.isDirectory() ? null : RESOURCE_MIME_TYPES[entry.name.split(".").pop()] || RESOURCE_MIME_TYPES.default
+        }));
     }
 
     removeResource(ref) {
@@ -564,40 +552,28 @@ class ResourceManager extends LS.EventEmitter {
      */
     async addFolder(folderPath) {
         // Show the proper folder picker
-        if(isNode) {
-            if(typeof folderPath !== "string") folderPath = await electron.ipcRenderer.invoke('select-directory', 'export');
+        if(typeof folderPath !== "string") folderPath = await app.ipcInvoke('select-directory', 'export');
 
-            if(!folderPath) {
-                console.warn("ResourceManager.addFolder: folder selection cancelled");
-                return;
-            }
-
-            let folderName = RootFs.basename(folderPath);
-
-            if(this.projectFolders.has(folderName)) {
-                // If a folder with the same name already exists, append a number to the name
-                let counter = 1;
-                while(this.projectFolders.has(folderName + " (" + counter + ")")) {
-                    counter++;
-                }
-
-                folderName = folderName + " (" + counter + ")";
-            }
-
-            const folderData = { path: folderPath, name: folderName };
-            this.projectFolders.set(folderName, folderData);
-            this.emit("folder-added", [folderData]);
+        if(!folderPath) {
+            LS.Toast.show("ResourceManager.addFolder: folder selection cancelled");
             return;
         }
-        
-        // Currently not implemented.
-        LS.Modal.buildEphemeral({
-            title: "Add Folder",
-            content: "Sorry, browsing folders is currently only supported in the desktop version.",
-            buttons: [
-                { label: "OK" }
-            ]
-        });
+
+        let folderName = RootFs.basename(folderPath);
+
+        if(this.projectFolders.has(folderName)) {
+            // If a folder with the same name already exists, append a number to the name
+            let counter = 1;
+            while(this.projectFolders.has(folderName + " (" + counter + ")")) {
+                counter++;
+            }
+
+            folderName = folderName + " (" + counter + ")";
+        }
+
+        const folderData = { path: folderPath, name: folderName };
+        this.projectFolders.set(folderName, folderData);
+        this.emit("folder-added", [folderData]);
     }
 
     /**
@@ -675,32 +651,17 @@ class ResourceManager extends LS.EventEmitter {
      * @param {string} path Path to normalize
      * @param {boolean|null} isAbsolute Whether path is absolute
      * @returns {string} Normalized path
-     * 
-     * I think this is from LinuxJS lmao
      */
     static normalizePath(path, isAbsolute = null) {
-        console.log("Normalizing path", path);
-        if(isAbsolute === null) isAbsolute = path.startsWith("/");
-        const isMicroslopShitdows = !!path.match(/^([a-zA-Z]:)(\/?)/);
+        const normalized = RootFs.normalize(path, isAbsolute);
 
-        path = String(path || "").replace(/\\/g, "/").trim();
+        console.log("Normalizing path", path, normalized);
 
-        const parts = path.split("/");
-        const normalizedParts = [];
-
-        for(const part of parts) {
-            if(part === "..") {
-                normalizedParts.pop();
-            } else if(part !== "." && part !== "") {
-                normalizedParts.push(part);
-            }
-        }
-
-        const normalizedPath = normalizedParts.join("/");
-
-        console.log("Normalized path:", (isAbsolute ? (isMicroslopShitdows? "": "/") : "") + normalizedPath, "isAbsolute:", isAbsolute, "isMicroslopShitdows:", isMicroslopShitdows);
-        return (isAbsolute ? (isMicroslopShitdows? "": "/") : "") + normalizedPath;
+        // On microslop's OS a path needs to begin with a drive letter rather than a slash
+        return !!path.match(/^([a-zA-Z]:)(\/?)/) && normalized[0] === "/"? normalized.slice(1): normalized;
     }
 }
+
+globalThis.ResourceManager = ResourceManager;
 
 export { Resource, ResourceManager, RESOURCE_MIME_TYPES, RESOURCE_DEFAULT_COLORS, MAX_EMBED_RESOURCE_SIZE };
