@@ -228,8 +228,8 @@ const nodeBank = [
 
     {
         kind: "MixerTrack",
-        label: "Mixer channel",
-        description: "Mixer channel, visible in the mixer. Allows routing audio signals.",
+        label: "Mixer track",
+        description: "Mixer track, visible in the mixer. Allows routing audio signals.",
         icon: "speaker-hifi",
         inputs: [{ id: "In", type: "audio" }],
         outputs: [{ id: "Out", type: "audio" }],
@@ -319,7 +319,7 @@ export default class PatcherView extends LS.View {
 
                 icon: "speaker-hifi",
                 id: `channel.${i + 1}`,
-                label: `Channel ${i + 1}`,
+                label: `Track ${i + 1}`,
                 kind: "MixerTrack"
             })),
 

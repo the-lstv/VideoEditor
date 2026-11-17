@@ -16,6 +16,42 @@ class MIDITrackProcessor extends AudioNode {}
 
 const module = {};
 
+/**
+ * Just a dummy engine wrapper intended for testing in case the native addon is not available.
+ * No audio processing is done here.
+ */
+class DummyEngine {
+    floatView = new Float32Array(512);
+
+    constructor() {
+        console.warn("AudioEngine: The native addon could not be loaded. Make sure you are running in a supported environment.");
+        // Generate some dummy data for testing
+        for(let i = 0; i < this.floatView.length; i++) {
+            this.floatView[i] = Math.sin(i / 10);
+        }
+    }
+
+    sampleRate = 44100;
+    currentSample = 0;
+
+    dummyTicker = new LS.Util.FrameScheduler(() => {
+        this.currentSample += this.sampleRate / 60;
+    });
+
+    uploadProgram() { console.warn("AudioEngine: DummyEngine does not support uploadProgram.", arguments); }
+
+    start()        { this.dummyTicker.start(); }
+    pause()        { this.dummyTicker.stop();  }
+    stop()         { this.dummyTicker.stop(); this.currentSample = 0 }
+    setTime (t)    { this.currentSample = t    }
+    currentTime () { return this.currentSample }
+
+    destroy() {
+        this.dummyTicker.destroy();
+        this.dummyTicker = null;
+    }
+};
+
 // There could later be a browser fallback
 function loadEngine() {
     if(module.Engine) return module.Engine;
@@ -65,9 +101,9 @@ function loadEngine() {
                 }
 
                 node.invert = invert ?? node.invert;
-                node.swap = swap ?? node.swap;
+                node.swap   = swap   ?? node.swap;
                 node.bypass = bypass ?? node.bypass;
-                node.mute = mute ?? node.mute;
+                node.mute   = mute   ?? node.mute;
 
                 const nodeId = node.__programOffset;
                 if(typeof nodeId === "number") {
@@ -105,16 +141,21 @@ function loadEngine() {
         module.Engine = Engine;
         return module;
     } catch (e) {
-        throw new Error('AudioEngine: The native addon could not be loaded. Make sure you are using a supported Node.js version.\n\n' + e.toString());
+        // throw new Error('AudioEngine: The native addon could not be loaded. Make sure you are using a supported Node.js version.\n\n' + e.toString());
+
+        //! Debug: dummy engine for browser fallback
+        module.Engine = DummyEngine;
+        return module;
     }
 }
 
+// For virtual keyboard
 const keyRows = [
     ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "MINUS", "EQUAL"],
     ["Q", "W", "E", "R", "T", "Y", "U", "I", "O", "P", "BRACKETLEFT", "BRACKETRIGHT"],
     ["A", "S", "D", "F", "G", "H", "J", "K", "L", "SEMICOLON", "QUOTE"],
     ["Z", "X", "C", "V", "B", "N", "M", "COMMA", "PERIOD", "SLASH"]
-]
+];
 
 function keyboardMidi(engine) {
     const pressed = new Set();
@@ -192,6 +233,11 @@ async function userInitializeEngine(skipConfirmation = false) {
     const SOURCE = "https://repo.lstv.space/";
 
     if(!module.Engine && !exists) {
+        if(name === null) {
+            LS.Modal.alert("AudioEngine is not currently supported on this platform. Officially supported platforms as of now are Node.js versions 20, 22, 24 and 26 or Electron 43.2.0 on (glibc) Linux, on x86_64. Experimental builds for Windows, MacOS, WASM or other platforms aren't actively maintained.<br>You can check the official source for more information: <a href='" + SOURCE + "' target='_blank'>" + SOURCE + "</a><br><br><b>Keep in mind:</b> The DAW currently does not work in the browser. Support may come in the future if there is any demand for it.");
+            return loadEngine();
+        }
+
         const downloadAllowed = skipConfirmation || await LS.Modal.confirm('The audio engine needed for this application is not present. Do you want to download it for your system now?<br><br>Debug info:<br><code>' + name + path + '</code>', {
             title: 'Download AudioEngine?'
         });
@@ -258,6 +304,7 @@ async function userInitializeEngine(skipConfirmation = false) {
 }
 
 // Order matters
+// These are "built in/stock plugins" that are able to work directly within the core DSP, meaning they take very little overhead and can process with little to no latency.
 const processors = [
     "MixerTrack",
     "Oscillator",
@@ -287,6 +334,8 @@ const processors = [
     "CLAPProcessor",
     "AAXProcessor",
     "CustomProcessor",
-]
+    "PixelBlaster",
+    "Saturator",
+];
 
 export { module, loadEngine, getEnginePath, userInitializeEngine, processors };

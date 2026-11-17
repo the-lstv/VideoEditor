@@ -48,7 +48,7 @@ export default class Flavor extends LS.Context {
 
     destroy() {
         if(this.destroyed) return;
-        app.flavorInstance = null;
+        app.project = null;
         super.destroy();
     }
 }

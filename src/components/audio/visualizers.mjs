@@ -1,4 +1,6 @@
 class Basic extends LS.GL.Renderable {
+    name = "BasicAudioVisualizer";
+
     constructor(options = {}) {
         super({
             fragment: LS.GL.shaders.basic_color_fragment,
@@ -20,17 +22,17 @@ void main() {
             ...options
         });
 
-        this.width = options.width || 100;
+        this.width  = options.width  || 100;
         this.height = options.height || 100;
 
         this.style = options.style || {};
 
         this.element = document.createElement("div");
-        this.element.style.width = this.width + "px";
+        this.element.style.width  = this.width  + "px";
         this.element.style.height = this.height + "px";
-        
+
         const gl = this.renderer.gl;
-        
+
         this.buffer = gl.createBuffer();
         LS.GL.WebGLBuffer.bindToAttribute(gl, this.buffer, false, this.attributes.y, 1, gl.FLOAT, false, 0, 0, 0);
         
@@ -39,7 +41,9 @@ void main() {
         this.rect = { x: 0, y: 0, width: 0, height: 0 };
     }
 
-    render(delta, now, gl, cw, ch, updatedDimensions, uniforms, attributes, projectionMatrix) {
+    renderCallback(delta, now, gl, cw, ch, updatedDimensions, uniforms, attributes, projectionMatrix) {
+        const sampleCount = Math.min(1024, this.width);
+
         const attachment = this.attachedTo || this.parent;
         if(!attachment || !attachment.engine) {
             console.warn("PlaybackPanel: cannot render visualizer without an attachment or parent project with an engine");

@@ -906,7 +906,7 @@ LS.once("ready", async () => {
                     group: "ls-editor-header-menu"
                 });
 
-                app.shortcutManager.assign("GLOBAL_HEADER_MENU_" + menuTitle.toUpperCase(), () => { console.log(menuTitle); menu.open() });
+                app.shortcutManager.assign("GLOBAL_HEADER_MENU_" + menuTitle.toUpperCase(), () => { menu.open() });
             }
         }
 

@@ -62,7 +62,7 @@ export default class PlaybackPanel extends LS.View {
             [
                 {
                     class: "playback-panel-header",
-                    inner: [this.masterGainKnob, this.tempoKnob, this.visualizer]
+                    inner: [ this.masterGainKnob, this.tempoKnob, this.visualizer ]
                 },
             ],
 
@@ -110,6 +110,8 @@ export default class PlaybackPanel extends LS.View {
             playing: false
         };
 
+        LS.GlobalWebGLRenderer.renderables.push(this.visualizer);
+
         this.frameScheduler = new LS.Util.FrameScheduler((delta) => {
             previewTimeCurrent.textContent = this.#formatTime(this.details.time, true);
             previewTimeTotal.textContent = this.#formatTime(this.details.totalTime);
@@ -151,6 +153,7 @@ export default class PlaybackPanel extends LS.View {
         this.addExternalEventListener(attachment, 'playing-changed', (playing) => this.#updatePlay(playing));
 
         this.tempoKnob.value = attachment.tempo || 140;
+        this.visualizer.attachedTo = attachment;
     }
 
     #formatTime(ms, decisecond = false) {
