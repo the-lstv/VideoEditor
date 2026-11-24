@@ -40,6 +40,18 @@ body {
     box-sizing: border-box;
 }
 
+body, .editor-background {
+    background-repeat: no-repeat;
+    background-position: center;
+    background-size: cover;
+}
+
+.editor-background {
+    position: absolute;
+    pointer-events: none;
+    inset: 0;
+}
+
 /**
  * On desktop, we have a custom frame. This should apply when the window is not maximized.
  */
@@ -590,7 +602,7 @@ ls-box ul li {
     padding-left: 4px !important;
 }
 
-[ls-theme="light"] .file-browser .ls-tree-node[ls-accent] {
+[data-ls-theme="light"] .file-browser .ls-tree-node[ls-accent] {
     color: var(--accent-30);
 }
 
@@ -852,7 +864,7 @@ pre.log-message {
     }
 }
 
-[ls-theme="light"] .editor-panel {
+[data-ls-theme="light"] .editor-panel {
 
     .ͼb {
         color: #c02bd5;
@@ -1132,11 +1144,72 @@ ls-knob[preset=numeric]:active {
     margin: 10px;
     background: var(--elevate-n1);
     border-radius: var(--border-radius-medium);
-    box-shadow: 0 4px 18px 0 #0006;
+    box-shadow: var(--ls-shadow);
     padding: 10px;
     outline: 1px solid var(--surface-1);
 }
 
 .slide-item.active {
     outline: 2px solid var(--accent);
+}
+
+/* Experimental (rounded list style) */
+.experiment-enable-rounded-list .ls-tree-styled {
+    padding-top: 4px;
+
+     .ls-tree-node:hover, .ls-tree-expanded, .ls-tree-node[aria-selected=true] {
+        background: none !important;
+        background-color: transparent !important;
+        
+        &::before {
+            content: "";
+            position: absolute;
+            inset: 2px 5px;
+            border-radius: var(--border-radius);
+            background-color: var(--elevate);
+            z-index: -1;
+        }
+    }
+    
+    .ls-tree-expanded {
+        &::before {
+            background-color: var(--elevate-1) !important;
+        }
+    }
+}
+
+/* Highly experimental, may not work well yet */
+.experiment-wallpaper {
+    main {
+        background: color-mix(var(--surface-0), transparent 50%) !important;
+        backdrop-filter: blur(8px);
+    }
+
+    .ls-patcher-container {
+        background: color-mix(var(--background), transparent 50%);
+    }
+
+    .file-browser-content, .editor-preview {
+        background: color-mix(var(--surface-n1), transparent 50%);
+    }
+
+    .playback-panel-header {
+        background: color-mix(var(--surface-n2), transparent 50%);
+    }
+}
+
+/* Experimental (frosted UI) */
+/* Warning: Can have some impact on performance. */
+.experiment-enable-frost {
+    .ls-menu-container {
+        background-color: color-mix(var(--elevate, var(--surface-1)), transparent 40%) !important;
+    }
+
+    .ls-modal-styled {
+        background-color: color-mix(var(--background), transparent 15%) !important;
+    }
+
+    .ls-menu-container, .ls-modal-styled {
+        backdrop-filter: blur(25px);
+    }
 }

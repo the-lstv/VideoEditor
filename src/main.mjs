@@ -46,6 +46,9 @@ if(!globalThis.LS) {
 function selectOrCreate(selector, parent = document.body) { return document.querySelector(selector) || LS.Create({ emmet: selector, parent }) }
 function invokeAndReturn(method) { method(); return method }
 
+// Todo: use environments
+const USER = "default";
+
 const config = new ConfigStore();
 await config.open();
 
@@ -75,6 +78,8 @@ LS.GL.createGlobalWebGLRenderer({ compositeLayerParent: appContainer });
 const app = globalThis.app = {
     container: appContainer,
     config,
+
+    globalEvents: new LS.EventEmitter(),
 
     // Layout & shortcuts
     layoutManager:   new LS.Multipane(layoutContainer),
@@ -139,15 +144,17 @@ const app = globalThis.app = {
         { name: "Video Editor", value: "video-editor", icon: "bi-camera-reels-fill" },
         { name: "Digital Audio Workstation", value: "merge", icon: "bi-music-note-beamed" },
         { name: "Game Engine", value: "quicksand", icon: "bi-dpad-fill" },
-
+        
         // To be added
         { name: "Slides", value: "slides", icon: "bi-easel2-fill" },
         
         // Planned
         { name: "Graphics editor", value: "light", icon: "bi-vector-pen" },
         { name: "Image editor", value: "image-editor", icon: "bi-image" },
-
+        
         { name: "Glitter Playground", value: "glitter-playground", icon: "bi-code-slash" },
+
+        { name: "Test", value: "test", icon: "bi-123" },
     ],
 
     /**
@@ -283,6 +290,76 @@ const app = globalThis.app = {
             await app.leaveShade();
         }
 
+    },
+
+    async setTheme(theme, options) {
+        const colors      = theme.colors      || {};
+        const ui          = theme.ui          || {};
+        const backgrounds = theme.backgrounds || {};
+
+        LS.Color.update("custom", LS.Color.fromHSL(colors?.hue ?? 0, colors?.sat ?? 0, colors?.lightness ?? 50), null, null, { hueShift: colors?.step ?? 0, saturationBoost: colors?.blend ?? 1 }); // increaseContrast: colors.increaseContrast ?? false
+        LS.Color.setAccent("custom");
+
+        LS.Animation.DEFAULT_DURATION = theme?.animationDuration ?? 450;
+        LS.Tooltips.animationEnabled = !!theme.animatedTooltips;
+
+        document.body.style.setProperty('--border-radius-multiplier', theme?.corners ?? 1);
+        document.body.setAttribute('data-ls-style', ui?.style || "flat");
+
+        document.body.classList.toggle("experiment-enable-frost", ui.frost ?? false);
+        document.body.classList.toggle("experiment-enable-rounded-list", ui.roundedList ?? true);
+        document.body.classList.toggle("ls-contrast", colors.increaseContrast ?? false);
+
+        // Temporary
+        if(colors.increaseContrast) {
+            LS.Color.contrast = 1;
+            for(const v of [-3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]) {
+                document.body.style.removeProperty(`--surface-${String(v).replace("-", "n")}`)
+            }
+        } else {
+            LS.Color.contrast = colors?.contrast ?? 1;
+        }
+
+        LS.Color.setTheme(colors?.scheme || "dark");
+
+        // Todo: could inherit from user
+        const globalWallpaper = backgrounds?.wallpaper || {};
+        document.body.classList.toggle("experiment-wallpaper", !!globalWallpaper.src);
+
+        if(globalWallpaper.src) {
+            document.body.style.backgroundImage = `url("${globalWallpaper.src}")`;
+        }
+
+        app.theme = theme;
+        app.globalEvents.emit("theme-updated", theme);
+    },
+
+    /**
+     * Gets whatever is the default theme for the app is.
+     * @returns 
+     */
+    getDefaultTheme() {
+        return LS.Util.clone(window.globalConfig?.defaultTheme || {
+            version: 1,
+
+            colors: {
+                scheme: "dark",
+                hue: 208,
+                sat: 80,
+                blend: 1,
+                step: 0
+            },
+
+            corners: 1,
+            animationDuration: 450,
+            roundedList: true,
+
+            ui: {
+                style: "flat",
+                frost: false,
+                compact: true
+            }
+        });
     },
 
     /**
@@ -443,6 +520,8 @@ LS.i18n.changeLocale(app.config.get("language") || "en");
 // --- Workspace initialization
 // LS ready event is guaranted to be called even in the occurence of a delay
 LS.once("ready", async () => {
+    app.setTheme(app.getDefaultTheme());
+
     if(window.globalConfig && window.globalConfig.flavor) {
         // TODO: Don't guess
         const icon = document.querySelector("#logo");
@@ -802,9 +881,9 @@ LS.once("ready", async () => {
                 { type: "separator" },
 
                 { text: "Set editor &theme", items: [
-                    { icon: "bi-sun", text: "Light",   action() { LS.Color.setTheme('light'); localStorage.setItem("ls-theme", "light"); } },
-                    { icon: "bi-moon", text: "Dark",   action() { LS.Color.setTheme('dark'); localStorage.setItem("ls-theme", "dark"); } },
-                    { icon: "bi-laptop", text: "Auto", action() { localStorage.removeItem("ls-theme"); LS.Color.setAdaptiveTheme(); } },
+                    { icon: "bi-sun", text: "Light",   action() { LS.Color.setTheme('light'); localStorage.setItem("data-ls-theme", "light"); } },
+                    { icon: "bi-moon", text: "Dark",   action() { LS.Color.setTheme('dark');  localStorage.setItem("data-ls-theme", "dark"); } },
+                    { icon: "bi-laptop", text: "Auto", action() { localStorage.removeItem("data-ls-theme"); LS.Color.setAdaptiveTheme(); } },
                     { type: "separator" },
                     { text: "More...", action() {
                         settings.openPage("appearance");
@@ -889,7 +968,7 @@ LS.once("ready", async () => {
 
                 // { type: "separator" },
 
-                { text: "&About", icon: "bi-stars", action() {
+                { text: "&About", action() {
                     app.aboutDialog();
                 } }
             ]

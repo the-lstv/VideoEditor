@@ -78,13 +78,13 @@ export default function initCommandPalette(app, paletteOverlay) {
             description: "Set user theme",
             onCalled(theme) {
                 if (theme === "system") {
-                    localStorage.removeItem("ls-theme");
+                    localStorage.removeItem("data-ls-theme");
                     LS.Color.setAdaptiveTheme();
                     return;
                 }
 
                 LS.Color.setTheme(theme);
-                localStorage.setItem("ls-theme", theme);
+                localStorage.setItem("data-ls-theme", theme);
             },
             inputs: [
                 {

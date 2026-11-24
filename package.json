@@ -46,7 +46,7 @@
         "package": "electron-forge package",
         "make": "electron-forge make"
     },
-    "main": "electron/index.js",
+    "main": "index.js",
     "config": {
         "forge": {
             "packagerConfig": {},

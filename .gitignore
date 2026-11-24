@@ -37,6 +37,13 @@ build
 ___*
 
 user/video_proxies
+
 user/projects/*
 !user/projects/.gitkeep
+
+user/default/*
+user/default/themes/*
+!user/default/themes
+!user/default/themes/default.*
+
 src/flavors/quicksand/runtime/physics.matter.js

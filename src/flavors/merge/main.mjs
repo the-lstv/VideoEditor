@@ -408,8 +408,8 @@ class MergeDaw extends FlavorBase {
                 { tag: 'img', src: this.constructor.iconSet.icon, style: 'height: 5em; width: 100px; position: relative; left: 50%; translate: -50% 0; animation: yoyo3d 20s ease-in-out infinite alternate;--scale: 0.2', attributes: { draggable: "false" }, effects: "spring,push" },
                 { tag: 'p', html: `Version <code>${this.constructor.version}</code><br>Editor version <code>${app.VERSION}</code><br>LS version <code>${LS.version}</code>` },
                 { tag: 'p', inner: 'A work-in progress intuitive, open and hackable digital audio workstation.' },
-                { tag: 'p', html: `Created with love and a lot of hard work by Lukas (<a href='https://lstv.space' target='_blank'>https://lstv.space</a>)<br><br><strong>Credits:</strong><br>Lukas - <span style=color:var(--surface-10)>Programming, engine (platform, audio engine, UI framework), components, design, libraries, artwork</span><br><br>Chromium and Node.JS authors - <span style=color:var(--surface-10)>Browser APIs & runtime</span><br><br>No AI was used in the development of this software.` },
-                { tag: 'p', inner: ['Engine source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }] },
+                { tag: 'p', html: `Created with love and a lot of hard work by Lukas (<a href='https://lstv.space' target='_blank'>https://lstv.space</a>)<br><br><strong>Credits:</strong><br>Lukas - <span style=color:var(--surface-10)>Programming, engine (platform, audio engine, UI framework), components, design, libraries, artwork</span><br><br>Chromium and Node.JS authors - <span style=color:var(--surface-10)>Browser APIs & runtime</span><br><br><b>No AI was used in the development of this software or its components, both in code and design.</b>` },
+                // { tag: 'p', inner: ['Engine source code available on ', { tag: 'a', href: app.GITHUB_REPO, target: '_blank', inner: 'GitHub' }] },
             ],
             buttons: [ { label: "Close" } ]
         });

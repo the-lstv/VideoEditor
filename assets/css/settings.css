@@ -20,7 +20,6 @@
         background: var(--accent);
         border-radius: var(--border-radius-full);
         opacity: 0;
-        transition: opacity 0.2s ease-in-out;
     }
 
     [data-tab-id].active::before {
@@ -45,7 +44,7 @@
     position: relative;
 }
 
-[ls-theme=light] .menu .grouped-buttons> :is(button, .ls-button) {
+[data-ls-theme=light] .menu .grouped-buttons> :is(button, .ls-button) {
     background-color: var(--accent-mix-10);
     --accent-mix-40: var(--accent-mix-20);
 }
@@ -205,12 +204,27 @@
         width: 100%;
     }
 
+    .pallete-chip-container {
+        display: inline-flex;
+        margin-bottom: 0;
+        overflow: hidden;
+        border-radius: var(--border-radius);
+    }
+
     .pallete-chip {
-        display: inline-block;
+        /* display: inline-block;
         width: 15px;
         height: 15px;
         border-radius: var(--border-radius-small);
-        margin: 0 2px;
+        margin: 0 2px; */
+        display: inline-block;
+        width: 15px;
+        height: 10px;
+        margin: 0 0px;
+    }
+
+    .pallete-chip:not(:last-child) {
+        border-right: 1px solid var(--surface-2);
     }
 
     .ls-range {
@@ -261,3 +275,60 @@ hr.vertical {
 .ls-tab-content:not(.tab-active) {
   display: none !important;
 }
+
+
+.themePreview {
+    display: flex;
+    height: 90px;
+    width: 150px;
+    background-color: var(--background);
+    overflow: hidden;
+    border-radius: var(--border-radius);
+    flex-direction: column;
+    outline: 2px solid var(--surface-n2);
+
+    cursor: pointer;
+
+    position: relative;
+    overflow: visible;
+    margin-top: 1.8em;
+
+    button { margin-top: 4px; pointer-events: none; }
+
+    &::after {
+        content: attr(data-theme-label);
+        position: absolute;
+        top: -1.4em;
+    }
+}
+
+body[data-ls-theme="light"] .themePreview::after {
+    color: var(--accent-20);
+}
+
+body[data-ls-theme="dark"] .themePreview::after {
+    color: var(--accent-80);
+}
+
+.appearance-settings {
+    display: flex;
+    justify-content: space-between;
+
+    >div:last-child {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+    }
+}
+
+.p-header, .p-body, .p-footer {
+    width: 100%;
+}
+
+.p-header, .p-footer { height: 10px; }
+.p-header { background: var(--surface-2); }
+.p-footer { background: var(--surface-n1); }
+.p-body   { flex: 1; display: flex; background: var(--surface-1); background-position: center; background-size: cover; }
+.p-l, .p-c, .p-r { height: 100%; }
+.p-l, .p-r       { width: 50px; padding: 4px; background: var(--surface-0); }
+.p-c             { flex: 1 }
